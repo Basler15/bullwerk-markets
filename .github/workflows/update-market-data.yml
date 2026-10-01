@@ -1,0 +1,102 @@
+name: Update Bullwerk Market Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 5 * * 1-5"
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: FMP Daten abrufen
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.request
+          from datetime import datetime, timezone
+
+          api_key = os.environ["FMP_API_KEY"]
+
+          symbols = [
+              "AAPL",
+              "MSFT",
+              "NVDA",
+              "AMD",
+              "AMZN",
+              "META",
+              "GOOGL",
+              "PLTR"
+          ]
+
+          stocks = []
+
+          for symbol in symbols:
+              url = (
+                  f"https://financialmodelingprep.com/stable/quote"
+                  f"?symbol={symbol}&apikey={api_key}"
+              )
+
+              try:
+                  with urllib.request.urlopen(url, timeout=20) as response:
+                      result = json.loads(response.read().decode("utf-8"))
+
+                  if isinstance(result, list) and result:
+                      quote = result[0]
+                  elif isinstance(result, dict):
+                      quote = result
+                  else:
+                      continue
+
+                  stocks.append({
+                      "symbol": symbol,
+                      "name": quote.get("name"),
+                      "price": quote.get("price"),
+                      "change": quote.get("change"),
+                      "changePercentage": quote.get("changePercentage"),
+                      "volume": quote.get("volume"),
+                      "dayHigh": quote.get("dayHigh"),
+                      "dayLow": quote.get("dayLow"),
+                      "yearHigh": quote.get("yearHigh"),
+                      "yearLow": quote.get("yearLow")
+                  })
+
+              except Exception as error:
+                  print(f"Fehler bei {symbol}: {error}")
+
+          output = {
+              "updated": datetime.now(timezone.utc).isoformat(),
+              "source": "Financial Modeling Prep",
+              "stocks": stocks
+          }
+
+          os.makedirs("data", exist_ok=True)
+
+          with open("data/market-data.json", "w", encoding="utf-8") as file:
+              json.dump(output, file, ensure_ascii=False, indent=2)
+
+          print(f"{len(stocks)} Aktien gespeichert.")
+          PY
+
+      - name: Neue Daten speichern
+        run: |
+          git config user.name "Bullwerk Data Bot"
+          git config user.email "actions@github.com"
+          git add data/market-data.json
+
+          if git diff --cached --quiet; then
+            echo "Keine neuen Daten."
+          else
+            git commit -m "Update Bullwerk market data"
+            git push
+          fi
