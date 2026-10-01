@@ -1,27 +1,321 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bullwerk Markets</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Bullwerk Markets</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #080808;
+    color: #f4f4f4;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+header {
+    border-bottom: 1px solid #292929;
+    padding: 22px 6%;
+}
+
+.nav {
+    max-width: 1250px;
+    margin: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 30px;
+}
+
+.logo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.logo .bull {
+    color: #d6a72d;
+}
+
+.logo .werk {
+    color: #f2f2f2;
+}
+
+nav {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+nav a {
+    color: #aaa;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+nav a:hover {
+    color: #d6a72d;
+}
+
+.hero {
+    max-width: 1250px;
+    margin: auto;
+    padding: 85px 6% 60px;
+}
+
+.kicker {
+    color: #d6a72d;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 18px;
+}
+
+h1 {
+    font-size: clamp(42px, 6vw, 78px);
+    line-height: 1;
+    max-width: 850px;
+}
+
+.hero p {
+    margin-top: 24px;
+    color: #999;
+    font-size: 18px;
+    max-width: 650px;
+    line-height: 1.6;
+}
+
+.market {
+    max-width: 1250px;
+    margin: auto;
+    padding: 20px 6% 80px;
+}
+
+.section-label {
+    color: #d6a72d;
+    font-size: 12px;
+    letter-spacing: 2px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.market h2 {
+    font-size: 32px;
+    margin-bottom: 25px;
+}
+
+.traffic-card {
+    background: #111;
+    border: 1px solid #262626;
+    border-radius: 18px;
+    padding: 30px;
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+.traffic-light {
+    background: #050505;
+    border: 1px solid #333;
+    border-radius: 30px;
+    padding: 14px;
+    display: flex;
+    gap: 10px;
+}
+
+.light {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    opacity: .18;
+}
+
+.red {
+    background: #e74c3c;
+}
+
+.yellow {
+    background: #f2c94c;
+    opacity: 1;
+    box-shadow: 0 0 22px rgba(242,201,76,.45);
+}
+
+.green {
+    background: #39c76f;
+}
+
+.market-status {
+    flex: 1;
+}
+
+.market-status strong {
+    color: #f2c94c;
+    font-size: 25px;
+}
+
+.market-status p {
+    color: #999;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+
+.cards {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.card {
+    background: #0e0e0e;
+    border: 1px solid #242424;
+    border-radius: 14px;
+    padding: 22px;
+}
+
+.card span {
+    color: #777;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card h3 {
+    margin-top: 10px;
+    font-size: 18px;
+}
+
+.gold {
+    color: #d6a72d;
+}
+
+footer {
+    border-top: 1px solid #222;
+    color: #666;
+    text-align: center;
+    padding: 28px;
+    font-size: 13px;
+}
+
+@media (max-width: 800px) {
+    .nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    nav {
+        gap: 14px;
+    }
+
+    .traffic-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .cards {
+        grid-template-columns: 1fr;
+    }
+
+    .hero {
+        padding-top: 55px;
+    }
+}
+</style>
 </head>
 
 <body>
-  <h1>🐂 BULLWERK MARKETS</h1>
 
-  <h2>Bullen finden, bevor sie ausbrechen.</h2>
+<header>
+    <div class="nav">
+        <div class="logo">
+            🐂 <span class="bull">BULL</span><span class="werk">WERK</span>
+            <span class="bull"> MARKETS</span>
+        </div>
 
-  <p>
-    Märkte verstehen. Veränderungen früh erkennen.
-  </p>
+        <nav>
+            <a href="#">Startseite</a>
+            <a href="#">Morgenroutine</a>
+            <a href="#">🐂 Bullen-ETF</a>
+            <a href="#">Scanner</a>
+            <a href="#">Trading-Ideen</a>
+            <a href="#">Performance</a>
+            <a href="#">Wissen</a>
+            <a href="#">Über uns</a>
+        </nav>
+    </div>
+</header>
 
-  <hr>
+<section class="hero">
 
-  <h2>🟡 Morgenroutine</h2>
-  <p>Die Bullwerk Marktampel wird vorbereitet.</p>
+    <div class="kicker">BULLWERK MARKETS</div>
 
-  <h2>📈 Scanner</h2>
-  <p>Der Bullwerk Scanner wird vorbereitet.</p>
+    <h1>
+        Bullen finden,<br>
+        bevor sie ausbrechen.
+    </h1>
+
+    <p>
+        Andere Screener zeigen dir, was stark ist.
+        Bullwerk versucht sichtbar zu machen, was gerade stärker wird –
+        und ob das Marktumfeld dazu passt.
+    </p>
+
+</section>
+
+<section class="market">
+
+    <div class="section-label">MORGENROUTINE</div>
+
+    <h2>Das Marktumfeld auf einen Blick.</h2>
+
+    <div class="traffic-card">
+
+        <div class="traffic-light">
+            <div class="light red"></div>
+            <div class="light yellow"></div>
+            <div class="light green"></div>
+        </div>
+
+        <div class="market-status">
+            <strong>🟡 Marktampel</strong>
+            <p>
+                Marktumfeld aktuell noch nicht mit Live-Daten verbunden.
+                Hier entsteht die tägliche Bullwerk-Morgenroutine.
+            </p>
+        </div>
+
+    </div>
+
+    <div class="cards">
+
+        <div class="card">
+            <span>Markttrend</span>
+            <h3>Wird vorbereitet</h3>
+        </div>
+
+        <div class="card">
+            <span>Money Flow</span>
+            <h3 class="gold">Wird vorbereitet</h3>
+        </div>
+
+        <div class="card">
+            <span>Risiko & Liquidität</span>
+            <h3>Wird vorbereitet</h3>
+        </div>
+
+    </div>
+
+</section>
+
+<footer>
+    BULLWERK MARKETS · Märkte verstehen. Veränderungen früh erkennen.
+</footer>
 
 </body>
 </html>
