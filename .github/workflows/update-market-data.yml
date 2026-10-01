@@ -16,18 +16,22 @@ jobs:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: FMP Daten abrufen und Kennzahlen berechnen
+      - name: FMP Daten abrufen und Bullwerk Technik berechnen
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
         run: |
           python3 <<'PY'
+
           import json
           import os
           import urllib.request
           import urllib.parse
+
           from datetime import datetime, timezone, timedelta
 
+
           api_key = os.environ["FMP_API_KEY"]
+
 
           symbols = [
               "AAPL",
@@ -40,226 +44,814 @@ jobs:
               "PLTR"
           ]
 
+
           stocks = []
 
+
+          # --------------------------------------------------
+          # Hilfsfunktionen
+          # --------------------------------------------------
+
           def get_json(url):
+
               request = urllib.request.Request(
                   url,
-                  headers={"User-Agent": "Bullwerk-Markets/1.0"}
+                  headers={
+                      "User-Agent": "Bullwerk-Markets/1.0"
+                  }
               )
 
-              with urllib.request.urlopen(request, timeout=30) as response:
-                  return json.loads(response.read().decode("utf-8"))
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+
+                  return json.loads(
+                      response.read().decode("utf-8")
+                  )
 
 
           def safe_number(value):
+
               try:
+
                   if value is None:
                       return None
+
                   return float(value)
+
               except (TypeError, ValueError):
+
                   return None
 
 
+          def average(values):
+
+              clean = [
+                  value
+                  for value in values
+                  if value is not None
+              ]
+
+              if not clean:
+                  return None
+
+              return sum(clean) / len(clean)
+
+
+          def percent_difference(value, reference):
+
+              if (
+                  value is None
+                  or reference is None
+                  or reference == 0
+              ):
+                  return None
+
+              return (
+                  (value / reference) - 1
+              ) * 100
+
+
+          # --------------------------------------------------
+          # Zeitraum
+          # --------------------------------------------------
+
           today = datetime.now(timezone.utc).date()
-          history_start = today - timedelta(days=400)
+
+          history_start = (
+              today - timedelta(days=400)
+          )
+
+
+          # --------------------------------------------------
+          # Aktien durchlaufen
+          # --------------------------------------------------
 
           for symbol in symbols:
 
-              print(f"Verarbeite {symbol} ...")
+              print("")
+              print("------------------------------")
+              print(f"Verarbeite {symbol}")
+              print("------------------------------")
+
 
               quote = {}
               historical = []
 
-              # ---------------------------------------
+
+              # --------------------------------------------------
               # 1. Aktuelle Kursdaten
-              # ---------------------------------------
+              # --------------------------------------------------
 
               try:
+
                   quote_url = (
                       "https://financialmodelingprep.com/stable/quote"
                       f"?symbol={urllib.parse.quote(symbol)}"
                       f"&apikey={urllib.parse.quote(api_key)}"
                   )
 
-                  quote_result = get_json(quote_url)
+                  quote_result = get_json(
+                      quote_url
+                  )
 
-                  if isinstance(quote_result, list) and quote_result:
+
+                  if (
+                      isinstance(quote_result, list)
+                      and quote_result
+                  ):
+
                       quote = quote_result[0]
 
-                  elif isinstance(quote_result, dict):
+
+                  elif isinstance(
+                      quote_result,
+                      dict
+                  ):
+
                       quote = quote_result
 
+
               except Exception as error:
-                  print(f"Quote-Fehler bei {symbol}: {error}")
+
+                  print(
+                      f"Quote-Fehler bei {symbol}: "
+                      f"{error}"
+                  )
 
 
-              # ---------------------------------------
+              # --------------------------------------------------
               # 2. Historische Tageskurse
-              # ---------------------------------------
+              # --------------------------------------------------
 
               try:
+
                   history_url = (
-                      "https://financialmodelingprep.com/stable/historical-price-eod/full"
+                      "https://financialmodelingprep.com/"
+                      "stable/historical-price-eod/full"
                       f"?symbol={urllib.parse.quote(symbol)}"
                       f"&from={history_start.isoformat()}"
                       f"&to={today.isoformat()}"
                       f"&apikey={urllib.parse.quote(api_key)}"
                   )
 
-                  history_result = get_json(history_url)
+                  history_result = get_json(
+                      history_url
+                  )
 
-                  if isinstance(history_result, list):
+
+                  if isinstance(
+                      history_result,
+                      list
+                  ):
+
                       historical = history_result
 
-                  elif isinstance(history_result, dict):
 
-                      if isinstance(history_result.get("historical"), list):
-                          historical = history_result["historical"]
+                  elif isinstance(
+                      history_result,
+                      dict
+                  ):
 
-                      elif isinstance(history_result.get("data"), list):
-                          historical = history_result["data"]
+                      if isinstance(
+                          history_result.get("historical"),
+                          list
+                      ):
+
+                          historical = (
+                              history_result["historical"]
+                          )
+
+
+                      elif isinstance(
+                          history_result.get("data"),
+                          list
+                      ):
+
+                          historical = (
+                              history_result["data"]
+                          )
+
 
               except Exception as error:
-                  print(f"History-Fehler bei {symbol}: {error}")
+
+                  print(
+                      f"History-Fehler bei {symbol}: "
+                      f"{error}"
+                  )
 
 
-              # ---------------------------------------
-              # 3. Historische Daten sortieren
-              # ---------------------------------------
+              # --------------------------------------------------
+              # 3. Historie bereinigen
+              # --------------------------------------------------
 
               historical = [
-                  row for row in historical
-                  if isinstance(row, dict) and row.get("date")
+
+                  row
+
+                  for row in historical
+
+                  if (
+                      isinstance(row, dict)
+                      and row.get("date")
+                  )
               ]
 
+
               historical.sort(
-                  key=lambda row: row.get("date", ""),
+                  key=lambda row: row.get(
+                      "date",
+                      ""
+                  ),
                   reverse=True
               )
 
 
-              # ---------------------------------------
-              # 4. Technische Kennzahlen
-              # ---------------------------------------
+              # --------------------------------------------------
+              # 4. Zeitfenster
+              # --------------------------------------------------
+
+              last_5 = historical[:5]
+
+              last_10 = historical[:10]
 
               last_20 = historical[:20]
+
+              last_50 = historical[:50]
+
               last_252 = historical[:252]
 
-              highs_20 = [
-                  safe_number(row.get("high"))
+
+              # --------------------------------------------------
+              # 5. Schlusskurse
+              # --------------------------------------------------
+
+              closes_20 = [
+
+                  safe_number(
+                      row.get("close")
+                  )
+
                   for row in last_20
               ]
 
+
+              closes_50 = [
+
+                  safe_number(
+                      row.get("close")
+                  )
+
+                  for row in last_50
+              ]
+
+
+              ma20 = average(
+                  closes_20
+              )
+
+              ma50 = average(
+                  closes_50
+              )
+
+
+              # --------------------------------------------------
+              # 6. Hochs
+              # --------------------------------------------------
+
               highs_20 = [
-                  value for value in highs_20
+
+                  safe_number(
+                      row.get("high")
+                  )
+
+                  for row in last_20
+              ]
+
+
+              highs_20 = [
+
+                  value
+
+                  for value in highs_20
+
                   if value is not None
               ]
 
+
               highs_252 = [
-                  safe_number(row.get("high"))
+
+                  safe_number(
+                      row.get("high")
+                  )
+
                   for row in last_252
               ]
 
+
               highs_252 = [
-                  value for value in highs_252
+
+                  value
+
+                  for value in highs_252
+
                   if value is not None
               ]
 
-              volumes_20 = [
-                  safe_number(row.get("volume"))
-                  for row in last_20
-              ]
 
-              volumes_20 = [
-                  value for value in volumes_20
-                  if value is not None
-              ]
-
-              high_20 = max(highs_20) if highs_20 else None
-              high_52w = max(highs_252) if highs_252 else None
-
-              avg_volume_20 = (
-                  sum(volumes_20) / len(volumes_20)
-                  if volumes_20
+              high_20 = (
+                  max(highs_20)
+                  if highs_20
                   else None
               )
 
-              current_price = safe_number(quote.get("price"))
 
-              distance_20_high_pct = None
+              high_52w = (
+                  max(highs_252)
+                  if highs_252
+                  else None
+              )
+
+
+              # --------------------------------------------------
+              # 7. Volumen
+              # --------------------------------------------------
+
+              volumes_20 = [
+
+                  safe_number(
+                      row.get("volume")
+                  )
+
+                  for row in last_20
+              ]
+
+
+              avg_volume_20 = average(
+                  volumes_20
+              )
+
+
+              current_volume = safe_number(
+                  quote.get("volume")
+              )
+
+
+              volume_ratio_20 = None
+
 
               if (
-                  current_price is not None
-                  and high_20 is not None
-                  and high_20 != 0
+                  current_volume is not None
+                  and avg_volume_20 is not None
+                  and avg_volume_20 != 0
               ):
-                  distance_20_high_pct = (
-                      (current_price / high_20) - 1
-                  ) * 100
+
+                  volume_ratio_20 = (
+                      current_volume
+                      / avg_volume_20
+                  )
 
 
-              # ---------------------------------------
-              # 5. Nur kompakte Historie speichern
-              # ---------------------------------------
+              # --------------------------------------------------
+              # 8. Aktueller Kurs
+              # --------------------------------------------------
+
+              current_price = safe_number(
+                  quote.get("price")
+              )
+
+
+              distance_20_high_pct = (
+                  percent_difference(
+                      current_price,
+                      high_20
+                  )
+              )
+
+
+              distance_52w_high_pct = (
+                  percent_difference(
+                      current_price,
+                      high_52w
+                  )
+              )
+
+
+              distance_ma20_pct = (
+                  percent_difference(
+                      current_price,
+                      ma20
+                  )
+              )
+
+
+              distance_ma50_pct = (
+                  percent_difference(
+                      current_price,
+                      ma50
+                  )
+              )
+
+
+              # --------------------------------------------------
+              # 9. Trend
+              # --------------------------------------------------
+
+              above_ma20 = (
+
+                  current_price is not None
+                  and ma20 is not None
+                  and current_price > ma20
+              )
+
+
+              above_ma50 = (
+
+                  current_price is not None
+                  and ma50 is not None
+                  and current_price > ma50
+              )
+
+
+              ma20_above_ma50 = (
+
+                  ma20 is not None
+                  and ma50 is not None
+                  and ma20 > ma50
+              )
+
+
+              trend_status = "NEUTRAL"
+
+
+              if (
+                  above_ma20
+                  and above_ma50
+                  and ma20_above_ma50
+              ):
+
+                  trend_status = "UPTREND"
+
+
+              elif (
+                  current_price is not None
+                  and ma20 is not None
+                  and ma50 is not None
+                  and current_price < ma20
+                  and current_price < ma50
+              ):
+
+                  trend_status = "WEAK"
+
+
+              # --------------------------------------------------
+              # 10. Higher-Low-Näherung
+              # --------------------------------------------------
+
+              lows_recent = [
+
+                  safe_number(
+                      row.get("low")
+                  )
+
+                  for row in last_5
+              ]
+
+
+              lows_previous = [
+
+                  safe_number(
+                      row.get("low")
+                  )
+
+                  for row in historical[5:10]
+              ]
+
+
+              lows_recent = [
+
+                  value
+
+                  for value in lows_recent
+
+                  if value is not None
+              ]
+
+
+              lows_previous = [
+
+                  value
+
+                  for value in lows_previous
+
+                  if value is not None
+              ]
+
+
+              higher_low = None
+
+
+              if (
+                  lows_recent
+                  and lows_previous
+              ):
+
+                  higher_low = (
+                      min(lows_recent)
+                      >
+                      min(lows_previous)
+                  )
+
+
+              # --------------------------------------------------
+              # 11. Breakout-Nähe
+              # --------------------------------------------------
+
+              breakout_status = "FAR"
+
+
+              if (
+                  distance_20_high_pct
+                  is not None
+              ):
+
+                  if current_price > high_20:
+
+                      breakout_status = "BREAKOUT"
+
+
+                  elif distance_20_high_pct >= -1:
+
+                      breakout_status = "AT_TRIGGER"
+
+
+                  elif distance_20_high_pct >= -3:
+
+                      breakout_status = "NEAR"
+
+
+                  elif distance_20_high_pct >= -7:
+
+                      breakout_status = "WATCH"
+
+
+              # --------------------------------------------------
+              # 12. Volumenstatus
+              # --------------------------------------------------
+
+              volume_status = "NORMAL"
+
+
+              if volume_ratio_20 is not None:
+
+                  if volume_ratio_20 >= 1.5:
+
+                      volume_status = "STRONG"
+
+
+                  elif volume_ratio_20 >= 1.2:
+
+                      volume_status = "ELEVATED"
+
+
+                  elif volume_ratio_20 < 0.7:
+
+                      volume_status = "LOW"
+
+
+              # --------------------------------------------------
+              # 13. Technischer Rohscore
+              # Nur interne Testkennzahl.
+              # Noch NICHT Bullwerk Score V2.
+              # --------------------------------------------------
+
+              technical_raw_score = 0
+
+
+              if trend_status == "UPTREND":
+
+                  technical_raw_score += 3
+
+
+              if breakout_status == "AT_TRIGGER":
+
+                  technical_raw_score += 3
+
+
+              elif breakout_status == "NEAR":
+
+                  technical_raw_score += 2
+
+
+              elif breakout_status == "WATCH":
+
+                  technical_raw_score += 1
+
+
+              if higher_low is True:
+
+                  technical_raw_score += 2
+
+
+              if volume_status == "STRONG":
+
+                  technical_raw_score += 2
+
+
+              elif volume_status == "ELEVATED":
+
+                  technical_raw_score += 1
+
+
+              # --------------------------------------------------
+              # 14. Historie kompakt speichern
+              # --------------------------------------------------
 
               compact_history = []
+
 
               for row in historical[:260]:
 
                   compact_history.append({
-                      "date": row.get("date"),
-                      "open": safe_number(row.get("open")),
-                      "high": safe_number(row.get("high")),
-                      "low": safe_number(row.get("low")),
-                      "close": safe_number(row.get("close")),
-                      "volume": safe_number(row.get("volume"))
+
+                      "date":
+                          row.get("date"),
+
+                      "open":
+                          safe_number(
+                              row.get("open")
+                          ),
+
+                      "high":
+                          safe_number(
+                              row.get("high")
+                          ),
+
+                      "low":
+                          safe_number(
+                              row.get("low")
+                          ),
+
+                      "close":
+                          safe_number(
+                              row.get("close")
+                          ),
+
+                      "volume":
+                          safe_number(
+                              row.get("volume")
+                          )
+
                   })
 
 
-              # ---------------------------------------
-              # 6. Aktie speichern
-              # ---------------------------------------
+              # --------------------------------------------------
+              # 15. Aktie speichern
+              # --------------------------------------------------
 
               stocks.append({
-                  "symbol": symbol,
-                  "name": quote.get("name"),
-                  "price": current_price,
-                  "change": safe_number(quote.get("change")),
-                  "changePercentage": safe_number(
-                      quote.get("changePercentage")
-                  ),
-                  "volume": safe_number(quote.get("volume")),
-                  "dayHigh": safe_number(quote.get("dayHigh")),
-                  "dayLow": safe_number(quote.get("dayLow")),
+
+                  "symbol":
+                      symbol,
+
+                  "name":
+                      quote.get("name"),
+
+                  "price":
+                      current_price,
+
+                  "change":
+                      safe_number(
+                          quote.get("change")
+                      ),
+
+                  "changePercentage":
+                      safe_number(
+                          quote.get(
+                              "changePercentage"
+                          )
+                      ),
+
+                  "volume":
+                      current_volume,
+
+                  "dayHigh":
+                      safe_number(
+                          quote.get("dayHigh")
+                      ),
+
+                  "dayLow":
+                      safe_number(
+                          quote.get("dayLow")
+                      ),
+
 
                   "technical": {
-                      "high20": high_20,
-                      "high52WeekCalculated": high_52w,
-                      "distanceTo20DayHighPct": distance_20_high_pct,
-                      "averageVolume20": avg_volume_20,
-                      "historyDays": len(historical)
+
+                      "high20":
+                          high_20,
+
+                      "high52WeekCalculated":
+                          high_52w,
+
+                      "distanceTo20DayHighPct":
+                          distance_20_high_pct,
+
+                      "distanceTo52WeekHighPct":
+                          distance_52w_high_pct,
+
+                      "ma20":
+                          ma20,
+
+                      "ma50":
+                          ma50,
+
+                      "distanceToMA20Pct":
+                          distance_ma20_pct,
+
+                      "distanceToMA50Pct":
+                          distance_ma50_pct,
+
+                      "aboveMA20":
+                          above_ma20,
+
+                      "aboveMA50":
+                          above_ma50,
+
+                      "ma20AboveMA50":
+                          ma20_above_ma50,
+
+                      "trendStatus":
+                          trend_status,
+
+                      "higherLow":
+                          higher_low,
+
+                      "averageVolume20":
+                          avg_volume_20,
+
+                      "volumeRatio20":
+                          volume_ratio_20,
+
+                      "volumeStatus":
+                          volume_status,
+
+                      "breakoutStatus":
+                          breakout_status,
+
+                      "technicalRawScore":
+                          technical_raw_score,
+
+                      "historyDays":
+                          len(historical)
+
                   },
 
-                  "history": compact_history
+
+                  "history":
+                      compact_history
+
               })
+
 
               print(
                   f"{symbol}: "
-                  f"{len(historical)} historische Tage | "
-                  f"20T-Hoch={high_20} | "
-                  f"52W-Hoch={high_52w}"
+                  f"Trend={trend_status} | "
+                  f"Breakout={breakout_status} | "
+                  f"Volumen={volume_status} | "
+                  f"RawScore={technical_raw_score}"
               )
 
 
+          # --------------------------------------------------
+          # 16. Ausgabe
+          # --------------------------------------------------
+
           output = {
-              "updated": datetime.now(timezone.utc).isoformat(),
-              "source": "Financial Modeling Prep",
-              "version": "bullwerk-market-data-v2",
-              "stocks": stocks
+
+              "updated":
+                  datetime.now(
+                      timezone.utc
+                  ).isoformat(),
+
+              "source":
+                  "Financial Modeling Prep",
+
+              "version":
+                  "bullwerk-market-data-v3",
+
+              "stocks":
+                  stocks
+
           }
 
-          os.makedirs("data", exist_ok=True)
+
+          os.makedirs(
+              "data",
+              exist_ok=True
+          )
+
 
           with open(
               "data/market-data.json",
@@ -274,23 +866,38 @@ jobs:
                   indent=2
               )
 
+
+          print("")
           print("----------------------------------")
           print(f"{len(stocks)} Aktien gespeichert.")
-          print("Bullwerk Market Data V2 erstellt.")
+          print("Bullwerk Market Data V3 erstellt.")
           print("----------------------------------")
 
           PY
 
+
       - name: Neue Daten speichern
         run: |
-          git config user.name "Bullwerk Data Bot"
-          git config user.email "actions@github.com"
 
-          git add data/market-data.json
+          git config user.name \
+            "Bullwerk Data Bot"
+
+          git config user.email \
+            "actions@github.com"
+
+          git add \
+            data/market-data.json
+
 
           if git diff --cached --quiet; then
+
             echo "Keine neuen Daten."
+
           else
-            git commit -m "Update Bullwerk market data v2"
+
+            git commit \
+              -m "Update Bullwerk market data v3"
+
             git push
+
           fi
