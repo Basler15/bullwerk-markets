@@ -48,9 +48,9 @@ jobs:
           stocks = []
 
 
-          # --------------------------------------------------
+          # ==================================================
           # Hilfsfunktionen
-          # --------------------------------------------------
+          # ==================================================
 
           def get_json(url):
 
@@ -99,7 +99,10 @@ jobs:
               return sum(clean) / len(clean)
 
 
-          def percent_difference(value, reference):
+          def percent_difference(
+              value,
+              reference
+          ):
 
               if (
                   value is None
@@ -113,20 +116,24 @@ jobs:
               ) * 100
 
 
-          # --------------------------------------------------
+          # ==================================================
           # Zeitraum
-          # --------------------------------------------------
+          # ==================================================
 
-          today = datetime.now(timezone.utc).date()
+          today = datetime.now(
+              timezone.utc
+          ).date()
+
 
           history_start = (
-              today - timedelta(days=400)
+              today
+              - timedelta(days=400)
           )
 
 
-          # --------------------------------------------------
-          # Aktien durchlaufen
-          # --------------------------------------------------
+          # ==================================================
+          # Aktien
+          # ==================================================
 
           for symbol in symbols:
 
@@ -140,17 +147,19 @@ jobs:
               historical = []
 
 
-              # --------------------------------------------------
-              # 1. Aktuelle Kursdaten
-              # --------------------------------------------------
+              # ==================================================
+              # 1. Aktueller Quote
+              # ==================================================
 
               try:
 
                   quote_url = (
-                      "https://financialmodelingprep.com/stable/quote"
+                      "https://financialmodelingprep.com/"
+                      "stable/quote"
                       f"?symbol={urllib.parse.quote(symbol)}"
                       f"&apikey={urllib.parse.quote(api_key)}"
                   )
+
 
                   quote_result = get_json(
                       quote_url
@@ -158,7 +167,10 @@ jobs:
 
 
                   if (
-                      isinstance(quote_result, list)
+                      isinstance(
+                          quote_result,
+                          list
+                      )
                       and quote_result
                   ):
 
@@ -181,9 +193,9 @@ jobs:
                   )
 
 
-              # --------------------------------------------------
-              # 2. Historische Tageskurse
-              # --------------------------------------------------
+              # ==================================================
+              # 2. Historische Kurse
+              # ==================================================
 
               try:
 
@@ -195,6 +207,7 @@ jobs:
                       f"&to={today.isoformat()}"
                       f"&apikey={urllib.parse.quote(api_key)}"
                   )
+
 
                   history_result = get_json(
                       history_url
@@ -215,22 +228,30 @@ jobs:
                   ):
 
                       if isinstance(
-                          history_result.get("historical"),
+                          history_result.get(
+                              "historical"
+                          ),
                           list
                       ):
 
                           historical = (
-                              history_result["historical"]
+                              history_result[
+                                  "historical"
+                              ]
                           )
 
 
                       elif isinstance(
-                          history_result.get("data"),
+                          history_result.get(
+                              "data"
+                          ),
                           list
                       ):
 
                           historical = (
-                              history_result["data"]
+                              history_result[
+                                  "data"
+                              ]
                           )
 
 
@@ -242,9 +263,10 @@ jobs:
                   )
 
 
-              # --------------------------------------------------
-              # 3. Historie bereinigen
-              # --------------------------------------------------
+              # ==================================================
+              # 3. Historie sortieren
+              # Neuester Tag zuerst
+              # ==================================================
 
               historical = [
 
@@ -260,32 +282,66 @@ jobs:
 
 
               historical.sort(
-                  key=lambda row: row.get(
-                      "date",
-                      ""
-                  ),
+                  key=lambda row:
+                      row.get("date", ""),
                   reverse=True
               )
 
 
-              # --------------------------------------------------
-              # 4. Zeitfenster
-              # --------------------------------------------------
+              # ==================================================
+              # 4. Aktuellen Handelstag erkennen
+              # ==================================================
 
-              last_5 = historical[:5]
-
-              last_10 = historical[:10]
-
-              last_20 = historical[:20]
-
-              last_50 = historical[:50]
-
-              last_252 = historical[:252]
+              today_string = (
+                  today.isoformat()
+              )
 
 
-              # --------------------------------------------------
-              # 5. Schlusskurse
-              # --------------------------------------------------
+              if (
+                  historical
+                  and historical[0].get("date")
+                  == today_string
+              ):
+
+                  previous_history = (
+                      historical[1:]
+                  )
+
+              else:
+
+                  previous_history = (
+                      historical
+                  )
+
+
+              # ==================================================
+              # 5. Zeitfenster
+              # ==================================================
+
+              last_5 = (
+                  previous_history[:5]
+              )
+
+              previous_5 = (
+                  previous_history[5:10]
+              )
+
+              previous_20 = (
+                  previous_history[:20]
+              )
+
+              previous_50 = (
+                  previous_history[:50]
+              )
+
+              previous_252 = (
+                  previous_history[:252]
+              )
+
+
+              # ==================================================
+              # 6. Moving Averages
+              # ==================================================
 
               closes_20 = [
 
@@ -293,7 +349,8 @@ jobs:
                       row.get("close")
                   )
 
-                  for row in last_20
+                  for row
+                  in previous_20
               ]
 
 
@@ -303,7 +360,8 @@ jobs:
                       row.get("close")
                   )
 
-                  for row in last_50
+                  for row
+                  in previous_50
               ]
 
 
@@ -311,90 +369,109 @@ jobs:
                   closes_20
               )
 
+
               ma50 = average(
                   closes_50
               )
 
 
-              # --------------------------------------------------
-              # 6. Hochs
-              # --------------------------------------------------
+              # ==================================================
+              # 7. Vorheriges 20-Tage-Hoch
+              # DAS IST UNSER BREAKOUT-TRIGGER
+              # ==================================================
 
-              highs_20 = [
-
-                  safe_number(
-                      row.get("high")
-                  )
-
-                  for row in last_20
-              ]
-
-
-              highs_20 = [
-
-                  value
-
-                  for value in highs_20
-
-                  if value is not None
-              ]
-
-
-              highs_252 = [
+              previous_highs_20 = [
 
                   safe_number(
                       row.get("high")
                   )
 
-                  for row in last_252
+                  for row
+                  in previous_20
               ]
 
 
-              highs_252 = [
+              previous_highs_20 = [
 
                   value
 
-                  for value in highs_252
+                  for value
+                  in previous_highs_20
 
                   if value is not None
               ]
 
 
-              high_20 = (
-                  max(highs_20)
-                  if highs_20
+              breakout_trigger = (
+
+                  max(previous_highs_20)
+
+                  if previous_highs_20
+
                   else None
               )
+
+
+              # ==================================================
+              # 8. 52-Wochen-Hoch
+              # ==================================================
+
+              highs_252 = [
+
+                  safe_number(
+                      row.get("high")
+                  )
+
+                  for row
+                  in previous_252
+              ]
+
+
+              highs_252 = [
+
+                  value
+
+                  for value
+                  in highs_252
+
+                  if value is not None
+              ]
 
 
               high_52w = (
+
                   max(highs_252)
+
                   if highs_252
+
                   else None
               )
 
 
-              # --------------------------------------------------
-              # 7. Volumen
-              # --------------------------------------------------
+              # ==================================================
+              # 9. Volumen
+              # ==================================================
 
-              volumes_20 = [
+              previous_volumes_20 = [
 
                   safe_number(
                       row.get("volume")
                   )
 
-                  for row in last_20
+                  for row
+                  in previous_20
               ]
 
 
               avg_volume_20 = average(
-                  volumes_20
+                  previous_volumes_20
               )
 
 
-              current_volume = safe_number(
-                  quote.get("volume")
+              current_volume = (
+                  safe_number(
+                      quote.get("volume")
+                  )
               )
 
 
@@ -413,19 +490,35 @@ jobs:
                   )
 
 
-              # --------------------------------------------------
-              # 8. Aktueller Kurs
-              # --------------------------------------------------
+              # ==================================================
+              # 10. Aktueller Kurs
+              # ==================================================
 
-              current_price = safe_number(
-                  quote.get("price")
+              current_price = (
+                  safe_number(
+                      quote.get("price")
+                  )
               )
 
 
-              distance_20_high_pct = (
+              current_day_high = (
+                  safe_number(
+                      quote.get("dayHigh")
+                  )
+              )
+
+
+              current_day_low = (
+                  safe_number(
+                      quote.get("dayLow")
+                  )
+              )
+
+
+              distance_trigger_pct = (
                   percent_difference(
                       current_price,
-                      high_20
+                      breakout_trigger
                   )
               )
 
@@ -454,9 +547,9 @@ jobs:
               )
 
 
-              # --------------------------------------------------
-              # 9. Trend
-              # --------------------------------------------------
+              # ==================================================
+              # 11. Trend
+              # ==================================================
 
               above_ma20 = (
 
@@ -482,7 +575,9 @@ jobs:
               )
 
 
-              trend_status = "NEUTRAL"
+              trend_status = (
+                  "NEUTRAL"
+              )
 
 
               if (
@@ -491,7 +586,9 @@ jobs:
                   and ma20_above_ma50
               ):
 
-                  trend_status = "UPTREND"
+                  trend_status = (
+                      "UPTREND"
+                  )
 
 
               elif (
@@ -502,12 +599,14 @@ jobs:
                   and current_price < ma50
               ):
 
-                  trend_status = "WEAK"
+                  trend_status = (
+                      "WEAK"
+                  )
 
 
-              # --------------------------------------------------
-              # 10. Higher-Low-Näherung
-              # --------------------------------------------------
+              # ==================================================
+              # 12. Higher Low
+              # ==================================================
 
               lows_recent = [
 
@@ -515,7 +614,8 @@ jobs:
                       row.get("low")
                   )
 
-                  for row in last_5
+                  for row
+                  in last_5
               ]
 
 
@@ -525,7 +625,8 @@ jobs:
                       row.get("low")
                   )
 
-                  for row in historical[5:10]
+                  for row
+                  in previous_5
               ]
 
 
@@ -533,7 +634,8 @@ jobs:
 
                   value
 
-                  for value in lows_recent
+                  for value
+                  in lows_recent
 
                   if value is not None
               ]
@@ -543,7 +645,8 @@ jobs:
 
                   value
 
-                  for value in lows_previous
+                  for value
+                  in lows_previous
 
                   if value is not None
               ]
@@ -564,109 +667,216 @@ jobs:
                   )
 
 
-              # --------------------------------------------------
-              # 11. Breakout-Nähe
-              # --------------------------------------------------
+              # ==================================================
+              # 13. Breakout-Logik V4
+              # ==================================================
 
-              breakout_status = "FAR"
+              breakout_status = (
+                  "UNKNOWN"
+              )
 
 
               if (
-                  distance_20_high_pct
+                  current_price is not None
+                  and breakout_trigger is not None
+              ):
+
+                  if (
+                      current_price
+                      >
+                      breakout_trigger
+                  ):
+
+                      breakout_status = (
+                          "BREAKOUT"
+                      )
+
+
+                  elif (
+                      distance_trigger_pct
+                      is not None
+                      and
+                      distance_trigger_pct
+                      >= -1
+                  ):
+
+                      breakout_status = (
+                          "AT_TRIGGER"
+                      )
+
+
+                  elif (
+                      distance_trigger_pct
+                      is not None
+                      and
+                      distance_trigger_pct
+                      >= -3
+                  ):
+
+                      breakout_status = (
+                          "NEAR"
+                      )
+
+
+                  elif (
+                      distance_trigger_pct
+                      is not None
+                      and
+                      distance_trigger_pct
+                      >= -7
+                  ):
+
+                      breakout_status = (
+                          "WATCH"
+                      )
+
+
+                  else:
+
+                      breakout_status = (
+                          "FAR"
+                      )
+
+
+              # ==================================================
+              # 14. Intraday Trigger Touch
+              # Kurs kann unter Trigger liegen,
+              # Tageshoch aber bereits darüber gewesen sein.
+              # ==================================================
+
+              trigger_touched_today = False
+
+
+              if (
+                  current_day_high is not None
+                  and breakout_trigger is not None
+              ):
+
+                  trigger_touched_today = (
+                      current_day_high
+                      >
+                      breakout_trigger
+                  )
+
+
+              # ==================================================
+              # 15. Volumenstatus
+              # ==================================================
+
+              volume_status = (
+                  "NORMAL"
+              )
+
+
+              if (
+                  volume_ratio_20
                   is not None
               ):
 
-                  if current_price > high_20:
+                  if (
+                      volume_ratio_20
+                      >= 1.5
+                  ):
 
-                      breakout_status = "BREAKOUT"
-
-
-                  elif distance_20_high_pct >= -1:
-
-                      breakout_status = "AT_TRIGGER"
-
-
-                  elif distance_20_high_pct >= -3:
-
-                      breakout_status = "NEAR"
+                      volume_status = (
+                          "STRONG"
+                      )
 
 
-                  elif distance_20_high_pct >= -7:
+                  elif (
+                      volume_ratio_20
+                      >= 1.2
+                  ):
 
-                      breakout_status = "WATCH"
-
-
-              # --------------------------------------------------
-              # 12. Volumenstatus
-              # --------------------------------------------------
-
-              volume_status = "NORMAL"
+                      volume_status = (
+                          "ELEVATED"
+                      )
 
 
-              if volume_ratio_20 is not None:
+                  elif (
+                      volume_ratio_20
+                      < 0.7
+                  ):
 
-                  if volume_ratio_20 >= 1.5:
-
-                      volume_status = "STRONG"
-
-
-                  elif volume_ratio_20 >= 1.2:
-
-                      volume_status = "ELEVATED"
+                      volume_status = (
+                          "LOW"
+                      )
 
 
-                  elif volume_ratio_20 < 0.7:
-
-                      volume_status = "LOW"
-
-
-              # --------------------------------------------------
-              # 13. Technischer Rohscore
-              # Nur interne Testkennzahl.
-              # Noch NICHT Bullwerk Score V2.
-              # --------------------------------------------------
+              # ==================================================
+              # 16. Technischer Testscore
+              # Noch NICHT Bullwerk Score V2
+              # ==================================================
 
               technical_raw_score = 0
 
 
-              if trend_status == "UPTREND":
+              if (
+                  trend_status
+                  == "UPTREND"
+              ):
 
                   technical_raw_score += 3
 
 
-              if breakout_status == "AT_TRIGGER":
+              if (
+                  breakout_status
+                  == "BREAKOUT"
+              ):
 
                   technical_raw_score += 3
 
 
-              elif breakout_status == "NEAR":
+              elif (
+                  breakout_status
+                  == "AT_TRIGGER"
+              ):
+
+                  technical_raw_score += 3
+
+
+              elif (
+                  breakout_status
+                  == "NEAR"
+              ):
 
                   technical_raw_score += 2
 
 
-              elif breakout_status == "WATCH":
+              elif (
+                  breakout_status
+                  == "WATCH"
+              ):
 
                   technical_raw_score += 1
 
 
-              if higher_low is True:
+              if (
+                  higher_low is True
+              ):
 
                   technical_raw_score += 2
 
 
-              if volume_status == "STRONG":
+              if (
+                  volume_status
+                  == "STRONG"
+              ):
 
                   technical_raw_score += 2
 
 
-              elif volume_status == "ELEVATED":
+              elif (
+                  volume_status
+                  == "ELEVATED"
+              ):
 
                   technical_raw_score += 1
 
 
-              # --------------------------------------------------
-              # 14. Historie kompakt speichern
-              # --------------------------------------------------
+              # ==================================================
+              # 17. Historie speichern
+              # ==================================================
 
               compact_history = []
 
@@ -706,9 +916,9 @@ jobs:
                   })
 
 
-              # --------------------------------------------------
-              # 15. Aktie speichern
-              # --------------------------------------------------
+              # ==================================================
+              # 18. Aktie speichern
+              # ==================================================
 
               stocks.append({
 
@@ -737,26 +947,28 @@ jobs:
                       current_volume,
 
                   "dayHigh":
-                      safe_number(
-                          quote.get("dayHigh")
-                      ),
+                      current_day_high,
 
                   "dayLow":
-                      safe_number(
-                          quote.get("dayLow")
-                      ),
+                      current_day_low,
 
 
                   "technical": {
 
-                      "high20":
-                          high_20,
+                      "breakoutTrigger20":
+                          breakout_trigger,
+
+                      "distanceToTriggerPct":
+                          distance_trigger_pct,
+
+                      "breakoutStatus":
+                          breakout_status,
+
+                      "triggerTouchedToday":
+                          trigger_touched_today,
 
                       "high52WeekCalculated":
                           high_52w,
-
-                      "distanceTo20DayHighPct":
-                          distance_20_high_pct,
 
                       "distanceTo52WeekHighPct":
                           distance_52w_high_pct,
@@ -797,9 +1009,6 @@ jobs:
                       "volumeStatus":
                           volume_status,
 
-                      "breakoutStatus":
-                          breakout_status,
-
                       "technicalRawScore":
                           technical_raw_score,
 
@@ -815,18 +1024,26 @@ jobs:
               })
 
 
+              # ==================================================
+              # 19. GitHub Log
+              # ==================================================
+
               print(
                   f"{symbol}: "
-                  f"Trend={trend_status} | "
+                  f"Preis={current_price} | "
+                  f"Trigger={breakout_trigger} | "
+                  f"Abstand={distance_trigger_pct} | "
                   f"Breakout={breakout_status} | "
+                  f"Touch={trigger_touched_today} | "
+                  f"Trend={trend_status} | "
                   f"Volumen={volume_status} | "
                   f"RawScore={technical_raw_score}"
               )
 
 
-          # --------------------------------------------------
-          # 16. Ausgabe
-          # --------------------------------------------------
+          # ==================================================
+          # 20. JSON erzeugen
+          # ==================================================
 
           output = {
 
@@ -839,7 +1056,7 @@ jobs:
                   "Financial Modeling Prep",
 
               "version":
-                  "bullwerk-market-data-v3",
+                  "bullwerk-market-data-v4",
 
               "stocks":
                   stocks
@@ -869,8 +1086,12 @@ jobs:
 
           print("")
           print("----------------------------------")
-          print(f"{len(stocks)} Aktien gespeichert.")
-          print("Bullwerk Market Data V3 erstellt.")
+          print(
+              f"{len(stocks)} Aktien gespeichert."
+          )
+          print(
+              "Bullwerk Market Data V4 erstellt."
+          )
           print("----------------------------------")
 
           PY
@@ -896,7 +1117,7 @@ jobs:
           else
 
             git commit \
-              -m "Update Bullwerk market data v3"
+              -m "Update Bullwerk market data v4"
 
             git push
 
