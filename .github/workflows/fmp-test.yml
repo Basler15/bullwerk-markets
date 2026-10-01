@@ -1,0 +1,29 @@
+name: FMP API Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-fmp:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test FMP connection
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          echo "Teste Verbindung zu FMP..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://financialmodelingprep.com/stable/profile?symbol=AAPL&apikey=${FMP_API_KEY}")
+          STATUS=$(echo "$RESPONSE" | tail -n 1 | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $STATUS"
+
+          if [ "$STATUS" = "200" ] && echo "$BODY" | grep -q '"symbol"'; then
+            echo "FMP Verbindung erfolgreich."
+            echo "AAPL Daten wurden empfangen."
+          else
+            echo "FMP Test fehlgeschlagen."
+            echo "$BODY"
+            exit 1
+          fi
