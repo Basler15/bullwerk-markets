@@ -13,24 +13,19 @@ jobs:
           python3 <<'PY'
 
           import json
+          import time
           import urllib.request
-
-          # --------------------------------------------------
-          # Bullwerk SEC Test
-          # Erst einmal nur AAPL und MSFT
-          # --------------------------------------------------
+          import urllib.error
 
           companies = {
               "AAPL": "0000320193",
               "MSFT": "0000789019"
           }
 
-          # SEC verlangt einen identifizierbaren User-Agent.
-          # Für unseren technischen Test reicht zunächst
-          # eine eindeutige Bullwerk-Kennung.
+          # Identifizierbarer User-Agent für SEC-Zugriffe
           USER_AGENT = (
-              "BullwerkMarkets/1.0 "
-              "bullwerk-markets-github"
+              "Bullwerk Markets "
+              "contact: bullwerkmarkets@gmail.com"
           )
 
 
@@ -40,32 +35,57 @@ jobs:
                   url,
                   headers={
                       "User-Agent": USER_AGENT,
-                      "Accept-Encoding": "gzip, deflate",
-                      "Host": "data.sec.gov"
+                      "Accept": "application/json",
+                      "Accept-Encoding": "identity"
                   }
               )
 
-              with urllib.request.urlopen(
-                  request,
-                  timeout=30
-              ) as response:
+              try:
 
-                  return json.loads(
-                      response.read().decode("utf-8")
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=30
+                  ) as response:
+
+                      status = response.status
+
+                      print(
+                          f"HTTP Status: {status}"
+                      )
+
+                      raw = response.read()
+
+                      return json.loads(
+                          raw.decode("utf-8")
+                      )
+
+              except urllib.error.HTTPError as error:
+
+                  print(
+                      f"HTTP Fehler: {error.code}"
                   )
 
+                  print(
+                      f"URL: {url}"
+                  )
 
-          def get_units(facts, taxonomy, concept):
+                  raise
+
+
+          def get_units(
+              facts,
+              taxonomy,
+              concept
+          ):
 
               try:
-                  units = (
+
+                  return (
                       facts["facts"]
                       [taxonomy]
                       [concept]
                       ["units"]
                   )
-
-                  return units
 
               except (
                   KeyError,
@@ -77,14 +97,16 @@ jobs:
 
           def find_unit(units):
 
-              for preferred in [
+              preferred_units = [
                   "USD",
                   "USD/shares",
                   "shares"
-              ]:
+              ]
 
-                  if preferred in units:
-                      return units[preferred]
+              for unit in preferred_units:
+
+                  if unit in units:
+                      return units[unit]
 
               for values in units.values():
                   return values
@@ -92,28 +114,27 @@ jobs:
               return []
 
 
-          def recent_quarters(
+          def recent_facts(
               facts,
-              taxonomy,
               concept,
-              limit=8
+              limit=12
           ):
 
               units = get_units(
                   facts,
-                  taxonomy,
+                  "us-gaap",
                   concept
               )
 
-              values = find_unit(units)
+              values = find_unit(
+                  units
+              )
 
               rows = []
 
               for row in values:
 
-                  form = row.get("form")
-
-                  if form not in [
+                  if row.get("form") not in [
                       "10-Q",
                       "10-K"
                   ]:
@@ -123,18 +144,6 @@ jobs:
                       continue
 
                   rows.append({
-                      "fy":
-                          row.get("fy"),
-
-                      "fp":
-                          row.get("fp"),
-
-                      "form":
-                          form,
-
-                      "filed":
-                          row.get("filed"),
-
                       "start":
                           row.get("start"),
 
@@ -144,12 +153,23 @@ jobs:
                       "value":
                           row.get("val"),
 
+                      "form":
+                          row.get("form"),
+
+                      "fy":
+                          row.get("fy"),
+
+                      "fp":
+                          row.get("fp"),
+
+                      "filed":
+                          row.get("filed"),
+
                       "frame":
                           row.get("frame")
                   })
 
 
-              # Neueste Werte zuerst
               rows.sort(
                   key=lambda row: (
                       row.get("end") or "",
@@ -159,8 +179,6 @@ jobs:
               )
 
 
-              # Doppelte XBRL-Einträge reduzieren.
-              # Gleicher Zeitraum + gleicher Wert nur einmal.
               unique = []
               seen = set()
 
@@ -176,7 +194,10 @@ jobs:
                       continue
 
                   seen.add(key)
-                  unique.append(row)
+
+                  unique.append(
+                      row
+                  )
 
               return unique[:limit]
 
@@ -189,23 +210,23 @@ jobs:
                   "Revenues"
               ],
 
-              "NetIncome": [
+              "Net Income": [
                   "NetIncomeLoss"
               ],
 
-              "OperatingIncome": [
+              "Operating Income": [
                   "OperatingIncomeLoss"
               ],
 
-              "EPSDiluted": [
+              "Diluted EPS": [
                   "EarningsPerShareDiluted"
               ],
 
-              "OperatingCashFlow": [
+              "Operating Cash Flow": [
                   "NetCashProvidedByUsedInOperatingActivities"
               ],
 
-              "Capex": [
+              "Capital Expenditure": [
                   "PaymentsToAcquirePropertyPlantAndEquipment"
               ]
           }
@@ -221,13 +242,16 @@ jobs:
               print("=" * 70)
 
               url = (
-                  "https://data.sec.gov/api/xbrl/"
-                  f"companyfacts/CIK{cik}.json"
+                  "https://data.sec.gov/"
+                  "api/xbrl/companyfacts/"
+                  f"CIK{cik}.json"
               )
 
               try:
 
-                  facts = get_json(url)
+                  facts = get_json(
+                      url
+                  )
 
               except Exception as error:
 
@@ -244,6 +268,11 @@ jobs:
                   facts.get("entityName")
               )
 
+              print(
+                  "CIK:",
+                  facts.get("cik")
+              )
+
 
               for label, possible_concepts in concepts.items():
 
@@ -256,47 +285,53 @@ jobs:
 
                   for concept in possible_concepts:
 
-                      rows = recent_quarters(
+                      rows = recent_facts(
                           facts,
-                          "us-gaap",
-                          concept,
-                          limit=8
+                          concept
                       )
 
-                      if rows:
+                      if not rows:
+                          continue
+
+                      print(
+                          f"Concept: {concept}"
+                      )
+
+                      print(
+                          f"Gefundene Werte: {len(rows)}"
+                      )
+
+                      for row in rows[:8]:
 
                           print(
-                              "SEC Concept:",
-                              concept
+                              row
                           )
 
-                          for row in rows:
+                      found = True
 
-                              print(
-                                  row
-                              )
-
-                          found = True
-                          break
+                      break
 
 
                   if not found:
 
                       print(
-                          "Keine passenden Daten gefunden."
+                          "Keine passenden Werte gefunden."
                       )
 
 
               print("")
               print(
-                  f"{symbol} abgeschlossen."
+                  f"{symbol} erfolgreich verarbeitet."
               )
+
+              # SEC nicht unnötig schnell abfragen
+              time.sleep(1)
 
 
           print("")
           print("=" * 70)
           print(
-              "Bullwerk SEC Fundamental-Test abgeschlossen."
+              "Bullwerk SEC Test beendet."
           )
           print("=" * 70)
 
