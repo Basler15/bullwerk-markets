@@ -1,14 +1,14 @@
-name: Bullwerk SEC Fundamental Test
+name: Bullwerk SEC Quarterly Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  sec-fundamental-test:
+  sec-quarterly-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SEC Fundamentaldaten testen
+      - name: SEC Quartalsdaten aufbereiten
         run: |
           python3 <<'PY'
 
@@ -16,18 +16,30 @@ jobs:
           import time
           import urllib.request
           import urllib.error
+          from datetime import datetime
+
+          # ============================================================
+          # BULLWERK MARKETS
+          # SEC COMPANYFACTS -> ECHTE QUARTALE
+          #
+          # Testphase:
+          # Noch KEIN Bullwerk Fundamental Score.
+          # Erst prüfen wir, ob die Quartalsdaten sauber sind.
+          # ============================================================
 
           companies = {
               "AAPL": "0000320193",
               "MSFT": "0000789019"
           }
 
-          # Identifizierbarer User-Agent für SEC-Zugriffe
           USER_AGENT = (
               "Bullwerk Markets "
               "contact: bullwerkmarkets@gmail.com"
           )
 
+          # ------------------------------------------------------------
+          # SEC laden
+          # ------------------------------------------------------------
 
           def get_json(url):
 
@@ -40,212 +52,728 @@ jobs:
                   }
               )
 
-              try:
-
-                  with urllib.request.urlopen(
-                      request,
-                      timeout=30
-                  ) as response:
-
-                      status = response.status
-
-                      print(
-                          f"HTTP Status: {status}"
-                      )
-
-                      raw = response.read()
-
-                      return json.loads(
-                          raw.decode("utf-8")
-                      )
-
-              except urllib.error.HTTPError as error:
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
 
                   print(
-                      f"HTTP Fehler: {error.code}"
+                      f"HTTP Status: {response.status}"
                   )
 
-                  print(
-                      f"URL: {url}"
+                  raw = response.read()
+
+                  return json.loads(
+                      raw.decode("utf-8")
                   )
 
-                  raise
 
+          # ------------------------------------------------------------
+          # Hilfsfunktionen
+          # ------------------------------------------------------------
 
-          def get_units(
-              facts,
-              taxonomy,
-              concept
-          ):
+          def parse_date(value):
+
+              if not value:
+                  return None
 
               try:
+                  return datetime.strptime(
+                      value,
+                      "%Y-%m-%d"
+                  ).date()
 
-                  return (
-                      facts["facts"]
-                      [taxonomy]
-                      [concept]
-                      ["units"]
-                  )
-
-              except (
-                  KeyError,
-                  TypeError
-              ):
-
-                  return {}
+              except ValueError:
+                  return None
 
 
-          def find_unit(units):
+          def duration_days(row):
 
-              preferred_units = [
-                  "USD",
-                  "USD/shares",
-                  "shares"
-              ]
+              start = parse_date(
+                  row.get("start")
+              )
 
-              for unit in preferred_units:
+              end = parse_date(
+                  row.get("end")
+              )
 
-                  if unit in units:
-                      return units[unit]
+              if not start or not end:
+                  return None
 
-              for values in units.values():
-                  return values
+              return (
+                  end - start
+              ).days + 1
 
-              return []
 
-
-          def recent_facts(
+          def get_concept_rows(
               facts,
-              concept,
-              limit=12
+              concepts,
+              preferred_units
           ):
 
-              units = get_units(
-                  facts,
-                  "us-gaap",
-                  concept
-              )
+              for concept in concepts:
 
-              values = find_unit(
-                  units
-              )
+                  try:
 
-              rows = []
+                      units = (
+                          facts["facts"]
+                          ["us-gaap"]
+                          [concept]
+                          ["units"]
+                      )
 
-              for row in values:
-
-                  if row.get("form") not in [
-                      "10-Q",
-                      "10-K"
-                  ]:
+                  except KeyError:
                       continue
 
-                  if row.get("val") is None:
-                      continue
 
-                  rows.append({
-                      "start":
-                          row.get("start"),
+                  selected = None
 
-                      "end":
-                          row.get("end"),
+                  for unit in preferred_units:
 
-                      "value":
-                          row.get("val"),
+                      if unit in units:
 
-                      "form":
-                          row.get("form"),
-
-                      "fy":
-                          row.get("fy"),
-
-                      "fp":
-                          row.get("fp"),
-
-                      "filed":
-                          row.get("filed"),
-
-                      "frame":
-                          row.get("frame")
-                  })
+                          selected = units[unit]
+                          break
 
 
-              rows.sort(
-                  key=lambda row: (
-                      row.get("end") or "",
-                      row.get("filed") or ""
-                  ),
-                  reverse=True
+                  if selected is None:
+
+                      if units:
+                          selected = next(
+                              iter(
+                                  units.values()
+                              )
+                          )
+
+                      else:
+                          continue
+
+
+                  rows = []
+
+                  for row in selected:
+
+                      if row.get("form") not in (
+                          "10-Q",
+                          "10-K"
+                      ):
+                          continue
+
+                      if row.get("val") is None:
+                          continue
+
+                      if not row.get("start"):
+                          continue
+
+                      if not row.get("end"):
+                          continue
+
+                      new_row = dict(row)
+
+                      new_row[
+                          "concept"
+                      ] = concept
+
+                      new_row[
+                          "duration_days"
+                      ] = duration_days(
+                          row
+                      )
+
+                      rows.append(
+                          new_row
+                      )
+
+
+                  if rows:
+
+                      return (
+                          concept,
+                          rows
+                      )
+
+
+              return (
+                  None,
+                  []
               )
 
 
-              unique = []
-              seen = set()
+          # ------------------------------------------------------------
+          # Doppelte SEC-Kontexte reduzieren
+          # ------------------------------------------------------------
+
+          def dedupe_rows(rows):
+
+              best = {}
 
               for row in rows:
 
                   key = (
                       row.get("start"),
                       row.get("end"),
-                      row.get("value")
+                      row.get("val"),
+                      row.get("fy"),
+                      row.get("fp")
                   )
 
-                  if key in seen:
+                  old = best.get(
+                      key
+                  )
+
+                  if old is None:
+
+                      best[key] = row
                       continue
 
-                  seen.add(key)
 
-                  unique.append(
+                  old_filed = (
+                      old.get("filed")
+                      or ""
+                  )
+
+                  new_filed = (
+                      row.get("filed")
+                      or ""
+                  )
+
+                  if new_filed > old_filed:
+
+                      best[key] = row
+
+
+              return list(
+                  best.values()
+              )
+
+
+          # ------------------------------------------------------------
+          # Direkte Quartalswerte finden
+          #
+          # Dauer ungefähr 70-110 Tage.
+          # Damit schließen wir YTD- und Jahreswerte weitgehend aus.
+          # ------------------------------------------------------------
+
+          def direct_quarters(rows):
+
+              result = []
+
+              for row in rows:
+
+                  days = row.get(
+                      "duration_days"
+                  )
+
+                  if days is None:
+                      continue
+
+                  if 70 <= days <= 110:
+
+                      result.append({
+                          "start":
+                              row.get("start"),
+
+                          "end":
+                              row.get("end"),
+
+                          "value":
+                              row.get("val"),
+
+                          "fy":
+                              row.get("fy"),
+
+                          "fp":
+                              row.get("fp"),
+
+                          "form":
+                              row.get("form"),
+
+                          "filed":
+                              row.get("filed"),
+
+                          "frame":
+                              row.get("frame"),
+
+                          "source":
+                              "DIRECT",
+
+                          "duration_days":
+                              days
+                      })
+
+
+              return result
+
+
+          # ------------------------------------------------------------
+          # Kumulierte YTD-Werte sammeln
+          #
+          # Typischerweise:
+          # Q1  ~ 3 Monate
+          # Q2  ~ 6 Monate
+          # Q3  ~ 9 Monate
+          # FY  ~ 12 Monate
+          # ------------------------------------------------------------
+
+          def cumulative_rows(rows):
+
+              result = []
+
+              for row in rows:
+
+                  days = row.get(
+                      "duration_days"
+                  )
+
+                  if days is None:
+                      continue
+
+                  if 150 <= days <= 380:
+
+                      result.append(
+                          row
+                      )
+
+
+              return result
+
+
+          # ------------------------------------------------------------
+          # Quartale aus kumulierten Werten ableiten
+          #
+          # Beispiel:
+          # H1 - Q1 = Q2
+          # 9M - H1 = Q3
+          #
+          # Q4 aus FY - 9M wird nur versucht, wenn passende Daten
+          # desselben Fiscal Year vorhanden sind.
+          # ------------------------------------------------------------
+
+          def derived_quarters(rows):
+
+              result = []
+
+              by_fy = {}
+
+              for row in rows:
+
+                  fy = row.get(
+                      "fy"
+                  )
+
+                  if fy is None:
+                      continue
+
+                  by_fy.setdefault(
+                      fy,
+                      []
+                  ).append(
                       row
                   )
 
-              return unique[:limit]
 
+              for fy, fy_rows in by_fy.items():
+
+                  candidates = []
+
+                  for row in fy_rows:
+
+                      days = row.get(
+                          "duration_days"
+                      )
+
+                      if days is None:
+                          continue
+
+                      candidates.append(
+                          row
+                      )
+
+
+                  # Kürzere Perioden zuerst
+                  candidates.sort(
+                      key=lambda r: (
+                          r.get(
+                              "duration_days"
+                          ) or 9999,
+                          r.get(
+                              "end"
+                          ) or ""
+                      )
+                  )
+
+
+                  q1 = None
+                  h1 = None
+                  nine_month = None
+                  full_year = None
+
+
+                  for row in candidates:
+
+                      days = row.get(
+                          "duration_days"
+                      )
+
+                      fp = row.get(
+                          "fp"
+                      )
+
+                      form = row.get(
+                          "form"
+                      )
+
+
+                      if (
+                          q1 is None
+                          and 70 <= days <= 110
+                          and fp == "Q1"
+                      ):
+
+                          q1 = row
+
+
+                      if (
+                          h1 is None
+                          and 150 <= days <= 220
+                      ):
+
+                          h1 = row
+
+
+                      if (
+                          nine_month is None
+                          and 230 <= days <= 310
+                      ):
+
+                          nine_month = row
+
+
+                      if (
+                          full_year is None
+                          and 330 <= days <= 380
+                          and form == "10-K"
+                      ):
+
+                          full_year = row
+
+
+                  # Q2 = H1 - Q1
+                  if (
+                      q1 is not None
+                      and h1 is not None
+                      and q1.get("start")
+                          == h1.get("start")
+                  ):
+
+                      result.append({
+                          "start":
+                              q1.get("end"),
+
+                          "end":
+                              h1.get("end"),
+
+                          "value":
+                              h1.get("val")
+                              - q1.get("val"),
+
+                          "fy":
+                              fy,
+
+                          "fp":
+                              "Q2",
+
+                          "form":
+                              h1.get("form"),
+
+                          "filed":
+                              h1.get("filed"),
+
+                          "frame":
+                              h1.get("frame"),
+
+                          "source":
+                              "DERIVED_H1_MINUS_Q1",
+
+                          "duration_days":
+                              None
+                      })
+
+
+                  # Q3 = 9M - H1
+                  if (
+                      h1 is not None
+                      and nine_month is not None
+                      and h1.get("start")
+                          == nine_month.get("start")
+                  ):
+
+                      result.append({
+                          "start":
+                              h1.get("end"),
+
+                          "end":
+                              nine_month.get("end"),
+
+                          "value":
+                              nine_month.get("val")
+                              - h1.get("val"),
+
+                          "fy":
+                              fy,
+
+                          "fp":
+                              "Q3",
+
+                          "form":
+                              nine_month.get("form"),
+
+                          "filed":
+                              nine_month.get("filed"),
+
+                          "frame":
+                              nine_month.get("frame"),
+
+                          "source":
+                              "DERIVED_9M_MINUS_H1",
+
+                          "duration_days":
+                              None
+                      })
+
+
+                  # Q4 = FY - 9M
+                  if (
+                      nine_month is not None
+                      and full_year is not None
+                      and nine_month.get("start")
+                          == full_year.get("start")
+                  ):
+
+                      result.append({
+                          "start":
+                              nine_month.get("end"),
+
+                          "end":
+                              full_year.get("end"),
+
+                          "value":
+                              full_year.get("val")
+                              - nine_month.get("val"),
+
+                          "fy":
+                              fy,
+
+                          "fp":
+                              "Q4",
+
+                          "form":
+                              full_year.get("form"),
+
+                          "filed":
+                              full_year.get("filed"),
+
+                          "frame":
+                              full_year.get("frame"),
+
+                          "source":
+                              "DERIVED_FY_MINUS_9M",
+
+                          "duration_days":
+                              None
+                      })
+
+
+              return result
+
+
+          # ------------------------------------------------------------
+          # Direkte + abgeleitete Quartale zusammenführen
+          # ------------------------------------------------------------
+
+          def build_quarters(rows):
+
+              rows = dedupe_rows(
+                  rows
+              )
+
+              direct = direct_quarters(
+                  rows
+              )
+
+              derived = derived_quarters(
+                  rows
+              )
+
+              all_rows = (
+                  direct
+                  + derived
+              )
+
+
+              # Pro Quartals-Enddatum nur einen Wert behalten.
+              # Direkte SEC-Quartalswerte werden bevorzugt.
+              best_by_end = {}
+
+
+              for row in all_rows:
+
+                  end = row.get(
+                      "end"
+                  )
+
+                  if not end:
+                      continue
+
+
+                  old = best_by_end.get(
+                      end
+                  )
+
+
+                  if old is None:
+
+                      best_by_end[
+                          end
+                      ] = row
+
+                      continue
+
+
+                  if (
+                      row.get("source")
+                      == "DIRECT"
+                      and old.get("source")
+                      != "DIRECT"
+                  ):
+
+                      best_by_end[
+                          end
+                      ] = row
+
+
+              quarters = list(
+                  best_by_end.values()
+              )
+
+              quarters.sort(
+                  key=lambda row:
+                      row.get("end") or "",
+                  reverse=True
+              )
+
+              return quarters
+
+
+          # ------------------------------------------------------------
+          # Ausgabe formatieren
+          # ------------------------------------------------------------
+
+          def pretty_value(
+              label,
+              value
+          ):
+
+              if value is None:
+                  return "n/a"
+
+
+              if label == "Diluted EPS":
+
+                  return (
+                      f"{value:.2f}"
+                  )
+
+
+              return (
+                  f"{value / 1_000_000_000:.3f} Mrd."
+              )
+
+
+          # ------------------------------------------------------------
+          # Konzepte
+          # ------------------------------------------------------------
 
           concepts = {
 
-              "Revenue": [
-                  "RevenueFromContractWithCustomerExcludingAssessedTax",
-                  "SalesRevenueNet",
-                  "Revenues"
-              ],
+              "Revenue": (
+                  [
+                      "RevenueFromContractWithCustomerExcludingAssessedTax",
+                      "SalesRevenueNet",
+                      "Revenues"
+                  ],
+                  [
+                      "USD"
+                  ]
+              ),
 
-              "Net Income": [
-                  "NetIncomeLoss"
-              ],
+              "Net Income": (
+                  [
+                      "NetIncomeLoss"
+                  ],
+                  [
+                      "USD"
+                  ]
+              ),
 
-              "Operating Income": [
-                  "OperatingIncomeLoss"
-              ],
+              "Operating Income": (
+                  [
+                      "OperatingIncomeLoss"
+                  ],
+                  [
+                      "USD"
+                  ]
+              ),
 
-              "Diluted EPS": [
-                  "EarningsPerShareDiluted"
-              ],
+              "Diluted EPS": (
+                  [
+                      "EarningsPerShareDiluted"
+                  ],
+                  [
+                      "USD/shares"
+                  ]
+              ),
 
-              "Operating Cash Flow": [
-                  "NetCashProvidedByUsedInOperatingActivities"
-              ],
+              "Operating Cash Flow": (
+                  [
+                      "NetCashProvidedByUsedInOperatingActivities"
+                  ],
+                  [
+                      "USD"
+                  ]
+              ),
 
-              "Capital Expenditure": [
-                  "PaymentsToAcquirePropertyPlantAndEquipment"
-              ]
+              "Capital Expenditure": (
+                  [
+                      "PaymentsToAcquirePropertyPlantAndEquipment"
+                  ],
+                  [
+                      "USD"
+                  ]
+              )
           }
 
+
+          # ------------------------------------------------------------
+          # Unternehmen testen
+          # ------------------------------------------------------------
 
           for symbol, cik in companies.items():
 
               print("")
-              print("=" * 70)
+              print("=" * 78)
               print(
-                  f"SEC FUNDAMENTAL TEST: {symbol}"
+                  f"BULLWERK QUARTERLY TEST: {symbol}"
               )
-              print("=" * 70)
+              print("=" * 78)
+
 
               url = (
                   "https://data.sec.gov/"
                   "api/xbrl/companyfacts/"
                   f"CIK{cik}.json"
               )
+
 
               try:
 
@@ -265,74 +793,178 @@ jobs:
 
               print(
                   "Unternehmen:",
-                  facts.get("entityName")
-              )
-
-              print(
-                  "CIK:",
-                  facts.get("cik")
+                  facts.get(
+                      "entityName"
+                  )
               )
 
 
-              for label, possible_concepts in concepts.items():
+              company_results = {}
+
+
+              for label, (
+                  possible_concepts,
+                  preferred_units
+              ) in concepts.items():
+
+                  concept, rows = get_concept_rows(
+                      facts,
+                      possible_concepts,
+                      preferred_units
+                  )
+
 
                   print("")
                   print(
                       f"--- {label} ---"
                   )
 
-                  found = False
 
-                  for concept in possible_concepts:
-
-                      rows = recent_facts(
-                          facts,
-                          concept
-                      )
-
-                      if not rows:
-                          continue
+                  if not rows:
 
                       print(
-                          f"Concept: {concept}"
+                          "Keine SEC-Daten gefunden."
                       )
+
+                      company_results[
+                          label
+                      ] = []
+
+                      continue
+
+
+                  quarters = build_quarters(
+                      rows
+                  )
+
+
+                  company_results[
+                      label
+                  ] = quarters
+
+
+                  print(
+                      f"Concept: {concept}"
+                  )
+
+                  print(
+                      f"Quartale gefunden: "
+                      f"{len(quarters)}"
+                  )
+
+
+                  for quarter in quarters[:8]:
 
                       print(
-                          f"Gefundene Werte: {len(rows)}"
-                      )
-
-                      for row in rows[:8]:
-
-                          print(
-                              row
+                          quarter.get("end"),
+                          "| FY",
+                          quarter.get("fy"),
+                          "|",
+                          quarter.get("fp"),
+                          "|",
+                          pretty_value(
+                              label,
+                              quarter.get(
+                                  "value"
+                              )
+                          ),
+                          "|",
+                          quarter.get(
+                              "source"
                           )
-
-                      found = True
-
-                      break
-
-
-                  if not found:
-
-                      print(
-                          "Keine passenden Werte gefunden."
                       )
+
+
+              # --------------------------------------------------------
+              # FCF aus OCF - CapEx
+              # --------------------------------------------------------
+
+              print("")
+              print(
+                  "--- FREE CASH FLOW ---"
+              )
+
+
+              ocf = {
+                  row.get("end"):
+                      row
+                  for row in company_results.get(
+                      "Operating Cash Flow",
+                      []
+                  )
+              }
+
+
+              capex = {
+                  row.get("end"):
+                      row
+                  for row in company_results.get(
+                      "Capital Expenditure",
+                      []
+                  )
+              }
+
+
+              common_dates = sorted(
+                  set(
+                      ocf.keys()
+                  )
+                  & set(
+                      capex.keys()
+                  ),
+                  reverse=True
+              )
+
+
+              if not common_dates:
+
+                  print(
+                      "Keine gemeinsamen Quartale "
+                      "für FCF gefunden."
+                  )
+
+
+              for end in common_dates[:8]:
+
+                  operating_cf = (
+                      ocf[end]["value"]
+                  )
+
+                  capital_expenditure = (
+                      capex[end]["value"]
+                  )
+
+                  free_cash_flow = (
+                      operating_cf
+                      - capital_expenditure
+                  )
+
+
+                  print(
+                      end,
+                      "| OCF:",
+                      f"{operating_cf / 1_000_000_000:.3f} Mrd.",
+                      "| CapEx:",
+                      f"{capital_expenditure / 1_000_000_000:.3f} Mrd.",
+                      "| FCF:",
+                      f"{free_cash_flow / 1_000_000_000:.3f} Mrd."
+                  )
 
 
               print("")
               print(
-                  f"{symbol} erfolgreich verarbeitet."
+                  f"{symbol} abgeschlossen."
               )
 
-              # SEC nicht unnötig schnell abfragen
+
               time.sleep(1)
 
 
           print("")
-          print("=" * 70)
+          print("=" * 78)
           print(
-              "Bullwerk SEC Test beendet."
+              "Bullwerk SEC Quarterly Test beendet."
           )
-          print("=" * 70)
+          print("=" * 78)
 
           PY
