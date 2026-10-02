@@ -1,7 +1,8 @@
 {
-  "updated": "2026-10-02T10:27:15.110156+00:00",
+  "updated": "2026-10-02T10:41:25.875434+00:00",
   "source": "Financial Modeling Prep",
-  "version": "bullwerk-market-data-v4",
+  "version": "bullwerk-market-data-v5",
+  "scoreVersion": "bullwerk-technical-v1",
   "stocks": [
     {
       "symbol": "AAPL",
@@ -17,6 +18,8 @@
         "distanceToTriggerPct": -4.349336885388311,
         "breakoutStatus": "WATCH",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 345.34,
+        "distanceTo4WeekHighPct": -4.349336885388311,
         "high52WeekCalculated": 345.34,
         "distanceTo52WeekHighPct": -4.349336885388311,
         "ma20": 331.621,
@@ -31,7 +34,20 @@
         "averageVolume20": 42433235.85,
         "volumeRatio20": 0.8252440403976403,
         "volumeStatus": "NORMAL",
-        "technicalRawScore": 1,
+        "boxRange10Pct": 5.994291151284482,
+        "recentRange5Pct": 5.273011878088458,
+        "previousRange5Pct": 3.8522840044507274,
+        "compressionRatio": 1.3688014362379035,
+        "technicalScore": 10,
+        "technicalGrade": "CONSTRUCTIVE",
+        "technicalBreakdown": {
+          "box": 4,
+          "proximity": 2,
+          "structure": 0,
+          "compression": 0,
+          "highProximity": 3,
+          "trigger": 1
+        },
         "historyDays": 275
       },
       "history": [
@@ -2131,6 +2147,8 @@
         "distanceToTriggerPct": -1.9221574065219627,
         "breakoutStatus": "NEAR",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 522.85,
+        "distanceTo4WeekHighPct": -1.9221574065219627,
         "high52WeekCalculated": 553.72,
         "distanceTo52WeekHighPct": -7.390016614895623,
         "ma20": 501.30150000000003,
@@ -2145,7 +2163,20 @@
         "averageVolume20": 21570536.0,
         "volumeRatio20": 0.8762566215322605,
         "volumeStatus": "NORMAL",
-        "technicalRawScore": 7,
+        "boxRange10Pct": 6.46507839543881,
+        "recentRange5Pct": 5.1483157365510355,
+        "previousRange5Pct": 3.7344736306251223,
+        "compressionRatio": 1.3785920710033899,
+        "technicalScore": 14,
+        "technicalGrade": "STRONG",
+        "technicalBreakdown": {
+          "box": 4,
+          "proximity": 3,
+          "structure": 3,
+          "compression": 0,
+          "highProximity": 2,
+          "trigger": 2
+        },
         "historyDays": 275
       },
       "history": [
@@ -4245,6 +4276,8 @@
         "distanceToTriggerPct": -1.661271085363769,
         "breakoutStatus": "NEAR",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 234.76,
+        "distanceTo4WeekHighPct": -1.661271085363769,
         "high52WeekCalculated": 236.54,
         "distanceTo52WeekHighPct": -2.4012851948930325,
         "ma20": 223.51100000000002,
@@ -4259,7 +4292,20 @@
         "averageVolume20": 109941658.35,
         "volumeRatio20": 0.8871809509138626,
         "volumeStatus": "NORMAL",
-        "technicalRawScore": 7,
+        "boxRange10Pct": 6.962344631472736,
+        "recentRange5Pct": 4.517545825303641,
+        "previousRange5Pct": 5.480897124248951,
+        "compressionRatio": 0.82423474166607,
+        "technicalScore": 16,
+        "technicalGrade": "STRONG",
+        "technicalBreakdown": {
+          "box": 4,
+          "proximity": 3,
+          "structure": 3,
+          "compression": 1,
+          "highProximity": 3,
+          "trigger": 2
+        },
         "historyDays": 275
       },
       "history": [
@@ -6359,6 +6405,8 @@
         "distanceToTriggerPct": -3.6416275430359857,
         "breakoutStatus": "WATCH",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 639.0,
+        "distanceTo4WeekHighPct": -3.6416275430359857,
         "high52WeekCalculated": 639.0,
         "distanceTo52WeekHighPct": -3.6416275430359857,
         "ma20": 557.6020000000001,
@@ -6373,7 +6421,20 @@
         "averageVolume20": 22453964.5,
         "volumeRatio20": 0.7407859311436963,
         "volumeStatus": "NORMAL",
-        "technicalRawScore": 6,
+        "boxRange10Pct": 17.99900282532824,
+        "recentRange5Pct": 7.202174241280377,
+        "previousRange5Pct": 16.484774620057983,
+        "compressionRatio": 0.43689855683662626,
+        "technicalScore": 12,
+        "technicalGrade": "CONSTRUCTIVE",
+        "technicalBreakdown": {
+          "box": 0,
+          "proximity": 2,
+          "structure": 3,
+          "compression": 3,
+          "highProximity": 3,
+          "trigger": 1
+        },
         "historyDays": 275
       },
       "history": [
@@ -8473,6 +8534,8 @@
         "distanceToTriggerPct": -4.936427696078438,
         "breakoutStatus": "WATCH",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 261.12,
+        "distanceTo4WeekHighPct": -4.936427696078438,
         "high52WeekCalculated": 287.2,
         "distanceTo52WeekHighPct": -13.568941504178278,
         "ma20": 252.01100000000002,
@@ -8487,7 +8550,20 @@
         "averageVolume20": 34854674.05,
         "volumeRatio20": 0.93662144001602,
         "volumeStatus": "NORMAL",
-        "technicalRawScore": 1,
+        "boxRange10Pct": 6.0311363543497,
+        "recentRange5Pct": 3.150410656642017,
+        "previousRange5Pct": 5.655537459283394,
+        "compressionRatio": 0.5570488533270543,
+        "technicalScore": 11,
+        "technicalGrade": "CONSTRUCTIVE",
+        "technicalBreakdown": {
+          "box": 4,
+          "proximity": 2,
+          "structure": 0,
+          "compression": 3,
+          "highProximity": 1,
+          "trigger": 1
+        },
         "historyDays": 275
       },
       "history": [
@@ -10587,6 +10663,8 @@
         "distanceToTriggerPct": -6.910569105691067,
         "breakoutStatus": "WATCH",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 779.82,
+        "distanceTo4WeekHighPct": -6.910569105691067,
         "high52WeekCalculated": 779.82,
         "distanceTo52WeekHighPct": -6.910569105691067,
         "ma20": 690.048,
@@ -10601,7 +10679,20 @@
         "averageVolume20": 24004545.55,
         "volumeRatio20": 0.5105746315618127,
         "volumeStatus": "LOW",
-        "technicalRawScore": 6,
+        "boxRange10Pct": 18.01150121065377,
+        "recentRange5Pct": 7.905326771267123,
+        "previousRange5Pct": 18.01150121065377,
+        "compressionRatio": 0.43890437997423204,
+        "technicalScore": 10,
+        "technicalGrade": "CONSTRUCTIVE",
+        "technicalBreakdown": {
+          "box": 0,
+          "proximity": 2,
+          "structure": 3,
+          "compression": 3,
+          "highProximity": 1,
+          "trigger": 1
+        },
         "historyDays": 275
       },
       "history": [
@@ -12701,6 +12792,8 @@
         "distanceToTriggerPct": -7.120300958343629,
         "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 364.17,
+        "distanceTo4WeekHighPct": -7.120300958343629,
         "high52WeekCalculated": 408.61,
         "distanceTo52WeekHighPct": -17.221800739091066,
         "ma20": 342.5695,
@@ -12715,7 +12808,20 @@
         "averageVolume20": 27219465.55,
         "volumeRatio20": 1.216443428662397,
         "volumeStatus": "ELEVATED",
-        "technicalRawScore": 1,
+        "boxRange10Pct": 8.542219307919295,
+        "recentRange5Pct": 5.278531191320687,
+        "previousRange5Pct": 8.37747753109935,
+        "compressionRatio": 0.6300859861128153,
+        "technicalScore": 5,
+        "technicalGrade": "WEAK",
+        "technicalBreakdown": {
+          "box": 3,
+          "proximity": 0,
+          "structure": 0,
+          "compression": 2,
+          "highProximity": 0,
+          "trigger": 0
+        },
         "historyDays": 275
       },
       "history": [
@@ -14815,6 +14921,8 @@
         "distanceToTriggerPct": -2.383398397370051,
         "breakoutStatus": "NEAR",
         "triggerTouchedToday": false,
+        "high4WeekCalculated": 194.68,
+        "distanceTo4WeekHighPct": -2.383398397370051,
         "high52WeekCalculated": 207.52,
         "distanceTo52WeekHighPct": -8.423284502698547,
         "ma20": 179.877,
@@ -14829,7 +14937,20 @@
         "averageVolume20": 24042208.45,
         "volumeRatio20": 0.7385150177416419,
         "volumeStatus": "NORMAL",
-        "technicalRawScore": 7,
+        "boxRange10Pct": 13.18604651162791,
+        "recentRange5Pct": 5.0863048536334645,
+        "previousRange5Pct": 13.18604651162791,
+        "compressionRatio": 0.38573387778878115,
+        "technicalScore": 14,
+        "technicalGrade": "STRONG",
+        "technicalBreakdown": {
+          "box": 1,
+          "proximity": 3,
+          "structure": 3,
+          "compression": 3,
+          "highProximity": 2,
+          "trigger": 2
+        },
         "historyDays": 275
       },
       "history": [
