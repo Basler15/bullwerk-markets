@@ -1,0 +1,258 @@
+name: Bullwerk Fundamental Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fundamental-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fundamentaldaten von FMP testen
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          python3 <<'PY'
+
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          api_key = os.environ["FMP_API_KEY"]
+
+          symbols = [
+              "AAPL",
+              "MSFT",
+              "NVDA",
+              "AMD",
+              "AMZN",
+              "META",
+              "GOOGL",
+              "PLTR"
+          ]
+
+
+          def get_json(url):
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent": "Bullwerk-Markets/1.0"
+                  }
+              )
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+
+                  return json.loads(
+                      response.read().decode("utf-8")
+                  )
+
+
+          def fetch(endpoint, symbol):
+
+              url = (
+                  "https://financialmodelingprep.com/"
+                  f"stable/{endpoint}"
+                  f"?symbol={urllib.parse.quote(symbol)}"
+                  "&period=quarter"
+                  "&limit=8"
+                  f"&apikey={urllib.parse.quote(api_key)}"
+              )
+
+              try:
+
+                  result = get_json(url)
+
+                  if isinstance(result, list):
+                      return result
+
+                  if isinstance(result, dict):
+
+                      for key in [
+                          "data",
+                          "historical"
+                      ]:
+
+                          if isinstance(
+                              result.get(key),
+                              list
+                          ):
+                              return result[key]
+
+                  return []
+
+              except Exception as error:
+
+                  print(
+                      f"FEHLER {endpoint}: {error}"
+                  )
+
+                  return []
+
+
+          for symbol in symbols:
+
+              print("")
+              print("=" * 70)
+              print(f"FUNDAMENTAL TEST: {symbol}")
+              print("=" * 70)
+
+              income = fetch(
+                  "income-statement",
+                  symbol
+              )
+
+              cashflow = fetch(
+                  "cash-flow-statement",
+                  symbol
+              )
+
+              print(
+                  f"Income Quartale: {len(income)}"
+              )
+
+              print(
+                  f"Cashflow Quartale: {len(cashflow)}"
+              )
+
+
+              # ------------------------------------------
+              # Income Statement
+              # ------------------------------------------
+
+              if income:
+
+                  print("")
+                  print("INCOME STATEMENT - NEUESTE QUARTALE")
+
+                  for row in income[:4]:
+
+                      print({
+                          "date":
+                              row.get("date"),
+
+                          "fiscalYear":
+                              row.get("fiscalYear"),
+
+                          "period":
+                              row.get("period"),
+
+                          "revenue":
+                              row.get("revenue"),
+
+                          "grossProfit":
+                              row.get("grossProfit"),
+
+                          "operatingIncome":
+                              row.get("operatingIncome"),
+
+                          "netIncome":
+                              row.get("netIncome"),
+
+                          "eps":
+                              row.get("eps"),
+
+                          "epsDiluted":
+                              row.get("epsDiluted")
+                      })
+
+
+              # ------------------------------------------
+              # Cashflow Statement
+              # ------------------------------------------
+
+              if cashflow:
+
+                  print("")
+                  print("CASHFLOW - NEUESTE QUARTALE")
+
+                  for row in cashflow[:4]:
+
+                      print({
+                          "date":
+                              row.get("date"),
+
+                          "fiscalYear":
+                              row.get("fiscalYear"),
+
+                          "period":
+                              row.get("period"),
+
+                          "operatingCashFlow":
+                              row.get(
+                                  "operatingCashFlow"
+                              ),
+
+                          "capitalExpenditure":
+                              row.get(
+                                  "capitalExpenditure"
+                              ),
+
+                          "freeCashFlow":
+                              row.get(
+                                  "freeCashFlow"
+                              )
+                      })
+
+
+              # ------------------------------------------
+              # YoY-Vergleich vorbereiten
+              # Quartal 0 gegen Quartal 4
+              # ------------------------------------------
+
+              if len(income) >= 5:
+
+                  latest = income[0]
+                  year_ago = income[4]
+
+                  print("")
+                  print("YOY TEST")
+
+                  print(
+                      "Aktuell:",
+                      latest.get("date")
+                  )
+
+                  print(
+                      "Vorjahr:",
+                      year_ago.get("date")
+                  )
+
+                  print(
+                      "Revenue aktuell:",
+                      latest.get("revenue")
+                  )
+
+                  print(
+                      "Revenue Vorjahr:",
+                      year_ago.get("revenue")
+                  )
+
+                  print(
+                      "EPS aktuell:",
+                      latest.get("epsDiluted")
+                  )
+
+                  print(
+                      "EPS Vorjahr:",
+                      year_ago.get("epsDiluted")
+                  )
+
+              print("")
+              print(
+                  f"{symbol} abgeschlossen."
+              )
+
+
+          print("")
+          print("=" * 70)
+          print(
+              "Bullwerk Fundamental-Test abgeschlossen."
+          )
+          print("=" * 70)
+
+          PY
