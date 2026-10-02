@@ -1,0 +1,303 @@
+name: Bullwerk SEC Fundamental Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sec-fundamental-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SEC Fundamentaldaten testen
+        run: |
+          python3 <<'PY'
+
+          import json
+          import urllib.request
+
+          # --------------------------------------------------
+          # Bullwerk SEC Test
+          # Erst einmal nur AAPL und MSFT
+          # --------------------------------------------------
+
+          companies = {
+              "AAPL": "0000320193",
+              "MSFT": "0000789019"
+          }
+
+          # SEC verlangt einen identifizierbaren User-Agent.
+          # Für unseren technischen Test reicht zunächst
+          # eine eindeutige Bullwerk-Kennung.
+          USER_AGENT = (
+              "BullwerkMarkets/1.0 "
+              "bullwerk-markets-github"
+          )
+
+
+          def get_json(url):
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent": USER_AGENT,
+                      "Accept-Encoding": "gzip, deflate",
+                      "Host": "data.sec.gov"
+                  }
+              )
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+
+                  return json.loads(
+                      response.read().decode("utf-8")
+                  )
+
+
+          def get_units(facts, taxonomy, concept):
+
+              try:
+                  units = (
+                      facts["facts"]
+                      [taxonomy]
+                      [concept]
+                      ["units"]
+                  )
+
+                  return units
+
+              except (
+                  KeyError,
+                  TypeError
+              ):
+
+                  return {}
+
+
+          def find_unit(units):
+
+              for preferred in [
+                  "USD",
+                  "USD/shares",
+                  "shares"
+              ]:
+
+                  if preferred in units:
+                      return units[preferred]
+
+              for values in units.values():
+                  return values
+
+              return []
+
+
+          def recent_quarters(
+              facts,
+              taxonomy,
+              concept,
+              limit=8
+          ):
+
+              units = get_units(
+                  facts,
+                  taxonomy,
+                  concept
+              )
+
+              values = find_unit(units)
+
+              rows = []
+
+              for row in values:
+
+                  form = row.get("form")
+
+                  if form not in [
+                      "10-Q",
+                      "10-K"
+                  ]:
+                      continue
+
+                  if row.get("val") is None:
+                      continue
+
+                  rows.append({
+                      "fy":
+                          row.get("fy"),
+
+                      "fp":
+                          row.get("fp"),
+
+                      "form":
+                          form,
+
+                      "filed":
+                          row.get("filed"),
+
+                      "start":
+                          row.get("start"),
+
+                      "end":
+                          row.get("end"),
+
+                      "value":
+                          row.get("val"),
+
+                      "frame":
+                          row.get("frame")
+                  })
+
+
+              # Neueste Werte zuerst
+              rows.sort(
+                  key=lambda row: (
+                      row.get("end") or "",
+                      row.get("filed") or ""
+                  ),
+                  reverse=True
+              )
+
+
+              # Doppelte XBRL-Einträge reduzieren.
+              # Gleicher Zeitraum + gleicher Wert nur einmal.
+              unique = []
+              seen = set()
+
+              for row in rows:
+
+                  key = (
+                      row.get("start"),
+                      row.get("end"),
+                      row.get("value")
+                  )
+
+                  if key in seen:
+                      continue
+
+                  seen.add(key)
+                  unique.append(row)
+
+              return unique[:limit]
+
+
+          concepts = {
+
+              "Revenue": [
+                  "RevenueFromContractWithCustomerExcludingAssessedTax",
+                  "SalesRevenueNet",
+                  "Revenues"
+              ],
+
+              "NetIncome": [
+                  "NetIncomeLoss"
+              ],
+
+              "OperatingIncome": [
+                  "OperatingIncomeLoss"
+              ],
+
+              "EPSDiluted": [
+                  "EarningsPerShareDiluted"
+              ],
+
+              "OperatingCashFlow": [
+                  "NetCashProvidedByUsedInOperatingActivities"
+              ],
+
+              "Capex": [
+                  "PaymentsToAcquirePropertyPlantAndEquipment"
+              ]
+          }
+
+
+          for symbol, cik in companies.items():
+
+              print("")
+              print("=" * 70)
+              print(
+                  f"SEC FUNDAMENTAL TEST: {symbol}"
+              )
+              print("=" * 70)
+
+              url = (
+                  "https://data.sec.gov/api/xbrl/"
+                  f"companyfacts/CIK{cik}.json"
+              )
+
+              try:
+
+                  facts = get_json(url)
+
+              except Exception as error:
+
+                  print(
+                      f"SEC FEHLER bei {symbol}: "
+                      f"{error}"
+                  )
+
+                  continue
+
+
+              print(
+                  "Unternehmen:",
+                  facts.get("entityName")
+              )
+
+
+              for label, possible_concepts in concepts.items():
+
+                  print("")
+                  print(
+                      f"--- {label} ---"
+                  )
+
+                  found = False
+
+                  for concept in possible_concepts:
+
+                      rows = recent_quarters(
+                          facts,
+                          "us-gaap",
+                          concept,
+                          limit=8
+                      )
+
+                      if rows:
+
+                          print(
+                              "SEC Concept:",
+                              concept
+                          )
+
+                          for row in rows:
+
+                              print(
+                                  row
+                              )
+
+                          found = True
+                          break
+
+
+                  if not found:
+
+                      print(
+                          "Keine passenden Daten gefunden."
+                      )
+
+
+              print("")
+              print(
+                  f"{symbol} abgeschlossen."
+              )
+
+
+          print("")
+          print("=" * 70)
+          print(
+              "Bullwerk SEC Fundamental-Test abgeschlossen."
+          )
+          print("=" * 70)
+
+          PY
