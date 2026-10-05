@@ -1,4 +1,4 @@
-name: Bullwerk Fundamental Momentum Test V4
+name: Bullwerk Fundamental Momentum Score V5
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fundamental Momentum V4 berechnen
+      - name: Fundamental Momentum V5 berechnen
         run: |
           python3 <<'PY'
 
@@ -20,7 +20,7 @@ jobs:
 
           # ============================================================
           # BULLWERK MARKETS
-          # FUNDAMENTAL MOMENTUM TEST V4
+          # FUNDAMENTAL MOMENTUM SCORE V5
           #
           # WICHTIGE ÄNDERUNG:
           #
@@ -38,7 +38,7 @@ jobs:
           # Beschleunigung:
           # aktuelles YoY minus YoY des direkt vorherigen Quartals.
           #
-          # Noch KEIN 0-20 Fundamental Score.
+          # V5 ergänzt den Bullwerk Fundamental Score 0-20.
           # ============================================================
 
 
@@ -1378,7 +1378,7 @@ jobs:
 
               print(
                   "BULLWERK FUNDAMENTAL "
-                  f"MOMENTUM V4: {symbol}"
+                  f"MOMENTUM V5: {symbol}"
               )
 
               print("=" * 90)
@@ -1741,6 +1741,148 @@ jobs:
                   )
 
 
+              # ========================================================
+              # BULLWERK FUNDAMENTAL SCORE V5
+              # Umsatz 0-4 | Gewinn/EPS 0-4 | Marge 0-3 | FCF 0-3
+              # Guidance 0-3/N/A | Orders/Backlog 0-3/N/A
+              # N/A wird nicht als 0 gewertet.
+              # ========================================================
+
+              def score_revenue(row):
+                  if not row or row.get("yoy") is None:
+                      return None
+                  yoy = row["yoy"]
+                  acc = row.get("acceleration")
+                  acc = 0 if acc is None else acc
+
+                  if (yoy >= 15 and acc > 0) or (yoy >= 25 and acc >= -3):
+                      return 4
+                  if (yoy >= 8 and acc >= 0) or (yoy >= 15 and acc >= -8):
+                      return 3
+                  if yoy >= 3:
+                      return 2
+                  if yoy >= 0:
+                      return 1
+                  return 0
+
+
+              def score_profit_eps(income_row, eps_row):
+                  values = []
+
+                  for row in (income_row, eps_row):
+                      if row and row.get("yoy") is not None:
+                          acc = row.get("acceleration")
+                          acc = 0 if acc is None else acc
+                          values.append((row["yoy"], acc))
+
+                  if not values:
+                      return None
+
+                  growth = max(v[0] for v in values)
+                  acc = max(v[1] for v in values)
+
+                  if growth >= 20 and acc > 0:
+                      return 4
+                  if (growth >= 10 and acc >= 0) or (growth >= 20 and acc >= -8):
+                      return 3
+                  if growth >= 3:
+                      return 2
+                  if growth >= 0:
+                      return 1
+                  return 0
+
+
+              def score_margin(row):
+                  if not row:
+                      return None
+
+                  change = row.get("margin_change_pp")
+
+                  if change is None:
+                      return None
+                  if change >= 1.0:
+                      return 3
+                  if change >= 0.25:
+                      return 2
+                  if change >= -0.25:
+                      return 1
+                  return 0
+
+
+              def score_fcf(row):
+                  if not row or row.get("yoy") is None:
+                      return None
+
+                  yoy = row["yoy"]
+                  acc = row.get("acceleration")
+                  acc = 0 if acc is None else acc
+
+                  if yoy >= 15 and acc >= 0:
+                      return 3
+                  if (yoy >= 5 and acc >= 0) or (yoy >= 15 and acc >= -8):
+                      return 2
+                  if yoy >= 0:
+                      return 1
+                  return 0
+
+
+              revenue_score = score_revenue(current_revenue)
+              profit_eps_score = score_profit_eps(current_income, current_eps)
+              margin_score = score_margin(current_margin)
+              fcf_score = score_fcf(current_fcf)
+
+              # Guidance und Orders/Backlog bleiben bewusst einfach.
+              # Bis eine eindeutige aktuelle Bewertung vorliegt: N/A.
+              guidance_score = None
+              orders_backlog_score = None
+
+              components = [
+                  ("Umsatz", revenue_score, 4),
+                  ("Gewinn/EPS", profit_eps_score, 4),
+                  ("Marge", margin_score, 3),
+                  ("FCF", fcf_score, 3),
+                  ("Guidance", guidance_score, 3),
+                  ("Orders/Backlog", orders_backlog_score, 3)
+              ]
+
+              earned = sum(
+                  value
+                  for _, value, _ in components
+                  if value is not None
+              )
+
+              available_max = sum(
+                  maximum
+                  for _, value, maximum in components
+                  if value is not None
+              )
+
+              fundamental_score = (
+                  earned / available_max * 20
+                  if available_max > 0
+                  else None
+              )
+
+              print("")
+              print("--- BULLWERK FUNDAMENTAL SCORE V5 ---")
+
+              for label, value, maximum in components:
+                  if value is None:
+                      print(f"{label}: N/A")
+                  else:
+                      print(f"{label}: {value}/{maximum}")
+
+              if fundamental_score is None:
+                  print("FUNDAMENTAL SCORE: N/A")
+              else:
+                  print(
+                      "FUNDAMENTAL SCORE:",
+                      f"{fundamental_score:.1f}/20",
+                      "| Rohpunkte:",
+                      f"{earned}/{available_max}"
+                  )
+
+
               print("")
               print(
                   symbol,
@@ -1756,7 +1898,7 @@ jobs:
 
           print(
               "Bullwerk Fundamental "
-              "Momentum Test V4 beendet."
+              "Momentum Score V5 beendet."
           )
 
           print("=" * 90)
