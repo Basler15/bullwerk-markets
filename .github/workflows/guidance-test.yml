@@ -1,4 +1,4 @@
-name: Bullwerk Guidance Test V5
+name: Bullwerk Guidance Test V6
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Guidance V5 bewerten
+      - name: Guidance V6 vergleichen
         run: |
           python3 <<'PY'
 
@@ -20,18 +20,22 @@ jobs:
 
 
           # ============================================================
-          # BULLWERK MARKETS - GUIDANCE TEST V5
+          # BULLWERK MARKETS - GUIDANCE TEST V6
           #
-          # Ziel:
-          # 1. jüngste Earnings-8-K finden
-          # 2. echte Earnings-/CFO-Commentary-Dokumente finden
-          # 3. offizielle Guidance-Blöcke erkennen
-          # 4. historische Guidance ausschließen
-          # 5. Guidance vorläufig mit 0-3 bewerten
+          # NEU:
+          # - zwei jüngste Earnings-8-Ks
+          # - aktuelle + vorherige Guidance
+          # - quantitative Guidance extrahieren
+          # - gleiche Kennzahlen vergleichen
           #
-          # WICHTIG:
-          # N/A = nicht gemeldet / nicht zuverlässig erkennbar
-          # N/A darf NICHT automatisch 0 Punkte bedeuten.
+          # Vorläufige Interpretation:
+          # 3 = verbessert / erhöht
+          # 2 = stabil / bestätigt
+          # 1 = gemischt / vorsichtiger
+          # 0 = gesenkt / verschlechtert
+          # N/A = nicht zuverlässig vergleichbar
+          #
+          # NOCH TESTVERSION - NICHT FINAL EINGEFROREN
           # ============================================================
 
 
@@ -46,132 +50,6 @@ jobs:
               "Bullwerk Markets "
               "contact: bullwerkmarkets@gmail.com"
           )
-
-
-          # ============================================================
-          # OFFIZIELLE GUIDANCE-ANKER
-          #
-          # Diese Muster sollen deutlich stärker gewichtet werden als
-          # ein allgemeines "we expect".
-          # ============================================================
-
-          GUIDANCE_ANCHORS = [
-
-              r"\boutlook for the (?:first|second|third|fourth) quarter\b",
-              r"\boutlook for (?:q1|q2|q3|q4)\b",
-
-              r"\boutlook for the next quarter\b",
-              r"\bquarterly outlook\b",
-              r"\bnext quarter outlook\b",
-
-              r"\bguidance for the (?:first|second|third|fourth) quarter\b",
-              r"\bguidance for (?:q1|q2|q3|q4)\b",
-              r"\bguidance for the next quarter\b",
-
-              r"\bfull[- ]year outlook\b",
-              r"\bfull[- ]year guidance\b",
-
-              r"\boutlook for fiscal (?:20)?\d{2}\b",
-              r"\bguidance for fiscal (?:20)?\d{2}\b",
-
-              r"\bfor the next fiscal quarter\b",
-              r"\bfor the upcoming quarter\b",
-              r"\bfor the coming quarter\b"
-          ]
-
-
-          # ============================================================
-          # FORWARD LANGUAGE
-          # ============================================================
-
-          FORWARD_PATTERNS = [
-
-              r"\bwe expect\b",
-              r"\bwe anticipate\b",
-              r"\bwe forecast\b",
-              r"\bwe project\b",
-              r"\bwe estimate\b",
-
-              r"\bcompany expects\b",
-              r"\bcompany anticipates\b",
-
-              r"\brevenue is expected\b",
-              r"\brevenue.*expected to be\b",
-
-              r"\bgross margins?.*expected\b",
-              r"\boperating margins?.*expected\b",
-              r"\boperating expenses?.*expected\b",
-              r"\boperating income.*expected\b",
-
-              r"\bearnings.*expected\b",
-              r"\beps.*expected\b",
-
-              r"\btax rates?.*expected\b",
-              r"\bcapital expenditures?.*expected\b"
-          ]
-
-
-          # ============================================================
-          # HISTORISCHE GUIDANCE
-          # ============================================================
-
-          HISTORICAL_PATTERNS = [
-
-              r"\bguidance provided\b",
-              r"\bpreviously provided guidance\b",
-              r"\bprevious guidance\b",
-              r"\bprior guidance\b",
-
-              r"\bcompared to our guidance\b",
-              r"\bcompared with our guidance\b",
-              r"\bversus our guidance\b",
-
-              r"\bprovided on\b",
-
-              r"\blower[- ]than[- ]expected\b",
-              r"\bhigher[- ]than[- ]expected\b",
-
-              r"\bexceeded expectations\b",
-              r"\bbelow expectations\b",
-
-              r"\bresults.*compared\b",
-              r"\bresults.*versus\b"
-          ]
-
-
-          # ============================================================
-          # KENNZAHLEN
-          # ============================================================
-
-          BUSINESS_TERMS = [
-
-              "revenue",
-              "sales",
-              "growth",
-
-              "gross margin",
-              "gross margins",
-
-              "operating margin",
-              "operating margins",
-
-              "operating income",
-
-              "operating expense",
-              "operating expenses",
-
-              "earnings",
-              "eps",
-
-              "free cash flow",
-              "cash flow",
-
-              "capital expenditures",
-              "capex",
-
-              "tax rate",
-              "tax rates"
-          ]
 
 
           # ============================================================
@@ -245,6 +123,7 @@ jobs:
                   html
               )
 
+
               for tag in [
                   r"<br\s*/?>",
                   r"</p>",
@@ -299,27 +178,31 @@ jobs:
 
 
           # ============================================================
-          # JÜNGSTE EARNINGS-8-K
+          # ZWEI JÜNGSTE EARNINGS 8-Ks
           # ============================================================
 
-          def latest_earnings_8k(data):
+          def latest_earnings_filings(
+              data,
+              limit=2
+          ):
 
               recent = (
                   data.get("filings", {})
                       .get("recent", {})
               )
 
-              accession = recent.get(
+
+              accessions = recent.get(
                   "accessionNumber",
                   []
               )
 
-              filing_date = recent.get(
+              filing_dates = recent.get(
                   "filingDate",
                   []
               )
 
-              report_date = recent.get(
+              report_dates = recent.get(
                   "reportDate",
                   []
               )
@@ -329,7 +212,7 @@ jobs:
                   []
               )
 
-              items = recent.get(
+              items_list = recent.get(
                   "items",
                   []
               )
@@ -340,9 +223,12 @@ jobs:
               )
 
 
+              result = []
+
+
               count = min(
-                  len(accession),
-                  len(filing_date),
+                  len(accessions),
+                  len(filing_dates),
                   len(forms),
                   len(documents)
               )
@@ -352,46 +238,50 @@ jobs:
 
                   form = forms[i]
 
-                  filing_items = (
-                      items[i]
-                      if i < len(items)
+                  items = (
+                      items_list[i]
+                      if i < len(items_list)
                       else ""
                   )
 
 
                   if (
                       form in ("8-K", "8-K/A")
-                      and "2.02" in filing_items
+                      and "2.02" in items
                   ):
 
-                      return {
+                      result.append({
 
                           "accession":
-                              accession[i],
+                              accessions[i],
 
                           "filing_date":
-                              filing_date[i],
+                              filing_dates[i],
 
                           "report_date":
                               (
-                                  report_date[i]
-                                  if i < len(report_date)
+                                  report_dates[i]
+                                  if i < len(report_dates)
                                   else ""
                               ),
 
                           "items":
-                              filing_items,
+                              items,
 
                           "primary_document":
                               documents[i]
-                      }
+                      })
 
 
-              return None
+                      if len(result) >= limit:
+                          break
+
+
+              return result
 
 
           # ============================================================
-          # SEC ARCHIVE
+          # ARCHIVE
           # ============================================================
 
           def archive_base(cik, accession):
@@ -415,28 +305,28 @@ jobs:
               )
 
 
-          def load_filing_index(cik, accession):
+          def load_filing_index(
+              cik,
+              accession
+          ):
 
               base = archive_base(
                   cik,
                   accession
               )
 
-              return (
-                  base,
-                  get_json(
-                      base + "index.json"
-                  )
+              index = get_json(
+                  base + "index.json"
               )
+
+              return base, index
 
 
           # ============================================================
-          # HTML-DATEIEN
+          # DOKUMENTE
           # ============================================================
 
           def get_html_files(index_data):
-
-              result = []
 
               items = (
                   index_data
@@ -445,12 +335,16 @@ jobs:
               )
 
 
+              result = []
+
+
               for item in items:
 
                   name = (
                       item.get("name")
                       or ""
                   )
+
 
                   if name.lower().endswith(
                       (".htm", ".html")
@@ -462,10 +356,6 @@ jobs:
               return result
 
 
-          # ============================================================
-          # DOKUMENT-PRIORITÄT
-          # ============================================================
-
           def document_priority(name):
 
               lower = name.lower()
@@ -476,6 +366,7 @@ jobs:
               if "cfocommentary" in lower:
                   score += 150
 
+
               if (
                   "cfo" in lower
                   and "commentary" in lower
@@ -485,6 +376,7 @@ jobs:
 
               if "earningscommentary" in lower:
                   score += 140
+
 
               if (
                   "earnings" in lower
@@ -504,24 +396,26 @@ jobs:
               if "ex99" in lower:
                   score += 100
 
+
               if "exhibit99" in lower:
                   score += 100
 
-              if "99-1" in lower:
-                  score += 95
 
-              if "99_1" in lower:
-                  score += 95
-
-              if "99.1" in lower:
+              if (
+                  "99-1" in lower
+                  or "99_1" in lower
+                  or "99.1" in lower
+              ):
                   score += 95
 
 
               if "earn" in lower:
                   score += 40
 
+
               if "release" in lower:
                   score += 35
+
 
               if "results" in lower:
                   score += 25
@@ -529,6 +423,7 @@ jobs:
 
               if "index" in lower:
                   score -= 100
+
 
               if "header" in lower:
                   score -= 100
@@ -573,355 +468,821 @@ jobs:
 
 
           # ============================================================
-          # HILFSFUNKTIONEN
+          # GUIDANCE-TEXT FINDEN
           # ============================================================
 
-          def matches_any(text, patterns):
+          GUIDANCE_ANCHORS = [
 
-              return any(
-                  re.search(
-                      pattern,
-                      text,
-                      flags=re.I
-                  )
-                  for pattern in patterns
-              )
+              r"\boutlook for the first quarter\b",
+              r"\boutlook for the second quarter\b",
+              r"\boutlook for the third quarter\b",
+              r"\boutlook for the fourth quarter\b",
+
+              r"\boutlook for q1\b",
+              r"\boutlook for q2\b",
+              r"\boutlook for q3\b",
+              r"\boutlook for q4\b",
+
+              r"\bquarterly outlook\b",
+
+              r"\bguidance for the first quarter\b",
+              r"\bguidance for the second quarter\b",
+              r"\bguidance for the third quarter\b",
+              r"\bguidance for the fourth quarter\b",
+
+              r"\bfull[- ]year outlook\b",
+              r"\bfull[- ]year guidance\b"
+          ]
 
 
-          def business_relevance(text):
+          def find_guidance_region(text):
 
               lower = text.lower()
 
-              return [
-                  term
-                  for term in BUSINESS_TERMS
-                  if term in lower
-              ]
+
+              positions = []
 
 
-          def has_numeric_target(text):
+              for pattern in GUIDANCE_ANCHORS:
 
-              patterns = [
-
-                  r"\$\s?\d",
-
-                  r"\d+(?:\.\d+)?\s?%",
-
-                  r"\d+(?:\.\d+)?\s*percent",
-
-                  r"\d+(?:\.\d+)?\s*"
-                  r"(?:billion|million)",
-
-                  r"\d+(?:\.\d+)?\s*"
-                  r"(?:to|-)\s*"
-                  r"\d+(?:\.\d+)?\s?%",
-
-                  r"\$\s?\d+(?:\.\d+)?\s*"
-                  r"(?:to|-)\s*"
-                  r"\$?\s?\d+(?:\.\d+)?",
-
-                  r"\d+(?:\.\d+)?\s*"
-                  r"(?:basis points|bps)",
-
-                  r"plus or minus\s*"
-                  r"\d+(?:\.\d+)?\s?%"
-              ]
-
-
-              return any(
-                  re.search(
+                  match = re.search(
                       pattern,
-                      text,
+                      lower,
                       flags=re.I
                   )
-                  for pattern in patterns
+
+
+                  if match:
+
+                      positions.append(
+                          match.start()
+                      )
+
+
+              if not positions:
+
+                  return None
+
+
+              start = min(
+                  positions
               )
 
 
-          # ============================================================
-          # TEXTBLÖCKE
-          # ============================================================
+              # Genug Text für mehrere Guidance-Punkte,
+              # aber nicht das ganze Dokument.
 
-          def split_blocks(text):
-
-              blocks = re.split(
-                  r"(?<=[.!?])\s+",
-                  text
+              end = min(
+                  len(text),
+                  start + 5000
               )
 
-              return [
-                  block.strip()
-                  for block in blocks
-                  if len(
-                      block.strip()
-                  ) >= 25
+
+              return text[
+                  start:end
               ]
 
 
           # ============================================================
-          # GUIDANCE-BLÖCKE FINDEN
+          # ZAHLEN NORMALISIEREN
           # ============================================================
 
-          def find_guidance_blocks(text):
+          def number(value):
 
-              blocks = split_blocks(
-                  text
+              return float(
+                  value.replace(
+                      ",",
+                      ""
+                  )
               )
 
-              results = []
+
+          # ============================================================
+          # GUIDANCE EXTRAKTION
+          # ============================================================
+
+          def extract_guidance(region):
+
+              if not region:
+                  return {}
 
 
-              for index, block in enumerate(blocks):
+              result = {}
 
-                  anchor = matches_any(
-                      block,
-                      GUIDANCE_ANCHORS
+              text = region
+
+
+              # --------------------------------------------------------
+              # REVENUE
+              #
+              # Beispiele:
+              # Revenue is expected to be $54.0 billion,
+              # plus or minus 2%.
+              #
+              # Revenue expected between $x and $y billion.
+              # --------------------------------------------------------
+
+              revenue_center = re.search(
+
+                  r"revenue.{0,100}?"
+                  r"(?:expected|expect)"
+                  r".{0,80}?"
+                  r"\$\s*"
+                  r"([\d,.]+)"
+                  r"\s*"
+                  r"(billion|million)",
+
+                  text,
+                  flags=re.I
+              )
+
+
+              if revenue_center:
+
+                  value = number(
+                      revenue_center.group(1)
                   )
 
-                  forward = matches_any(
-                      block,
-                      FORWARD_PATTERNS
+                  unit = (
+                      revenue_center
+                      .group(2)
+                      .lower()
                   )
 
 
-                  if not (
-                      anchor
-                      or forward
+                  if unit == "million":
+                      value /= 1000
+
+
+                  result[
+                      "revenue_billions"
+                  ] = value
+
+
+              revenue_range = re.search(
+
+                  r"revenue.{0,120}?"
+                  r"\$\s*"
+                  r"([\d,.]+)"
+                  r"\s*(?:billion|million)?"
+                  r".{0,30}?"
+                  r"(?:to|-|and)"
+                  r".{0,30}?"
+                  r"\$?\s*"
+                  r"([\d,.]+)"
+                  r"\s*"
+                  r"(billion|million)",
+
+                  text,
+                  flags=re.I
+              )
+
+
+              if revenue_range:
+
+                  low = number(
+                      revenue_range.group(1)
+                  )
+
+                  high = number(
+                      revenue_range.group(2)
+                  )
+
+                  unit = (
+                      revenue_range
+                      .group(3)
+                      .lower()
+                  )
+
+
+                  if unit == "million":
+
+                      low /= 1000
+                      high /= 1000
+
+
+                  result[
+                      "revenue_low_billions"
+                  ] = low
+
+                  result[
+                      "revenue_high_billions"
+                  ] = high
+
+                  result[
+                      "revenue_mid_billions"
+                  ] = (
+                      low + high
+                  ) / 2
+
+
+              # --------------------------------------------------------
+              # GROSS MARGIN
+              # --------------------------------------------------------
+
+              gross_margin = re.search(
+
+                  r"gross margins?"
+                  r".{0,100}?"
+                  r"(?:expected|expect)"
+                  r".{0,80}?"
+                  r"([\d.]+)\s*%",
+
+                  text,
+                  flags=re.I
+              )
+
+
+              if gross_margin:
+
+                  result[
+                      "gross_margin_pct"
+                  ] = float(
+                      gross_margin.group(1)
+                  )
+
+
+              # --------------------------------------------------------
+              # OPERATING EXPENSES
+              # --------------------------------------------------------
+
+              opex = re.search(
+
+                  r"operating expenses?"
+                  r".{0,100}?"
+                  r"(?:expected|expect)"
+                  r".{0,100}?"
+                  r"\$\s*"
+                  r"([\d,.]+)"
+                  r"\s*"
+                  r"(billion|million)",
+
+                  text,
+                  flags=re.I
+              )
+
+
+              if opex:
+
+                  value = number(
+                      opex.group(1)
+                  )
+
+                  unit = (
+                      opex.group(2)
+                      .lower()
+                  )
+
+
+                  if unit == "million":
+                      value /= 1000
+
+
+                  result[
+                      "operating_expenses_billions"
+                  ] = value
+
+
+              # --------------------------------------------------------
+              # TAX RATE
+              # --------------------------------------------------------
+
+              tax_rate = re.search(
+
+                  r"tax rates?"
+                  r".{0,100}?"
+                  r"(?:expected|expect)"
+                  r".{0,100}?"
+                  r"([\d.]+)\s*%",
+
+                  text,
+                  flags=re.I
+              )
+
+
+              if tax_rate:
+
+                  result[
+                      "tax_rate_pct"
+                  ] = float(
+                      tax_rate.group(1)
+                  )
+
+
+              return result
+
+
+          # ============================================================
+          # GUIDANCE AUS EINEM FILING
+          # ============================================================
+
+          def extract_from_filing(
+              cik,
+              filing
+          ):
+
+              base, index_data = (
+                  load_filing_index(
+                      cik,
+                      filing[
+                          "accession"
+                      ]
+                  )
+              )
+
+
+              files = (
+                  get_html_files(
+                      index_data
+                  )
+              )
+
+
+              files.sort(
+                  key=document_priority,
+                  reverse=True
+              )
+
+
+              print(
+                  "Filing:",
+                  filing[
+                      "filing_date"
+                  ]
+              )
+
+
+              for name in files[:12]:
+
+                  if not should_scan_document(
+                      name,
+                      filing[
+                          "primary_document"
+                      ]
                   ):
 
                       continue
 
 
-                  # Mehr Kontext nach vorne nehmen,
-                  # weil Outlook-Überschrift häufig
-                  # vor mehreren Guidance-Sätzen steht.
-
-                  start = max(
-                      0,
-                      index - 1
-                  )
-
-                  end = min(
-                      len(blocks),
-                      index + 4
-                  )
-
-
-                  context = " ".join(
-                      blocks[start:end]
-                  )
-
-
-                  context_anchor = (
-                      matches_any(
-                          context,
-                          GUIDANCE_ANCHORS
-                      )
-                  )
-
-                  context_forward = (
-                      matches_any(
-                          context,
-                          FORWARD_PATTERNS
-                      )
-                  )
-
-                  historical = (
-                      matches_any(
-                          context,
-                          HISTORICAL_PATTERNS
-                      )
-                  )
-
-                  numeric = (
-                      has_numeric_target(
-                          context
-                      )
-                  )
-
-                  business_hits = (
-                      business_relevance(
-                          context
+                  print(
+                      "Prüfe:",
+                      name,
+                      "| Priorität:",
+                      document_priority(
+                          name
                       )
                   )
 
 
-                  # --------------------------------------------
-                  # CLASSIFICATION
-                  # --------------------------------------------
+                  try:
 
-                  if historical:
-
-                      status = (
-                          "REJECT_HISTORICAL"
+                      html = get_text(
+                          base + name
                       )
 
+                  except Exception as error:
 
-                  elif (
-                      context_anchor
-                      and context_forward
-                      and numeric
-                      and business_hits
-                  ):
-
-                      status = (
-                          "OFFICIAL_HIGH"
+                      print(
+                          "Dokumentfehler:",
+                          error
                       )
 
-
-                  elif (
-                      context_anchor
-                      and business_hits
-                  ):
-
-                      status = (
-                          "OFFICIAL_MEDIUM"
-                      )
-
-
-                  elif (
-                      context_forward
-                      and numeric
-                      and business_hits
-                  ):
-
-                      status = (
-                          "FORWARD_ONLY"
-                      )
-
-
-                  else:
-
-                      status = "LOW"
-
-
-                  results.append({
-
-                      "status":
-                          status,
-
-                      "anchor":
-                          context_anchor,
-
-                      "forward":
-                          context_forward,
-
-                      "numeric":
-                          numeric,
-
-                      "business_hits":
-                          business_hits,
-
-                      "text":
-                          context
-                  })
-
-
-              # Duplikate entfernen
-
-              unique = []
-
-              seen = set()
-
-
-              for item in results:
-
-                  normalized = re.sub(
-                      r"\s+",
-                      " ",
-                      item["text"].lower()
-                  )
-
-
-                  key = normalized[:350]
-
-
-                  if key in seen:
                       continue
 
 
-                  seen.add(key)
-
-                  unique.append(
-                      item
+                  text = html_to_text(
+                      html
                   )
 
 
-              return unique[:20]
+                  region = (
+                      find_guidance_region(
+                          text
+                      )
+                  )
+
+
+                  if not region:
+
+                      continue
+
+
+                  guidance = (
+                      extract_guidance(
+                          region
+                      )
+                  )
+
+
+                  if guidance:
+
+                      print(
+                          "Guidance-Dokument:",
+                          name
+                      )
+
+                      print(
+                          "Extrahiert:",
+                          json.dumps(
+                              guidance,
+                              indent=2
+                          )
+                      )
+
+
+                      return {
+                          "filing_date":
+                              filing[
+                                  "filing_date"
+                              ],
+
+                          "document":
+                              name,
+
+                          "guidance":
+                              guidance,
+
+                          "text":
+                              region[:1800]
+                      }
+
+
+              return None
 
 
           # ============================================================
-          # VORLÄUFIGER GUIDANCE-SCORE
-          #
-          # 3 = klare offizielle quantitative Guidance
-          # 2 = klare offizielle Guidance, aber schwächer/teilweise
-          # 1 = nur allgemeine Zukunftsaussage
-          # 0 = belastbare negative/gesenkte Guidance
-          # N/A = keine verwertbare Guidance
-          #
-          # ACHTUNG:
-          # "0 = gesenkt" können wir erst zuverlässig verwenden,
-          # wenn wir aktuelle mit vorheriger Guidance vergleichen.
-          # Deshalb erzeugt V5 noch NICHT automatisch 0.
+          # VERGLEICH
           # ============================================================
 
-          def provisional_score(all_results):
+          def percent_change(
+              current,
+              previous
+          ):
 
-              official_high = [
-                  item
-                  for item in all_results
-                  if item["status"]
-                  == "OFFICIAL_HIGH"
-              ]
-
-              official_medium = [
-                  item
-                  for item in all_results
-                  if item["status"]
-                  == "OFFICIAL_MEDIUM"
-              ]
-
-              forward_only = [
-                  item
-                  for item in all_results
-                  if item["status"]
-                  == "FORWARD_ONLY"
-              ]
-
-
-              if official_high:
-
-                  return (
-                      3,
-                      "Klare offizielle "
-                      "quantitative Forward-Guidance"
-                  )
-
-
-              if official_medium:
-
-                  return (
-                      2,
-                      "Offizielle Forward-Guidance "
-                      "erkannt"
-                  )
-
-
-              if forward_only:
-
-                  return (
-                      1,
-                      "Allgemeine Forward-Aussage, "
-                      "aber kein ausreichend klarer "
-                      "Guidance-Block"
-                  )
+              if previous == 0:
+                  return None
 
 
               return (
-                  None,
-                  "Keine belastbare neue Guidance "
-                  "erkannt"
+                  (
+                      current
+                      - previous
+                  )
+                  / abs(previous)
+                  * 100
               )
+
+
+          def compare_guidance(
+              current,
+              previous
+          ):
+
+              if (
+                  not current
+                  or not previous
+              ):
+
+                  return {
+                      "score": None,
+                      "status": "N/A",
+                      "reason":
+                          "Aktuelle oder vorherige "
+                          "Guidance fehlt."
+                  }
+
+
+              current_g = (
+                  current[
+                      "guidance"
+                  ]
+              )
+
+              previous_g = (
+                  previous[
+                      "guidance"
+                  ]
+              )
+
+
+              comparisons = []
+
+
+              # --------------------------------------------------------
+              # REVENUE
+              # Höher = grundsätzlich positiv
+              # --------------------------------------------------------
+
+              current_revenue = (
+                  current_g.get(
+                      "revenue_mid_billions"
+                  )
+                  or current_g.get(
+                      "revenue_billions"
+                  )
+              )
+
+              previous_revenue = (
+                  previous_g.get(
+                      "revenue_mid_billions"
+                  )
+                  or previous_g.get(
+                      "revenue_billions"
+                  )
+              )
+
+
+              if (
+                  current_revenue is not None
+                  and previous_revenue is not None
+              ):
+
+                  change = percent_change(
+                      current_revenue,
+                      previous_revenue
+                  )
+
+
+                  comparisons.append({
+
+                      "metric":
+                          "Revenue",
+
+                      "current":
+                          current_revenue,
+
+                      "previous":
+                          previous_revenue,
+
+                      "change":
+                          change,
+
+                      "direction":
+                          (
+                              1
+                              if change > 1
+                              else
+                              -1
+                              if change < -1
+                              else
+                              0
+                          )
+                  })
+
+
+              # --------------------------------------------------------
+              # GROSS MARGIN
+              # Höher = positiv
+              # --------------------------------------------------------
+
+              if (
+                  "gross_margin_pct"
+                  in current_g
+                  and
+                  "gross_margin_pct"
+                  in previous_g
+              ):
+
+                  current_value = (
+                      current_g[
+                          "gross_margin_pct"
+                      ]
+                  )
+
+                  previous_value = (
+                      previous_g[
+                          "gross_margin_pct"
+                      ]
+                  )
+
+                  diff = (
+                      current_value
+                      - previous_value
+                  )
+
+
+                  comparisons.append({
+
+                      "metric":
+                          "Gross Margin",
+
+                      "current":
+                          current_value,
+
+                      "previous":
+                          previous_value,
+
+                      "change":
+                          diff,
+
+                      "direction":
+                          (
+                              1
+                              if diff >= 0.25
+                              else
+                              -1
+                              if diff <= -0.25
+                              else
+                              0
+                          )
+                  })
+
+
+              # --------------------------------------------------------
+              # OPERATING EXPENSES
+              #
+              # Noch NICHT als Richtung werten.
+              # Höhere Kosten können bei starkem Wachstum
+              # sinnvoll sein.
+              # --------------------------------------------------------
+
+              if (
+                  "operating_expenses_billions"
+                  in current_g
+                  and
+                  "operating_expenses_billions"
+                  in previous_g
+              ):
+
+                  comparisons.append({
+
+                      "metric":
+                          "Operating Expenses",
+
+                      "current":
+                          current_g[
+                              "operating_expenses_billions"
+                          ],
+
+                      "previous":
+                          previous_g[
+                              "operating_expenses_billions"
+                          ],
+
+                      "change":
+                          percent_change(
+                              current_g[
+                                  "operating_expenses_billions"
+                              ],
+                              previous_g[
+                                  "operating_expenses_billions"
+                              ]
+                          ),
+
+                      "direction":
+                          None
+                  })
+
+
+              # --------------------------------------------------------
+              # NUR gerichtete Kennzahlen bewerten
+              # --------------------------------------------------------
+
+              directional = [
+
+                  item
+
+                  for item in comparisons
+
+                  if item[
+                      "direction"
+                  ] is not None
+              ]
+
+
+              if not directional:
+
+                  return {
+                      "score": None,
+                      "status": "N/A",
+                      "reason":
+                          "Keine direkt vergleichbare "
+                          "gerichtete Kennzahl gefunden.",
+                      "comparisons":
+                          comparisons
+                  }
+
+
+              positive = sum(
+                  1
+                  for item in directional
+                  if item[
+                      "direction"
+                  ] > 0
+              )
+
+              negative = sum(
+                  1
+                  for item in directional
+                  if item[
+                      "direction"
+                  ] < 0
+              )
+
+              stable = sum(
+                  1
+                  for item in directional
+                  if item[
+                      "direction"
+                  ] == 0
+              )
+
+
+              # --------------------------------------------------------
+              # VORLÄUFIGE V6-LOGIK
+              # --------------------------------------------------------
+
+              if (
+                  positive > 0
+                  and negative == 0
+              ):
+
+                  score = 3
+
+                  status = (
+                      "IMPROVED"
+                  )
+
+                  reason = (
+                      "Vergleichbare Guidance "
+                      "hat sich verbessert."
+                  )
+
+
+              elif (
+                  positive == 0
+                  and negative == 0
+                  and stable > 0
+              ):
+
+                  score = 2
+
+                  status = (
+                      "STABLE"
+                  )
+
+                  reason = (
+                      "Vergleichbare Guidance "
+                      "ist weitgehend stabil."
+                  )
+
+
+              elif (
+                  positive > 0
+                  and negative > 0
+              ):
+
+                  score = 1
+
+                  status = (
+                      "MIXED"
+                  )
+
+                  reason = (
+                      "Guidance-Signale sind "
+                      "gemischt."
+                  )
+
+
+              elif negative > 0:
+
+                  score = 0
+
+                  status = (
+                      "WEAKER"
+                  )
+
+                  reason = (
+                      "Vergleichbare Guidance "
+                      "hat sich verschlechtert."
+                  )
+
+
+              else:
+
+                  score = None
+
+                  status = "N/A"
+
+                  reason = (
+                      "Kein belastbarer "
+                      "Vergleich möglich."
+                  )
+
+
+              return {
+                  "score":
+                      score,
+
+                  "status":
+                      status,
+
+                  "reason":
+                      reason,
+
+                  "comparisons":
+                      comparisons
+              }
 
 
           # ============================================================
@@ -934,7 +1295,7 @@ jobs:
               print("=" * 105)
 
               print(
-                  "BULLWERK GUIDANCE V5:",
+                  "BULLWERK GUIDANCE V6:",
                   symbol
               )
 
@@ -958,22 +1319,29 @@ jobs:
                   )
 
 
-                  filing = (
-                      latest_earnings_8k(
-                          submissions
+                  filings = (
+                      latest_earnings_filings(
+                          submissions,
+                          limit=2
                       )
                   )
 
 
-                  if not filing:
+                  print(
+                      "Gefundene Earnings-Filings:",
+                      len(filings)
+                  )
 
-                      print(
-                          "Keine Earnings-8-K "
-                          "mit Item 2.02 gefunden."
-                      )
+
+                  if len(filings) < 2:
 
                       print(
                           "GUIDANCE SCORE: N/A"
+                      )
+
+                      print(
+                          "Grund: Weniger als zwei "
+                          "vergleichbare Earnings-Filings."
                       )
 
                       continue
@@ -981,219 +1349,99 @@ jobs:
 
                   print("")
                   print(
-                      "Jüngste Earnings-8-K"
+                      "AKTUELLE GUIDANCE"
                   )
 
-                  print(
-                      "Filing Date:",
-                      filing[
-                          "filing_date"
-                      ]
-                  )
-
-                  print(
-                      "Report Date:",
-                      filing[
-                          "report_date"
-                      ]
-                  )
-
-                  print(
-                      "Items:",
-                      filing[
-                          "items"
-                      ]
-                  )
+                  print("-" * 105)
 
 
-                  base, index_data = (
-                      load_filing_index(
+                  current = (
+                      extract_from_filing(
                           cik,
-                          filing[
-                              "accession"
-                          ]
+                          filings[0]
                       )
-                  )
-
-
-                  html_files = (
-                      get_html_files(
-                          index_data
-                      )
-                  )
-
-
-                  html_files.sort(
-                      key=document_priority,
-                      reverse=True
                   )
 
 
                   print("")
                   print(
-                      "Dokumentauswahl:"
+                      "VORHERIGE GUIDANCE"
                   )
 
+                  print("-" * 105)
 
-                  for name in html_files[:12]:
 
-                      print(
-                          "-",
-                          name,
-                          "| Priorität:",
-                          document_priority(
-                              name
-                          ),
-                          "| Scan:",
-                          should_scan_document(
-                              name,
-                              filing[
-                                  "primary_document"
-                              ]
-                          )
+                  previous = (
+                      extract_from_filing(
+                          cik,
+                          filings[1]
                       )
+                  )
 
 
                   print("")
                   print("=" * 105)
 
                   print(
-                      "OFFIZIELLE GUIDANCE-SUCHE"
+                      "GUIDANCE-VERGLEICH"
                   )
 
                   print("=" * 105)
 
 
-                  all_results = []
-
-                  scanned = 0
-
-
-                  for name in html_files[:12]:
-
-                      if not should_scan_document(
-                          name,
-                          filing[
-                              "primary_document"
-                          ]
-                      ):
-
-                          continue
-
-
-                      scanned += 1
-
-                      url = (
-                          base + name
+                  result = (
+                      compare_guidance(
+                          current,
+                          previous
                       )
+                  )
 
 
-                      try:
-
-                          html = get_text(
-                              url
-                          )
-
-                      except Exception as error:
-
-                          print(
-                              "Fehler beim Laden:",
-                              name,
-                              error
-                          )
-
-                          continue
-
-
-                      text = html_to_text(
-                          html
+                  comparisons = (
+                      result.get(
+                          "comparisons",
+                          []
                       )
+                  )
 
 
-                      results = (
-                          find_guidance_blocks(
-                              text
-                          )
-                      )
-
+                  for item in comparisons:
 
                       print("")
                       print(
-                          "DOKUMENT:",
-                          name
+                          "Kennzahl:",
+                          item[
+                              "metric"
+                          ]
                       )
 
                       print(
-                          "URL:",
-                          url
+                          "Vorher:",
+                          item[
+                              "previous"
+                          ]
                       )
 
                       print(
-                          "Guidance-Kandidaten:",
-                          len(results)
+                          "Aktuell:",
+                          item[
+                              "current"
+                          ]
                       )
 
-
-                      for number, item in enumerate(
-                          results,
-                          start=1
-                      ):
-
-                          print("")
-                          print(
-                              f"[{number}] "
-                              f"STATUS: "
-                              f"{item['status']}"
-                          )
-
-                          print(
-                              "Offizieller "
-                              "Guidance-Anker:",
-                              item["anchor"]
-                          )
-
-                          print(
-                              "Forward-Sprache:",
-                              item["forward"]
-                          )
-
-                          print(
-                              "Zahl/Range:",
-                              item["numeric"]
-                          )
-
-                          print(
-                              "Kennzahlen:",
-                              ", ".join(
-                                  item[
-                                      "business_hits"
-                                  ]
-                              )
-                              if item[
-                                  "business_hits"
-                              ]
-                              else "-"
-                          )
-
-                          print(
-                              "TEXT:"
-                          )
-
-                          print(
-                              item["text"]
-                          )
-
-
-                      all_results.extend(
-                          results
+                      print(
+                          "Veränderung:",
+                          item[
+                              "change"
+                          ]
                       )
 
-
-                  score, reason = (
-                      provisional_score(
-                          all_results
+                      print(
+                          "Richtung:",
+                          item[
+                              "direction"
+                          ]
                       )
-                  )
 
 
                   print("")
@@ -1201,68 +1449,57 @@ jobs:
 
                   print(
                       "BULLWERK GUIDANCE "
-                      "V5 ERGEBNIS"
+                      "V6 ERGEBNIS"
                   )
 
                   print("=" * 105)
 
-                  print(
-                      "Geprüfte Dokumente:",
-                      scanned
-                  )
 
-
-                  if score is None:
+                  if (
+                      result[
+                          "score"
+                      ]
+                      is None
+                  ):
 
                       print(
                           "GUIDANCE SCORE: N/A"
-                      )
-
-                      print(
-                          "Grund:",
-                          reason
-                      )
-
-                      print(
-                          "N/A wird später NICHT "
-                          "wie 0 Punkte behandelt."
                       )
 
 
                   else:
 
                       print(
-                          "VORLÄUFIGER "
                           "GUIDANCE SCORE:",
-                          f"{score}/3"
+                          f"{result['score']}/3"
                       )
 
-                      print(
-                          "Grund:",
-                          reason
-                      )
+
+                  print(
+                      "STATUS:",
+                      result[
+                          "status"
+                      ]
+                  )
+
+                  print(
+                      "GRUND:",
+                      result[
+                          "reason"
+                      ]
+                  )
 
 
                   print("")
                   print(
-                      "HINWEIS:"
+                      "WICHTIG:"
                   )
 
                   print(
-                      "V5 bewertet zunächst die "
-                      "Qualität/Verfügbarkeit der "
-                      "aktuellen Guidance."
-                  )
-
-                  print(
-                      "Für die endgültige "
-                      "Bullwerk-Regel "
-                      "'raised / maintained / "
-                      "cautious / lowered' "
-                      "muss im nächsten Schritt "
-                      "die aktuelle Guidance mit "
-                      "der vorherigen Guidance "
-                      "verglichen werden."
+                      "V6 ist ein Vergleichstest. "
+                      "Die 0-3-Regel wird erst "
+                      "nach Gegenprüfung mehrerer "
+                      "Unternehmen eingefroren."
                   )
 
 
@@ -1290,7 +1527,7 @@ jobs:
           print("=" * 105)
 
           print(
-              "Bullwerk Guidance Test V5 beendet."
+              "Bullwerk Guidance Test V6 beendet."
           )
 
           print("=" * 105)
