@@ -1,0 +1,462 @@
+name: Bullwerk Guidance Test V1
+
+on:
+  workflow_dispatch:
+
+jobs:
+  guidance-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Guidance Quellen testen
+        run: |
+          python3 <<'PY'
+
+          import json
+          import urllib.request
+          import time
+          from datetime import datetime
+
+
+          # ============================================================
+          # BULLWERK MARKETS
+          # GUIDANCE TEST V1
+          #
+          # Ziel:
+          # - offizielle SEC Company Submissions laden
+          # - aktuelle 8-K Meldungen finden
+          # - earnings-/guidance-relevante 8-Ks markieren
+          # - noch KEINE automatische Punktevergabe
+          #
+          # Später:
+          # Guidance erhöht  -> 3
+          # Guidance bestätigt/stark -> 2
+          # vorsichtig/unklar -> 1
+          # Guidance gesenkt -> 0
+          # nicht vorhanden -> N/A
+          # ============================================================
+
+
+          companies = {
+              "AAPL": "0000320193",
+              "MSFT": "0000789019"
+          }
+
+
+          USER_AGENT = (
+              "Bullwerk Markets "
+              "contact: bullwerkmarkets@gmail.com"
+          )
+
+
+          # ============================================================
+          # HTTP
+          # ============================================================
+
+          def get_json(url):
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent": USER_AGENT,
+                      "Accept": "application/json",
+                      "Accept-Encoding": "identity"
+                  }
+              )
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+
+                  print(
+                      "HTTP Status:",
+                      response.status
+                  )
+
+                  return json.loads(
+                      response.read().decode(
+                          "utf-8"
+                      )
+                  )
+
+
+          # ============================================================
+          # SEC SUBMISSIONS
+          # ============================================================
+
+          def load_submissions(cik):
+
+              url = (
+                  "https://data.sec.gov/"
+                  "submissions/"
+                  f"CIK{cik}.json"
+              )
+
+              return get_json(url)
+
+
+          # ============================================================
+          # RECENT FILINGS NORMALISIEREN
+          # ============================================================
+
+          def build_recent_filings(data):
+
+              recent = (
+                  data.get(
+                      "filings",
+                      {}
+                  ).get(
+                      "recent",
+                      {}
+                  )
+              )
+
+
+              accession = recent.get(
+                  "accessionNumber",
+                  []
+              )
+
+              filing_date = recent.get(
+                  "filingDate",
+                  []
+              )
+
+              report_date = recent.get(
+                  "reportDate",
+                  []
+              )
+
+              form = recent.get(
+                  "form",
+                  []
+              )
+
+              primary_document = recent.get(
+                  "primaryDocument",
+                  []
+              )
+
+              primary_description = recent.get(
+                  "primaryDocDescription",
+                  []
+              )
+
+              items = recent.get(
+                  "items",
+                  []
+              )
+
+
+              count = min(
+                  len(accession),
+                  len(filing_date),
+                  len(form),
+                  len(primary_document)
+              )
+
+
+              filings = []
+
+
+              for i in range(count):
+
+                  filings.append({
+
+                      "accession":
+                          accession[i],
+
+                      "filing_date":
+                          filing_date[i],
+
+                      "report_date":
+                          (
+                              report_date[i]
+                              if i < len(report_date)
+                              else ""
+                          ),
+
+                      "form":
+                          form[i],
+
+                      "document":
+                          primary_document[i],
+
+                      "description":
+                          (
+                              primary_description[i]
+                              if i < len(
+                                  primary_description
+                              )
+                              else ""
+                          ),
+
+                      "items":
+                          (
+                              items[i]
+                              if i < len(items)
+                              else ""
+                          )
+                  })
+
+
+              return filings
+
+
+          # ============================================================
+          # GUIDANCE / EARNINGS RELEVANZ
+          #
+          # 8-K Item 2.02:
+          # Results of Operations and Financial Condition
+          #
+          # Item 7.01:
+          # Regulation FD Disclosure
+          #
+          # Beide sind für Earnings/Guidance interessant.
+          # ============================================================
+
+          def is_relevant_8k(filing):
+
+              if filing.get(
+                  "form"
+              ) not in (
+                  "8-K",
+                  "8-K/A"
+              ):
+
+                  return False
+
+
+              items = (
+                  filing.get(
+                      "items"
+                  )
+                  or ""
+              )
+
+
+              relevant_items = (
+                  "2.02",
+                  "7.01"
+              )
+
+
+              if any(
+                  item in items
+                  for item in relevant_items
+              ):
+
+                  return True
+
+
+              description = (
+                  filing.get(
+                      "description"
+                  )
+                  or ""
+              ).lower()
+
+
+              keywords = (
+                  "earnings",
+                  "results",
+                  "financial",
+                  "guidance",
+                  "outlook"
+              )
+
+
+              return any(
+                  word in description
+                  for word in keywords
+              )
+
+
+          # ============================================================
+          # SEC ARCHIVE URL
+          # ============================================================
+
+          def filing_url(
+              cik,
+              accession,
+              document
+          ):
+
+              cik_number = str(
+                  int(cik)
+              )
+
+              accession_clean = (
+                  accession.replace(
+                      "-",
+                      ""
+                  )
+              )
+
+
+              return (
+                  "https://www.sec.gov/"
+                  "Archives/edgar/data/"
+                  f"{cik_number}/"
+                  f"{accession_clean}/"
+                  f"{document}"
+              )
+
+
+          # ============================================================
+          # HAUPTLAUF
+          # ============================================================
+
+          for symbol, cik in companies.items():
+
+              print("")
+              print("=" * 90)
+
+              print(
+                  "BULLWERK GUIDANCE TEST:",
+                  symbol
+              )
+
+              print("=" * 90)
+
+
+              try:
+
+                  data = load_submissions(
+                      cik
+                  )
+
+              except Exception as error:
+
+                  print(
+                      "SEC FEHLER:",
+                      error
+                  )
+
+                  continue
+
+
+              print(
+                  "Unternehmen:",
+                  data.get("name")
+              )
+
+
+              filings = (
+                  build_recent_filings(
+                      data
+                  )
+              )
+
+
+              relevant = [
+
+                  filing
+
+                  for filing in filings
+
+                  if is_relevant_8k(
+                      filing
+                  )
+              ]
+
+
+              print(
+                  "Relevante aktuelle "
+                  "8-K Meldungen:",
+                  len(relevant)
+              )
+
+
+              print("")
+
+
+              if not relevant:
+
+                  print(
+                      "Keine relevanten "
+                      "8-K Meldungen gefunden."
+                  )
+
+
+              for filing in relevant[:10]:
+
+                  print("-" * 80)
+
+                  print(
+                      "Filing Date:",
+                      filing.get(
+                          "filing_date"
+                      )
+                  )
+
+                  print(
+                      "Report Date:",
+                      filing.get(
+                          "report_date"
+                      )
+                  )
+
+                  print(
+                      "Form:",
+                      filing.get(
+                          "form"
+                      )
+                  )
+
+                  print(
+                      "Items:",
+                      filing.get(
+                          "items"
+                      )
+                  )
+
+                  print(
+                      "Beschreibung:",
+                      filing.get(
+                          "description"
+                      )
+                  )
+
+                  print(
+                      "Dokument:",
+                      filing.get(
+                          "document"
+                      )
+                  )
+
+                  print(
+                      "URL:",
+                      filing_url(
+                          cik,
+                          filing.get(
+                              "accession"
+                          ),
+                          filing.get(
+                              "document"
+                          )
+                      )
+                  )
+
+
+              print("")
+              print(
+                  symbol,
+                  "abgeschlossen."
+              )
+
+
+              time.sleep(1)
+
+
+          print("")
+          print("=" * 90)
+
+          print(
+              "Bullwerk Guidance Test V1 beendet."
+          )
+
+          print("=" * 90)
+
+          PY
