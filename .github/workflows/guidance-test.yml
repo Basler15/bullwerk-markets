@@ -1,4 +1,4 @@
-name: Bullwerk Guidance Test V4
+name: Bullwerk Guidance Test V5
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Forward Guidance V4 erkennen
+      - name: Guidance V5 bewerten
         run: |
           python3 <<'PY'
 
@@ -20,26 +20,18 @@ jobs:
 
 
           # ============================================================
-          # BULLWERK MARKETS
-          # GUIDANCE TEST V4
+          # BULLWERK MARKETS - GUIDANCE TEST V5
           #
-          # AAPL:
-          # Test für Unternehmen ohne klar erkennbare neue Guidance
+          # Ziel:
+          # 1. jüngste Earnings-8-K finden
+          # 2. echte Earnings-/CFO-Commentary-Dokumente finden
+          # 3. offizielle Guidance-Blöcke erkennen
+          # 4. historische Guidance ausschließen
+          # 5. Guidance vorläufig mit 0-3 bewerten
           #
-          # MSFT:
-          # Test, ob historische Guidance verworfen wird
-          #
-          # NVDA:
-          # Test für echte numerische Forward-Guidance
-          #
-          # V4 NEU:
-          # - Exhibit 99.x
-          # - CFO Commentary
-          # - Earnings Commentary
-          # - Financial Commentary
-          # - Outlook-Dateien
-          #
-          # Noch KEINE 0-3 Punktevergabe.
+          # WICHTIG:
+          # N/A = nicht gemeldet / nicht zuverlässig erkennbar
+          # N/A darf NICHT automatisch 0 Punkte bedeuten.
           # ============================================================
 
 
@@ -57,10 +49,42 @@ jobs:
 
 
           # ============================================================
-          # FORWARD-PATTERNS
+          # OFFIZIELLE GUIDANCE-ANKER
+          #
+          # Diese Muster sollen deutlich stärker gewichtet werden als
+          # ein allgemeines "we expect".
           # ============================================================
 
-          STRONG_FORWARD_PATTERNS = [
+          GUIDANCE_ANCHORS = [
+
+              r"\boutlook for the (?:first|second|third|fourth) quarter\b",
+              r"\boutlook for (?:q1|q2|q3|q4)\b",
+
+              r"\boutlook for the next quarter\b",
+              r"\bquarterly outlook\b",
+              r"\bnext quarter outlook\b",
+
+              r"\bguidance for the (?:first|second|third|fourth) quarter\b",
+              r"\bguidance for (?:q1|q2|q3|q4)\b",
+              r"\bguidance for the next quarter\b",
+
+              r"\bfull[- ]year outlook\b",
+              r"\bfull[- ]year guidance\b",
+
+              r"\boutlook for fiscal (?:20)?\d{2}\b",
+              r"\bguidance for fiscal (?:20)?\d{2}\b",
+
+              r"\bfor the next fiscal quarter\b",
+              r"\bfor the upcoming quarter\b",
+              r"\bfor the coming quarter\b"
+          ]
+
+
+          # ============================================================
+          # FORWARD LANGUAGE
+          # ============================================================
+
+          FORWARD_PATTERNS = [
 
               r"\bwe expect\b",
               r"\bwe anticipate\b",
@@ -70,54 +94,25 @@ jobs:
 
               r"\bcompany expects\b",
               r"\bcompany anticipates\b",
-              r"\bcompany forecasts\b",
-
-              r"\bmanagement expects\b",
-              r"\bmanagement anticipates\b",
-
-              r"\bfor the next quarter\b",
-              r"\bfor the upcoming quarter\b",
-              r"\bfor the coming quarter\b",
-
-              r"\bnext quarter\b",
-              r"\bnext fiscal quarter\b",
-              r"\bnext fiscal year\b",
-
-              r"\bfull[- ]year outlook\b",
-              r"\bquarterly outlook\b",
-
-              r"\bguidance for\b",
-              r"\boutlook for\b",
-
-              r"\bexpects revenue\b",
-              r"\bexpect revenue\b",
 
               r"\brevenue is expected\b",
               r"\brevenue.*expected to be\b",
 
-              r"\bgross margins? (?:are|is) expected\b",
-              r"\bgross margins?.*expected to be\b",
-
+              r"\bgross margins?.*expected\b",
+              r"\boperating margins?.*expected\b",
               r"\boperating expenses?.*expected\b",
               r"\boperating income.*expected\b",
 
-              r"\btax rate.*expected\b",
+              r"\bearnings.*expected\b",
+              r"\beps.*expected\b",
 
-              r"\bcapital expenditures?.*expected\b",
-
-              r"\bexpects.*gross margin\b",
-              r"\bexpect.*gross margin\b",
-
-              r"\bexpects.*operating margin\b",
-              r"\bexpect.*operating margin\b",
-
-              r"\bexpects.*earnings\b",
-              r"\bexpect.*earnings\b"
+              r"\btax rates?.*expected\b",
+              r"\bcapital expenditures?.*expected\b"
           ]
 
 
           # ============================================================
-          # HISTORISCHE / RÜCKBLICKENDE GUIDANCE
+          # HISTORISCHE GUIDANCE
           # ============================================================
 
           HISTORICAL_PATTERNS = [
@@ -129,12 +124,9 @@ jobs:
 
               r"\bcompared to our guidance\b",
               r"\bcompared with our guidance\b",
-
               r"\bversus our guidance\b",
 
               r"\bprovided on\b",
-
-              r"\bpreviously announced\b",
 
               r"\blower[- ]than[- ]expected\b",
               r"\bhigher[- ]than[- ]expected\b",
@@ -148,7 +140,7 @@ jobs:
 
 
           # ============================================================
-          # FUNDAMENTALE BEGRIFFE
+          # KENNZAHLEN
           # ============================================================
 
           BUSINESS_TERMS = [
@@ -161,6 +153,8 @@ jobs:
               "gross margins",
 
               "operating margin",
+              "operating margins",
+
               "operating income",
 
               "operating expense",
@@ -176,11 +170,7 @@ jobs:
               "capex",
 
               "tax rate",
-
-              "data center",
-              "gaming",
-              "cloud",
-              "services"
+              "tax rates"
           ]
 
 
@@ -215,13 +205,11 @@ jobs:
 
           def get_json(url):
 
-              raw = request_bytes(
-                  url,
-                  "application/json"
-              )
-
               return json.loads(
-                  raw.decode(
+                  request_bytes(
+                      url,
+                      "application/json"
+                  ).decode(
                       "utf-8",
                       errors="replace"
                   )
@@ -230,12 +218,10 @@ jobs:
 
           def get_text(url):
 
-              raw = request_bytes(
+              return request_bytes(
                   url,
                   "text/html,*/*"
-              )
-
-              return raw.decode(
+              ).decode(
                   "utf-8",
                   errors="replace"
               )
@@ -259,29 +245,23 @@ jobs:
                   html
               )
 
-              html = re.sub(
-                  r"(?i)<br\s*/?>",
-                  ". ",
-                  html
-              )
+              for tag in [
+                  r"<br\s*/?>",
+                  r"</p>",
+                  r"</div>",
+                  r"</tr>",
+                  r"</li>",
+                  r"</h1>",
+                  r"</h2>",
+                  r"</h3>"
+              ]:
 
-              html = re.sub(
-                  r"(?i)</p>",
-                  ". ",
-                  html
-              )
+                  html = re.sub(
+                      rf"(?i){tag}",
+                      ". ",
+                      html
+                  )
 
-              html = re.sub(
-                  r"(?i)</div>",
-                  ". ",
-                  html
-              )
-
-              html = re.sub(
-                  r"(?i)</tr>",
-                  ". ",
-                  html
-              )
 
               html = re.sub(
                   r"(?is)<[^>]+>",
@@ -319,7 +299,7 @@ jobs:
 
 
           # ============================================================
-          # JÜNGSTE EARNINGS 8-K
+          # JÜNGSTE EARNINGS-8-K
           # ============================================================
 
           def latest_earnings_8k(data):
@@ -329,17 +309,17 @@ jobs:
                       .get("recent", {})
               )
 
-              accession_numbers = recent.get(
+              accession = recent.get(
                   "accessionNumber",
                   []
               )
 
-              filing_dates = recent.get(
+              filing_date = recent.get(
                   "filingDate",
                   []
               )
 
-              report_dates = recent.get(
+              report_date = recent.get(
                   "reportDate",
                   []
               )
@@ -349,7 +329,7 @@ jobs:
                   []
               )
 
-              items_list = recent.get(
+              items = recent.get(
                   "items",
                   []
               )
@@ -361,8 +341,8 @@ jobs:
 
 
               count = min(
-                  len(accession_numbers),
-                  len(filing_dates),
+                  len(accession),
+                  len(filing_date),
                   len(forms),
                   len(documents)
               )
@@ -372,38 +352,35 @@ jobs:
 
                   form = forms[i]
 
-                  items = (
-                      items_list[i]
-                      if i < len(items_list)
+                  filing_items = (
+                      items[i]
+                      if i < len(items)
                       else ""
                   )
 
 
                   if (
                       form in ("8-K", "8-K/A")
-                      and "2.02" in items
+                      and "2.02" in filing_items
                   ):
 
                       return {
 
                           "accession":
-                              accession_numbers[i],
+                              accession[i],
 
                           "filing_date":
-                              filing_dates[i],
+                              filing_date[i],
 
                           "report_date":
                               (
-                                  report_dates[i]
-                                  if i < len(report_dates)
+                                  report_date[i]
+                                  if i < len(report_date)
                                   else ""
                               ),
 
-                          "form":
-                              form,
-
                           "items":
-                              items,
+                              filing_items,
 
                           "primary_document":
                               documents[i]
@@ -459,13 +436,13 @@ jobs:
 
           def get_html_files(index_data):
 
+              result = []
+
               items = (
                   index_data
                   .get("directory", {})
                   .get("item", [])
               )
-
-              result = []
 
 
               for item in items:
@@ -486,13 +463,7 @@ jobs:
 
 
           # ============================================================
-          # DOKUMENT-PRIORITÄT V4
-          #
-          # WICHTIG:
-          # NVIDIA nennt sein relevantes Dokument z.B.
-          # q2fy27cfoCommentary.htm
-          #
-          # Deshalb nicht nur nach ex99 suchen.
+          # DOKUMENT-PRIORITÄT
           # ============================================================
 
           def document_priority(name):
@@ -502,9 +473,33 @@ jobs:
               score = 0
 
 
-              # -------------------------
-              # SEC Exhibits
-              # -------------------------
+              if "cfocommentary" in lower:
+                  score += 150
+
+              if (
+                  "cfo" in lower
+                  and "commentary" in lower
+              ):
+                  score += 150
+
+
+              if "earningscommentary" in lower:
+                  score += 140
+
+              if (
+                  "earnings" in lower
+                  and "commentary" in lower
+              ):
+                  score += 140
+
+
+              if "financialcommentary" in lower:
+                  score += 130
+
+
+              if "outlook" in lower:
+                  score += 120
+
 
               if "ex99" in lower:
                   score += 100
@@ -522,60 +517,6 @@ jobs:
                   score += 95
 
 
-              # -------------------------
-              # CFO Commentary
-              # -------------------------
-
-              if "cfocommentary" in lower:
-                  score += 120
-
-              if (
-                  "cfo" in lower
-                  and "commentary" in lower
-              ):
-                  score += 120
-
-
-              # -------------------------
-              # Earnings Commentary
-              # -------------------------
-
-              if "earningscommentary" in lower:
-                  score += 110
-
-              if (
-                  "earnings" in lower
-                  and "commentary" in lower
-              ):
-                  score += 110
-
-
-              # -------------------------
-              # Financial Commentary
-              # -------------------------
-
-              if "financialcommentary" in lower:
-                  score += 105
-
-              if (
-                  "financial" in lower
-                  and "commentary" in lower
-              ):
-                  score += 105
-
-
-              # -------------------------
-              # Outlook
-              # -------------------------
-
-              if "outlook" in lower:
-                  score += 90
-
-
-              # -------------------------
-              # Allgemeine Hinweise
-              # -------------------------
-
               if "earn" in lower:
                   score += 40
 
@@ -586,23 +527,15 @@ jobs:
                   score += 25
 
 
-              # -------------------------
-              # SEC Hilfsdateien
-              # -------------------------
-
               if "index" in lower:
-                  score -= 50
+                  score -= 100
 
               if "header" in lower:
-                  score -= 50
+                  score -= 100
 
 
               return score
 
-
-          # ============================================================
-          # DOKUMENT SOLL GEPRÜFT WERDEN?
-          # ============================================================
 
           def should_scan_document(
               name,
@@ -611,44 +544,28 @@ jobs:
 
               lower = name.lower()
 
-              primary_lower = (
+              primary = (
                   primary_document
                   or ""
               ).lower()
 
 
-              # Haupt-8-K nicht als Guidance-Dokument
-              # bevorzugen.
-
-              if lower == primary_lower:
-
+              if lower == primary:
                   return False
 
-
-              # SEC Index/Hilfsdateien ausschließen
 
               if (
                   "index" in lower
                   or "header" in lower
               ):
-
                   return False
 
 
-              # Hoch priorisierte Dokumente
-
               if document_priority(name) >= 40:
-
                   return True
 
 
-              # V4:
-              # Commentary-Dateien grundsätzlich
-              # zulassen, auch wenn Dateiname
-              # ungewöhnlich ist.
-
               if "commentary" in lower:
-
                   return True
 
 
@@ -656,98 +573,31 @@ jobs:
 
 
           # ============================================================
-          # TEXTBLÖCKE
-          # ============================================================
-
-          def split_blocks(text):
-
-              raw_blocks = re.split(
-                  r"(?<=[.!?])\s+",
-                  text
-              )
-
-              blocks = []
-
-
-              for block in raw_blocks:
-
-                  block = block.strip()
-
-
-                  if len(block) < 25:
-                      continue
-
-
-                  if len(block) > 2000:
-
-                      pieces = [
-                          block[i:i + 1200]
-                          for i in range(
-                              0,
-                              len(block),
-                              1200
-                          )
-                      ]
-
-                      blocks.extend(
-                          pieces
-                      )
-
-                  else:
-
-                      blocks.append(
-                          block
-                      )
-
-
-              return blocks
-
-
-          # ============================================================
-          # REGEX TEST
+          # HILFSFUNKTIONEN
           # ============================================================
 
           def matches_any(text, patterns):
 
-              lower = text.lower()
-
-
-              for pattern in patterns:
-
-                  if re.search(
+              return any(
+                  re.search(
                       pattern,
-                      lower,
+                      text,
                       flags=re.I
-                  ):
+                  )
+                  for pattern in patterns
+              )
 
-                      return True
-
-
-              return False
-
-
-          # ============================================================
-          # BUSINESS RELEVANZ
-          # ============================================================
 
           def business_relevance(text):
 
               lower = text.lower()
 
-
               return [
-
                   term
-
                   for term in BUSINESS_TERMS
-
                   if term in lower
               ]
 
-
-          # ============================================================
-          # ZAHL / RANGE
-          # ============================================================
 
           def has_numeric_target(text):
 
@@ -757,15 +607,24 @@ jobs:
 
                   r"\d+(?:\.\d+)?\s?%",
 
-                  r"\d+(?:\.\d+)?\s*(?:billion|million)",
+                  r"\d+(?:\.\d+)?\s*percent",
 
-                  r"\d+(?:\.\d+)?\s*(?:to|-)\s*\d+(?:\.\d+)?\s?%",
+                  r"\d+(?:\.\d+)?\s*"
+                  r"(?:billion|million)",
 
-                  r"\$\s?\d+(?:\.\d+)?\s*(?:to|-)\s*\$?\s?\d+(?:\.\d+)?",
+                  r"\d+(?:\.\d+)?\s*"
+                  r"(?:to|-)\s*"
+                  r"\d+(?:\.\d+)?\s?%",
 
-                  r"\d+(?:\.\d+)?\s*(?:billion|million)\s*(?:plus|minus)",
+                  r"\$\s?\d+(?:\.\d+)?\s*"
+                  r"(?:to|-)\s*"
+                  r"\$?\s?\d+(?:\.\d+)?",
 
-                  r"\d+(?:\.\d+)?\s*percent"
+                  r"\d+(?:\.\d+)?\s*"
+                  r"(?:basis points|bps)",
+
+                  r"plus or minus\s*"
+                  r"\d+(?:\.\d+)?\s?%"
               ]
 
 
@@ -780,10 +639,30 @@ jobs:
 
 
           # ============================================================
-          # FORWARD GUIDANCE ERKENNEN
+          # TEXTBLÖCKE
           # ============================================================
 
-          def find_forward_guidance(text):
+          def split_blocks(text):
+
+              blocks = re.split(
+                  r"(?<=[.!?])\s+",
+                  text
+              )
+
+              return [
+                  block.strip()
+                  for block in blocks
+                  if len(
+                      block.strip()
+                  ) >= 25
+              ]
+
+
+          # ============================================================
+          # GUIDANCE-BLÖCKE FINDEN
+          # ============================================================
+
+          def find_guidance_blocks(text):
 
               blocks = split_blocks(
                   text
@@ -794,46 +673,71 @@ jobs:
 
               for index, block in enumerate(blocks):
 
-                  if not matches_any(
+                  anchor = matches_any(
                       block,
-                      STRONG_FORWARD_PATTERNS
+                      GUIDANCE_ANCHORS
+                  )
+
+                  forward = matches_any(
+                      block,
+                      FORWARD_PATTERNS
+                  )
+
+
+                  if not (
+                      anchor
+                      or forward
                   ):
 
                       continue
 
 
-                  context_parts = []
+                  # Mehr Kontext nach vorne nehmen,
+                  # weil Outlook-Überschrift häufig
+                  # vor mehreren Guidance-Sätzen steht.
 
-
-                  if index > 0:
-
-                      context_parts.append(
-                          blocks[index - 1]
-                      )
-
-
-                  context_parts.append(
-                      block
+                  start = max(
+                      0,
+                      index - 1
                   )
 
-
-                  if index + 1 < len(blocks):
-
-                      context_parts.append(
-                          blocks[index + 1]
-                      )
+                  end = min(
+                      len(blocks),
+                      index + 4
+                  )
 
 
                   context = " ".join(
-                      context_parts
+                      blocks[start:end]
                   )
 
 
-                  historical = matches_any(
-                      context,
-                      HISTORICAL_PATTERNS
+                  context_anchor = (
+                      matches_any(
+                          context,
+                          GUIDANCE_ANCHORS
+                      )
                   )
 
+                  context_forward = (
+                      matches_any(
+                          context,
+                          FORWARD_PATTERNS
+                      )
+                  )
+
+                  historical = (
+                      matches_any(
+                          context,
+                          HISTORICAL_PATTERNS
+                      )
+                  )
+
+                  numeric = (
+                      has_numeric_target(
+                          context
+                      )
+                  )
 
                   business_hits = (
                       business_relevance(
@@ -842,12 +746,9 @@ jobs:
                   )
 
 
-                  numeric = (
-                      has_numeric_target(
-                          context
-                      )
-                  )
-
+                  # --------------------------------------------
+                  # CLASSIFICATION
+                  # --------------------------------------------
 
                   if historical:
 
@@ -857,16 +758,36 @@ jobs:
 
 
                   elif (
-                      business_hits
+                      context_anchor
+                      and context_forward
                       and numeric
+                      and business_hits
                   ):
 
-                      status = "HIGH"
+                      status = (
+                          "OFFICIAL_HIGH"
+                      )
 
 
-                  elif business_hits:
+                  elif (
+                      context_anchor
+                      and business_hits
+                  ):
 
-                      status = "MEDIUM"
+                      status = (
+                          "OFFICIAL_MEDIUM"
+                      )
+
+
+                  elif (
+                      context_forward
+                      and numeric
+                      and business_hits
+                  ):
+
+                      status = (
+                          "FORWARD_ONLY"
+                      )
 
 
                   else:
@@ -879,6 +800,12 @@ jobs:
                       "status":
                           status,
 
+                      "anchor":
+                          context_anchor,
+
+                      "forward":
+                          context_forward,
+
                       "numeric":
                           numeric,
 
@@ -890,9 +817,7 @@ jobs:
                   })
 
 
-              # -------------------------
               # Duplikate entfernen
-              # -------------------------
 
               unique = []
 
@@ -901,10 +826,14 @@ jobs:
 
               for item in results:
 
-                  key = (
-                      item["text"][:300]
-                      .lower()
+                  normalized = re.sub(
+                      r"\s+",
+                      " ",
+                      item["text"].lower()
                   )
+
+
+                  key = normalized[:350]
 
 
                   if key in seen:
@@ -922,20 +851,94 @@ jobs:
 
 
           # ============================================================
+          # VORLÄUFIGER GUIDANCE-SCORE
+          #
+          # 3 = klare offizielle quantitative Guidance
+          # 2 = klare offizielle Guidance, aber schwächer/teilweise
+          # 1 = nur allgemeine Zukunftsaussage
+          # 0 = belastbare negative/gesenkte Guidance
+          # N/A = keine verwertbare Guidance
+          #
+          # ACHTUNG:
+          # "0 = gesenkt" können wir erst zuverlässig verwenden,
+          # wenn wir aktuelle mit vorheriger Guidance vergleichen.
+          # Deshalb erzeugt V5 noch NICHT automatisch 0.
+          # ============================================================
+
+          def provisional_score(all_results):
+
+              official_high = [
+                  item
+                  for item in all_results
+                  if item["status"]
+                  == "OFFICIAL_HIGH"
+              ]
+
+              official_medium = [
+                  item
+                  for item in all_results
+                  if item["status"]
+                  == "OFFICIAL_MEDIUM"
+              ]
+
+              forward_only = [
+                  item
+                  for item in all_results
+                  if item["status"]
+                  == "FORWARD_ONLY"
+              ]
+
+
+              if official_high:
+
+                  return (
+                      3,
+                      "Klare offizielle "
+                      "quantitative Forward-Guidance"
+                  )
+
+
+              if official_medium:
+
+                  return (
+                      2,
+                      "Offizielle Forward-Guidance "
+                      "erkannt"
+                  )
+
+
+              if forward_only:
+
+                  return (
+                      1,
+                      "Allgemeine Forward-Aussage, "
+                      "aber kein ausreichend klarer "
+                      "Guidance-Block"
+                  )
+
+
+              return (
+                  None,
+                  "Keine belastbare neue Guidance "
+                  "erkannt"
+              )
+
+
+          # ============================================================
           # HAUPTLAUF
           # ============================================================
 
           for symbol, cik in COMPANIES.items():
 
               print("")
-              print("=" * 100)
+              print("=" * 105)
 
               print(
-                  "BULLWERK GUIDANCE V4:",
+                  "BULLWERK GUIDANCE V5:",
                   symbol
               )
 
-              print("=" * 100)
+              print("=" * 105)
 
 
               try:
@@ -967,6 +970,10 @@ jobs:
                       print(
                           "Keine Earnings-8-K "
                           "mit Item 2.02 gefunden."
+                      )
+
+                      print(
+                          "GUIDANCE SCORE: N/A"
                       )
 
                       continue
@@ -1024,21 +1031,11 @@ jobs:
 
                   print("")
                   print(
-                      "Priorisierte Dokumente:"
+                      "Dokumentauswahl:"
                   )
 
 
                   for name in html_files[:12]:
-
-                      scan = (
-                          should_scan_document(
-                              name,
-                              filing[
-                                  "primary_document"
-                              ]
-                          )
-                      )
-
 
                       print(
                           "-",
@@ -1048,23 +1045,28 @@ jobs:
                               name
                           ),
                           "| Scan:",
-                          scan
+                          should_scan_document(
+                              name,
+                              filing[
+                                  "primary_document"
+                              ]
+                          )
                       )
 
 
                   print("")
-                  print("=" * 100)
+                  print("=" * 105)
 
                   print(
-                      "ECHTE FORWARD-GUIDANCE-SUCHE"
+                      "OFFIZIELLE GUIDANCE-SUCHE"
                   )
 
-                  print("=" * 100)
+                  print("=" * 105)
 
 
-                  found_usable = False
+                  all_results = []
 
-                  scanned_documents = 0
+                  scanned = 0
 
 
                   for name in html_files[:12]:
@@ -1079,8 +1081,7 @@ jobs:
                           continue
 
 
-                      scanned_documents += 1
-
+                      scanned += 1
 
                       url = (
                           base + name
@@ -1110,7 +1111,7 @@ jobs:
 
 
                       results = (
-                          find_forward_guidance(
+                          find_guidance_blocks(
                               text
                           )
                       )
@@ -1123,30 +1124,14 @@ jobs:
                       )
 
                       print(
-                          "Priorität:",
-                          document_priority(
-                              name
-                          )
-                      )
-
-                      print(
                           "URL:",
                           url
                       )
 
                       print(
-                          "Forward-Kandidaten:",
+                          "Guidance-Kandidaten:",
                           len(results)
                       )
-
-
-                      if not results:
-
-                          print(
-                              "Keine Kandidaten."
-                          )
-
-                          continue
 
 
                       for number, item in enumerate(
@@ -1162,14 +1147,23 @@ jobs:
                           )
 
                           print(
-                              "Konkrete Zahl/Range:",
-                              item[
-                                  "numeric"
-                              ]
+                              "Offizieller "
+                              "Guidance-Anker:",
+                              item["anchor"]
                           )
 
                           print(
-                              "Business-Begriffe:",
+                              "Forward-Sprache:",
+                              item["forward"]
+                          )
+
+                          print(
+                              "Zahl/Range:",
+                              item["numeric"]
+                          )
+
+                          print(
+                              "Kennzahlen:",
                               ", ".join(
                                   item[
                                       "business_hits"
@@ -1186,63 +1180,90 @@ jobs:
                           )
 
                           print(
-                              item[
-                                  "text"
-                              ]
+                              item["text"]
                           )
 
 
-                          if item[
-                              "status"
-                          ] in (
-                              "HIGH",
-                              "MEDIUM"
-                          ):
-
-                              found_usable = True
+                      all_results.extend(
+                          results
+                      )
 
 
-                  print("")
-                  print("-" * 100)
-
-                  print(
-                      "Geprüfte Dokumente:",
-                      scanned_documents
+                  score, reason = (
+                      provisional_score(
+                          all_results
+                      )
                   )
 
 
-                  if found_usable:
+                  print("")
+                  print("=" * 105)
+
+                  print(
+                      "BULLWERK GUIDANCE "
+                      "V5 ERGEBNIS"
+                  )
+
+                  print("=" * 105)
+
+                  print(
+                      "Geprüfte Dokumente:",
+                      scanned
+                  )
+
+
+                  if score is None:
 
                       print(
-                          "BULLWERK ERGEBNIS:",
-                          "Neue Forward-Guidance "
-                          "möglicherweise vorhanden."
+                          "GUIDANCE SCORE: N/A"
                       )
 
                       print(
-                          "STATUS:",
-                          "PRÜFEN"
+                          "Grund:",
+                          reason
+                      )
+
+                      print(
+                          "N/A wird später NICHT "
+                          "wie 0 Punkte behandelt."
                       )
 
 
                   else:
 
                       print(
-                          "BULLWERK ERGEBNIS:",
-                          "Keine belastbare neue "
-                          "Forward-Guidance erkannt."
+                          "VORLÄUFIGER "
+                          "GUIDANCE SCORE:",
+                          f"{score}/3"
                       )
 
                       print(
-                          "STATUS:",
-                          "N/A"
+                          "Grund:",
+                          reason
                       )
 
-                      print(
-                          "WICHTIG:",
-                          "N/A bedeutet NICHT "
-                          "0 Punkte."
-                      )
+
+                  print("")
+                  print(
+                      "HINWEIS:"
+                  )
+
+                  print(
+                      "V5 bewertet zunächst die "
+                      "Qualität/Verfügbarkeit der "
+                      "aktuellen Guidance."
+                  )
+
+                  print(
+                      "Für die endgültige "
+                      "Bullwerk-Regel "
+                      "'raised / maintained / "
+                      "cautious / lowered' "
+                      "muss im nächsten Schritt "
+                      "die aktuelle Guidance mit "
+                      "der vorherigen Guidance "
+                      "verglichen werden."
+                  )
 
 
               except Exception as error:
@@ -1266,12 +1287,12 @@ jobs:
 
 
           print("")
-          print("=" * 100)
+          print("=" * 105)
 
           print(
-              "Bullwerk Guidance Test V4 beendet."
+              "Bullwerk Guidance Test V5 beendet."
           )
 
-          print("=" * 100)
+          print("=" * 105)
 
           PY
