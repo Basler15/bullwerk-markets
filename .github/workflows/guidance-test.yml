@@ -1,4 +1,4 @@
-name: Bullwerk Guidance Test V3
+name: Bullwerk Guidance Test V4
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Echte Forward Guidance erkennen
+      - name: Forward Guidance V4 erkennen
         run: |
           python3 <<'PY'
 
@@ -21,14 +21,25 @@ jobs:
 
           # ============================================================
           # BULLWERK MARKETS
-          # GUIDANCE TEST V3
+          # GUIDANCE TEST V4
           #
-          # Testunternehmen:
-          # AAPL = Gegenprobe ohne klare SEC-Guidance
-          # MSFT = Test historischer Guidance-Verweise
-          # NVDA = Gegenprobe für echte numerische Forward-Guidance
+          # AAPL:
+          # Test für Unternehmen ohne klar erkennbare neue Guidance
           #
-          # Noch KEINE Punktevergabe.
+          # MSFT:
+          # Test, ob historische Guidance verworfen wird
+          #
+          # NVDA:
+          # Test für echte numerische Forward-Guidance
+          #
+          # V4 NEU:
+          # - Exhibit 99.x
+          # - CFO Commentary
+          # - Earnings Commentary
+          # - Financial Commentary
+          # - Outlook-Dateien
+          #
+          # Noch KEINE 0-3 Punktevergabe.
           # ============================================================
 
 
@@ -46,7 +57,7 @@ jobs:
 
 
           # ============================================================
-          # ECHTE ZUKUNFTS-SIGNALE
+          # FORWARD-PATTERNS
           # ============================================================
 
           STRONG_FORWARD_PATTERNS = [
@@ -69,8 +80,8 @@ jobs:
               r"\bfor the coming quarter\b",
 
               r"\bnext quarter\b",
-              r"\bnext fiscal year\b",
               r"\bnext fiscal quarter\b",
+              r"\bnext fiscal year\b",
 
               r"\bfull[- ]year outlook\b",
               r"\bquarterly outlook\b",
@@ -81,11 +92,24 @@ jobs:
               r"\bexpects revenue\b",
               r"\bexpect revenue\b",
 
-              r"\bexpects.*operating margin\b",
-              r"\bexpect.*operating margin\b",
+              r"\brevenue is expected\b",
+              r"\brevenue.*expected to be\b",
+
+              r"\bgross margins? (?:are|is) expected\b",
+              r"\bgross margins?.*expected to be\b",
+
+              r"\boperating expenses?.*expected\b",
+              r"\boperating income.*expected\b",
+
+              r"\btax rate.*expected\b",
+
+              r"\bcapital expenditures?.*expected\b",
 
               r"\bexpects.*gross margin\b",
               r"\bexpect.*gross margin\b",
+
+              r"\bexpects.*operating margin\b",
+              r"\bexpect.*operating margin\b",
 
               r"\bexpects.*earnings\b",
               r"\bexpect.*earnings\b"
@@ -93,7 +117,7 @@ jobs:
 
 
           # ============================================================
-          # HISTORISCHE GUIDANCE / RÜCKBLICK
+          # HISTORISCHE / RÜCKBLICKENDE GUIDANCE
           # ============================================================
 
           HISTORICAL_PATTERNS = [
@@ -132,20 +156,31 @@ jobs:
               "revenue",
               "sales",
               "growth",
+
               "gross margin",
+              "gross margins",
+
               "operating margin",
               "operating income",
+
+              "operating expense",
+              "operating expenses",
+
               "earnings",
               "eps",
+
               "free cash flow",
               "cash flow",
+
               "capital expenditures",
               "capex",
-              "expenses",
-              "cloud",
-              "services",
+
+              "tax rate",
+
               "data center",
-              "gaming"
+              "gaming",
+              "cloud",
+              "services"
           ]
 
 
@@ -243,6 +278,12 @@ jobs:
               )
 
               html = re.sub(
+                  r"(?i)</tr>",
+                  ". ",
+                  html
+              )
+
+              html = re.sub(
                   r"(?is)<[^>]+>",
                   " ",
                   html
@@ -270,17 +311,15 @@ jobs:
 
           def load_submissions(cik):
 
-              url = (
+              return get_json(
                   "https://data.sec.gov/"
                   "submissions/"
                   f"CIK{cik}.json"
               )
 
-              return get_json(url)
-
 
           # ============================================================
-          # JÜNGSTE EARNINGS-8-K MIT ITEM 2.02
+          # JÜNGSTE EARNINGS 8-K
           # ============================================================
 
           def latest_earnings_8k(data):
@@ -406,13 +445,11 @@ jobs:
                   accession
               )
 
-              index_url = (
-                  base + "index.json"
-              )
-
               return (
                   base,
-                  get_json(index_url)
+                  get_json(
+                      base + "index.json"
+                  )
               )
 
 
@@ -449,7 +486,13 @@ jobs:
 
 
           # ============================================================
-          # EXHIBIT PRIORITÄT
+          # DOKUMENT-PRIORITÄT V4
+          #
+          # WICHTIG:
+          # NVIDIA nennt sein relevantes Dokument z.B.
+          # q2fy27cfoCommentary.htm
+          #
+          # Deshalb nicht nur nach ex99 suchen.
           # ============================================================
 
           def document_priority(name):
@@ -458,6 +501,10 @@ jobs:
 
               score = 0
 
+
+              # -------------------------
+              # SEC Exhibits
+              # -------------------------
 
               if "ex99" in lower:
                   score += 100
@@ -474,17 +521,138 @@ jobs:
               if "99.1" in lower:
                   score += 95
 
-              if "earn" in lower:
-                  score += 50
 
-              if "release" in lower:
+              # -------------------------
+              # CFO Commentary
+              # -------------------------
+
+              if "cfocommentary" in lower:
+                  score += 120
+
+              if (
+                  "cfo" in lower
+                  and "commentary" in lower
+              ):
+                  score += 120
+
+
+              # -------------------------
+              # Earnings Commentary
+              # -------------------------
+
+              if "earningscommentary" in lower:
+                  score += 110
+
+              if (
+                  "earnings" in lower
+                  and "commentary" in lower
+              ):
+                  score += 110
+
+
+              # -------------------------
+              # Financial Commentary
+              # -------------------------
+
+              if "financialcommentary" in lower:
+                  score += 105
+
+              if (
+                  "financial" in lower
+                  and "commentary" in lower
+              ):
+                  score += 105
+
+
+              # -------------------------
+              # Outlook
+              # -------------------------
+
+              if "outlook" in lower:
+                  score += 90
+
+
+              # -------------------------
+              # Allgemeine Hinweise
+              # -------------------------
+
+              if "earn" in lower:
                   score += 40
 
+              if "release" in lower:
+                  score += 35
+
+              if "results" in lower:
+                  score += 25
+
+
+              # -------------------------
+              # SEC Hilfsdateien
+              # -------------------------
+
               if "index" in lower:
-                  score -= 20
+                  score -= 50
+
+              if "header" in lower:
+                  score -= 50
 
 
               return score
+
+
+          # ============================================================
+          # DOKUMENT SOLL GEPRÜFT WERDEN?
+          # ============================================================
+
+          def should_scan_document(
+              name,
+              primary_document
+          ):
+
+              lower = name.lower()
+
+              primary_lower = (
+                  primary_document
+                  or ""
+              ).lower()
+
+
+              # Haupt-8-K nicht als Guidance-Dokument
+              # bevorzugen.
+
+              if lower == primary_lower:
+
+                  return False
+
+
+              # SEC Index/Hilfsdateien ausschließen
+
+              if (
+                  "index" in lower
+                  or "header" in lower
+              ):
+
+                  return False
+
+
+              # Hoch priorisierte Dokumente
+
+              if document_priority(name) >= 40:
+
+                  return True
+
+
+              # V4:
+              # Commentary-Dateien grundsätzlich
+              # zulassen, auch wenn Dateiname
+              # ungewöhnlich ist.
+
+              if "commentary" in lower:
+
+                  return True
+
+
+              return False
 
 
           # ============================================================
@@ -506,18 +674,18 @@ jobs:
                   block = block.strip()
 
 
-                  if len(block) < 30:
+                  if len(block) < 25:
                       continue
 
 
-                  if len(block) > 1800:
+                  if len(block) > 2000:
 
                       pieces = [
-                          block[i:i + 1000]
+                          block[i:i + 1200]
                           for i in range(
                               0,
                               len(block),
-                              1000
+                              1200
                           )
                       ]
 
@@ -567,7 +735,7 @@ jobs:
               lower = text.lower()
 
 
-              hits = [
+              return [
 
                   term
 
@@ -577,11 +745,8 @@ jobs:
               ]
 
 
-              return hits
-
-
           # ============================================================
-          # ZAHLEN / GUIDANCE RANGE
+          # ZAHL / RANGE
           # ============================================================
 
           def has_numeric_target(text):
@@ -596,7 +761,11 @@ jobs:
 
                   r"\d+(?:\.\d+)?\s*(?:to|-)\s*\d+(?:\.\d+)?\s?%",
 
-                  r"\$\s?\d+(?:\.\d+)?\s*(?:to|-)\s*\$?\s?\d+(?:\.\d+)?"
+                  r"\$\s?\d+(?:\.\d+)?\s*(?:to|-)\s*\$?\s?\d+(?:\.\d+)?",
+
+                  r"\d+(?:\.\d+)?\s*(?:billion|million)\s*(?:plus|minus)",
+
+                  r"\d+(?:\.\d+)?\s*percent"
               ]
 
 
@@ -686,6 +855,7 @@ jobs:
                           "REJECT_HISTORICAL"
                       )
 
+
                   elif (
                       business_hits
                       and numeric
@@ -693,9 +863,11 @@ jobs:
 
                       status = "HIGH"
 
+
                   elif business_hits:
 
                       status = "MEDIUM"
+
 
                   else:
 
@@ -718,7 +890,9 @@ jobs:
                   })
 
 
+              # -------------------------
               # Duplikate entfernen
+              # -------------------------
 
               unique = []
 
@@ -728,7 +902,7 @@ jobs:
               for item in results:
 
                   key = (
-                      item["text"][:250]
+                      item["text"][:300]
                       .lower()
                   )
 
@@ -744,7 +918,7 @@ jobs:
                   )
 
 
-              return unique[:15]
+              return unique[:20]
 
 
           # ============================================================
@@ -757,7 +931,7 @@ jobs:
               print("=" * 100)
 
               print(
-                  "BULLWERK GUIDANCE V3:",
+                  "BULLWERK GUIDANCE V4:",
                   symbol
               )
 
@@ -854,7 +1028,17 @@ jobs:
                   )
 
 
-                  for name in html_files[:8]:
+                  for name in html_files[:12]:
+
+                      scan = (
+                          should_scan_document(
+                              name,
+                              filing[
+                                  "primary_document"
+                              ]
+                          )
+                      )
+
 
                       print(
                           "-",
@@ -862,7 +1046,9 @@ jobs:
                           "| Priorität:",
                           document_priority(
                               name
-                          )
+                          ),
+                          "| Scan:",
+                          scan
                       )
 
 
@@ -878,18 +1064,22 @@ jobs:
 
                   found_usable = False
 
-
-                  for name in html_files[:8]:
-
-                      priority = (
-                          document_priority(
-                              name
-                          )
-                      )
+                  scanned_documents = 0
 
 
-                      if priority < 40:
+                  for name in html_files[:12]:
+
+                      if not should_scan_document(
+                          name,
+                          filing[
+                              "primary_document"
+                          ]
+                      ):
+
                           continue
+
+
+                      scanned_documents += 1
 
 
                       url = (
@@ -930,6 +1120,13 @@ jobs:
                       print(
                           "DOKUMENT:",
                           name
+                      )
+
+                      print(
+                          "Priorität:",
+                          document_priority(
+                              name
+                          )
                       )
 
                       print(
@@ -1005,12 +1202,13 @@ jobs:
                               found_usable = True
 
 
-                      if priority >= 90:
-                          break
-
-
                   print("")
                   print("-" * 100)
+
+                  print(
+                      "Geprüfte Dokumente:",
+                      scanned_documents
+                  )
 
 
                   if found_usable:
@@ -1026,13 +1224,13 @@ jobs:
                           "PRÜFEN"
                       )
 
+
                   else:
 
                       print(
                           "BULLWERK ERGEBNIS:",
                           "Keine belastbare neue "
-                          "Forward-Guidance im "
-                          "Earnings Release erkannt."
+                          "Forward-Guidance erkannt."
                       )
 
                       print(
@@ -1071,8 +1269,7 @@ jobs:
           print("=" * 100)
 
           print(
-              "Bullwerk Guidance Test V3 "
-              "mit NVIDIA beendet."
+              "Bullwerk Guidance Test V4 beendet."
           )
 
           print("=" * 100)
