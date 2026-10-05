@@ -1,4 +1,4 @@
-name: Bullwerk Guidance Test V7
+name: Bullwerk Guidance V7 Gegenprobe
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Guidance V7 gewichtet bewerten
+      - name: Guidance V7 Gegenprobe
         run: |
           python3 <<'PY'
 
@@ -20,33 +20,28 @@ jobs:
 
 
           # ============================================================
-          # BULLWERK MARKETS - GUIDANCE TEST V7
+          # BULLWERK MARKETS
+          # GUIDANCE V7 - GEGENPROBE
           #
-          # NEU GEGENÜBER V6:
+          # WICHTIG:
+          # Die Bewertungslogik von V7 bleibt unverändert.
+          # Wir testen sie jetzt an mehreren Unternehmen.
           #
-          # - funktionierende SEC-/Guidance-Extraktion bleibt erhalten
-          # - Umsatz-Guidance = Hauptsignal
-          # - Gross Margin = Qualitäts-/Profitabilitätsfaktor
-          # - Operating Expenses werden dokumentiert,
-          #   aber NICHT isoliert als negativ gewertet
-          # - Bewertung berücksichtigt Stärke der Veränderung
-          #
-          # V7 TESTLOGIK:
-          #
-          # 3/3 = klare Verbesserung
-          # 2/3 = positiv/stabil, aber mit Gegenwind
-          # 1/3 = vorsichtig / gemischt / schwach
+          # 3/3 = starke Verbesserung
+          # 2/3 = stabil bis positiv
+          # 1/3 = vorsichtig / Gegenwind
           # 0/3 = klare Verschlechterung
           # N/A = nicht zuverlässig vergleichbar
-          #
-          # NOCH NICHT FINAL EINGEFROREN
           # ============================================================
 
 
           COMPANIES = {
               "AAPL": "0000320193",
               "MSFT": "0000789019",
-              "NVDA": "0001045810"
+              "NVDA": "0001045810",
+              "AVGO": "0001730168",
+              "MU":   "0000723125",
+              "ORCL": "0001341439"
           }
 
 
@@ -62,7 +57,7 @@ jobs:
 
           def request_bytes(url, accept="*/*"):
 
-              request = urllib.request.Request(
+              req = urllib.request.Request(
                   url,
                   headers={
                       "User-Agent": USER_AGENT,
@@ -72,7 +67,7 @@ jobs:
               )
 
               with urllib.request.urlopen(
-                  request,
+                  req,
                   timeout=30
               ) as response:
 
@@ -127,24 +122,17 @@ jobs:
                   html
               )
 
+              html = re.sub(
+                  r"(?i)<br\s*/?>",
+                  ". ",
+                  html
+              )
 
-              for tag in [
-                  r"<br\s*/?>",
-                  r"</p>",
-                  r"</div>",
-                  r"</tr>",
-                  r"</li>",
-                  r"</h1>",
-                  r"</h2>",
-                  r"</h3>"
-              ]:
-
-                  html = re.sub(
-                      rf"(?i){tag}",
-                      ". ",
-                      html
-                  )
-
+              html = re.sub(
+                  r"(?i)</(?:p|div|tr|li|h1|h2|h3)>",
+                  ". ",
+                  html
+              )
 
               html = re.sub(
                   r"(?is)<[^>]+>",
@@ -175,14 +163,13 @@ jobs:
           def load_submissions(cik):
 
               return get_json(
-                  "https://data.sec.gov/"
-                  "submissions/"
+                  "https://data.sec.gov/submissions/"
                   f"CIK{cik}.json"
               )
 
 
           # ============================================================
-          # ZWEI JÜNGSTE EARNINGS-8-Ks
+          # EARNINGS 8-Ks
           # ============================================================
 
           def latest_earnings_filings(
@@ -195,13 +182,12 @@ jobs:
                       .get("recent", {})
               )
 
-
               accessions = recent.get(
                   "accessionNumber",
                   []
               )
 
-              filing_dates = recent.get(
+              dates = recent.get(
                   "filingDate",
                   []
               )
@@ -216,7 +202,7 @@ jobs:
                   []
               )
 
-              items_list = recent.get(
+              items = recent.get(
                   "items",
                   []
               )
@@ -226,41 +212,35 @@ jobs:
                   []
               )
 
-
               result = []
 
 
-              count = min(
-                  len(accessions),
-                  len(filing_dates),
-                  len(forms),
-                  len(documents)
-              )
+              for i in range(len(accessions)):
 
+                  form = (
+                      forms[i]
+                      if i < len(forms)
+                      else ""
+                  )
 
-              for i in range(count):
-
-                  form = forms[i]
-
-                  items = (
-                      items_list[i]
-                      if i < len(items_list)
+                  filing_items = (
+                      items[i]
+                      if i < len(items)
                       else ""
                   )
 
 
                   if (
                       form in ("8-K", "8-K/A")
-                      and "2.02" in items
+                      and "2.02" in filing_items
                   ):
 
                       result.append({
-
                           "accession":
                               accessions[i],
 
                           "filing_date":
-                              filing_dates[i],
+                              dates[i],
 
                           "report_date":
                               (
@@ -270,7 +250,7 @@ jobs:
                               ),
 
                           "items":
-                              items,
+                              filing_items,
 
                           "primary_document":
                               documents[i]
@@ -288,7 +268,10 @@ jobs:
           # SEC ARCHIVE
           # ============================================================
 
-          def archive_base(cik, accession):
+          def archive_base(
+              cik,
+              accession
+          ):
 
               cik_number = str(
                   int(cik)
@@ -327,7 +310,7 @@ jobs:
 
 
           # ============================================================
-          # DOKUMENTAUSWAHL
+          # DOKUMENTE
           # ============================================================
 
           def get_html_files(index_data):
@@ -338,25 +321,16 @@ jobs:
                   .get("item", [])
               )
 
-              result = []
-
-
-              for item in items:
-
-                  name = (
-                      item.get("name")
-                      or ""
-                  )
-
-
-                  if name.lower().endswith(
+              return [
+                  item.get("name", "")
+                  for item in items
+                  if item.get(
+                      "name",
+                      ""
+                  ).lower().endswith(
                       (".htm", ".html")
-                  ):
-
-                      result.append(name)
-
-
-              return result
+                  )
+              ]
 
 
           def document_priority(name):
@@ -367,90 +341,61 @@ jobs:
 
 
               if "cfocommentary" in lower:
-                  score += 150
-
+                  score += 300
 
               if (
                   "cfo" in lower
                   and "commentary" in lower
               ):
-                  score += 150
-
+                  score += 250
 
               if "earningscommentary" in lower:
-                  score += 140
-
-
-              if (
-                  "earnings" in lower
-                  and "commentary" in lower
-              ):
-                  score += 140
-
+                  score += 240
 
               if "financialcommentary" in lower:
-                  score += 130
-
+                  score += 230
 
               if "outlook" in lower:
-                  score += 120
-
+                  score += 220
 
               if "ex99" in lower:
-                  score += 100
-
+                  score += 195
 
               if "exhibit99" in lower:
-                  score += 100
-
+                  score += 195
 
               if (
                   "99-1" in lower
                   or "99_1" in lower
                   or "99.1" in lower
               ):
-                  score += 95
-
+                  score += 190
 
               if "earn" in lower:
-                  score += 40
-
+                  score += 60
 
               if "release" in lower:
-                  score += 35
-
+                  score += 50
 
               if "results" in lower:
-                  score += 25
-
+                  score += 40
 
               if "index" in lower:
-                  score -= 100
-
+                  score -= 200
 
               if "header" in lower:
-                  score -= 100
+                  score -= 200
 
 
               return score
 
 
-          def should_scan_document(
+          def should_scan(
               name,
               primary_document
           ):
 
               lower = name.lower()
-
-              primary = (
-                  primary_document
-                  or ""
-              ).lower()
-
-
-              if lower == primary:
-                  return False
-
 
               if (
                   "index" in lower
@@ -459,19 +404,22 @@ jobs:
                   return False
 
 
-              if document_priority(name) >= 40:
-                  return True
+              if name.lower() == (
+                  primary_document
+                  or ""
+              ).lower():
+
+                  return False
 
 
-              if "commentary" in lower:
-                  return True
-
-
-              return False
+              return (
+                  document_priority(name)
+                  >= 40
+              )
 
 
           # ============================================================
-          # GUIDANCE-ANKER
+          # GUIDANCE-REGION
           # ============================================================
 
           GUIDANCE_ANCHORS = [
@@ -494,13 +442,14 @@ jobs:
               r"\bguidance for the fourth quarter\b",
 
               r"\bfull[- ]year outlook\b",
-              r"\bfull[- ]year guidance\b"
+              r"\bfull[- ]year guidance\b",
+
+              r"\bfinancial outlook\b",
+              r"\bbusiness outlook\b"
           ]
 
 
           def find_guidance_region(text):
-
-              lower = text.lower()
 
               positions = []
 
@@ -509,13 +458,11 @@ jobs:
 
                   match = re.search(
                       pattern,
-                      lower,
+                      text,
                       flags=re.I
                   )
 
-
                   if match:
-
                       positions.append(
                           match.start()
                       )
@@ -529,14 +476,12 @@ jobs:
                   positions
               )
 
-              end = min(
-                  len(text),
-                  start + 5000
-              )
-
-
               return text[
-                  start:end
+                  start:
+                  min(
+                      len(text),
+                      start + 6000
+                  )
               ]
 
 
@@ -558,48 +503,40 @@ jobs:
           # GUIDANCE EXTRAHIEREN
           # ============================================================
 
-          def extract_guidance(region):
+          def extract_guidance(text):
 
-              if not region:
+              if not text:
                   return {}
 
 
               result = {}
 
-              text = region
 
+              # Revenue: Einzelwert
 
-              # --------------------------------------------------------
-              # REVENUE CENTER
-              # --------------------------------------------------------
+              revenue = re.search(
 
-              revenue_center = re.search(
-
-                  r"revenue.{0,100}?"
-                  r"(?:expected|expect)"
-                  r".{0,80}?"
-                  r"\$\s*"
-                  r"([\d,.]+)"
-                  r"\s*"
-                  r"(billion|million)",
+                  r"revenue.{0,120}?"
+                  r"(?:expected|expect|approximately|about)"
+                  r".{0,100}?"
+                  r"\$\s*([\d,.]+)"
+                  r"\s*(billion|million)",
 
                   text,
                   flags=re.I
               )
 
 
-              if revenue_center:
+              if revenue:
 
                   value = number(
-                      revenue_center.group(1)
+                      revenue.group(1)
                   )
 
                   unit = (
-                      revenue_center
-                      .group(2)
+                      revenue.group(2)
                       .lower()
                   )
-
 
                   if unit == "million":
                       value /= 1000
@@ -610,23 +547,18 @@ jobs:
                   ] = value
 
 
-              # --------------------------------------------------------
-              # REVENUE RANGE
-              # --------------------------------------------------------
+              # Revenue: Range
 
               revenue_range = re.search(
 
-                  r"revenue.{0,120}?"
-                  r"\$\s*"
-                  r"([\d,.]+)"
+                  r"revenue.{0,150}?"
+                  r"\$\s*([\d,.]+)"
                   r"\s*(?:billion|million)?"
-                  r".{0,30}?"
+                  r".{0,40}?"
                   r"(?:to|-|and)"
-                  r".{0,30}?"
-                  r"\$?\s*"
-                  r"([\d,.]+)"
-                  r"\s*"
-                  r"(billion|million)",
+                  r".{0,40}?"
+                  r"\$?\s*([\d,.]+)"
+                  r"\s*(billion|million)",
 
                   text,
                   flags=re.I
@@ -644,14 +576,11 @@ jobs:
                   )
 
                   unit = (
-                      revenue_range
-                      .group(3)
+                      revenue_range.group(3)
                       .lower()
                   )
 
-
                   if unit == "million":
-
                       low /= 1000
                       high /= 1000
 
@@ -671,16 +600,14 @@ jobs:
                   ) / 2
 
 
-              # --------------------------------------------------------
-              # GROSS MARGIN
-              # --------------------------------------------------------
+              # Gross Margin
 
-              gross_margin = re.search(
+              margin = re.search(
 
                   r"gross margins?"
+                  r".{0,120}?"
+                  r"(?:expected|expect|approximately|about)"
                   r".{0,100}?"
-                  r"(?:expected|expect)"
-                  r".{0,80}?"
                   r"([\d.]+)\s*%",
 
                   text,
@@ -688,29 +615,25 @@ jobs:
               )
 
 
-              if gross_margin:
+              if margin:
 
                   result[
                       "gross_margin_pct"
                   ] = float(
-                      gross_margin.group(1)
+                      margin.group(1)
                   )
 
 
-              # --------------------------------------------------------
-              # OPERATING EXPENSES
-              # --------------------------------------------------------
+              # Operating Expenses
 
               opex = re.search(
 
                   r"operating expenses?"
-                  r".{0,100}?"
-                  r"(?:expected|expect)"
-                  r".{0,100}?"
-                  r"\$\s*"
-                  r"([\d,.]+)"
-                  r"\s*"
-                  r"(billion|million)",
+                  r".{0,120}?"
+                  r"(?:expected|expect|approximately|about)"
+                  r".{0,120}?"
+                  r"\$\s*([\d,.]+)"
+                  r"\s*(billion|million)",
 
                   text,
                   flags=re.I
@@ -728,7 +651,6 @@ jobs:
                       .lower()
                   )
 
-
                   if unit == "million":
                       value /= 1000
 
@@ -738,37 +660,11 @@ jobs:
                   ] = value
 
 
-              # --------------------------------------------------------
-              # TAX RATE
-              # --------------------------------------------------------
-
-              tax_rate = re.search(
-
-                  r"tax rates?"
-                  r".{0,100}?"
-                  r"(?:expected|expect)"
-                  r".{0,100}?"
-                  r"([\d.]+)\s*%",
-
-                  text,
-                  flags=re.I
-              )
-
-
-              if tax_rate:
-
-                  result[
-                      "tax_rate_pct"
-                  ] = float(
-                      tax_rate.group(1)
-                  )
-
-
               return result
 
 
           # ============================================================
-          # GUIDANCE AUS FILING HOLEN
+          # GUIDANCE AUS EINEM FILING
           # ============================================================
 
           def extract_from_filing(
@@ -786,12 +682,9 @@ jobs:
               )
 
 
-              files = (
-                  get_html_files(
-                      index_data
-                  )
+              files = get_html_files(
+                  index_data
               )
-
 
               files.sort(
                   key=document_priority,
@@ -800,22 +693,21 @@ jobs:
 
 
               print(
-                  "Filing:",
+                  "Filing Date:",
                   filing[
                       "filing_date"
                   ]
               )
 
 
-              for name in files[:12]:
+              for name in files[:15]:
 
-                  if not should_scan_document(
+                  if not should_scan(
                       name,
                       filing[
                           "primary_document"
                       ]
                   ):
-
                       continue
 
 
@@ -823,9 +715,7 @@ jobs:
                       "Prüfe:",
                       name,
                       "| Priorität:",
-                      document_priority(
-                          name
-                      )
+                      document_priority(name)
                   )
 
 
@@ -839,7 +729,7 @@ jobs:
 
                       print(
                           "Dokumentfehler:",
-                          error
+                          repr(error)
                       )
 
                       continue
@@ -876,10 +766,6 @@ jobs:
                       )
 
                       print(
-                          "Extrahiert:"
-                      )
-
-                      print(
                           json.dumps(
                               guidance,
                               indent=2
@@ -888,7 +774,6 @@ jobs:
 
 
                       return {
-
                           "filing_date":
                               filing[
                                   "filing_date"
@@ -898,10 +783,7 @@ jobs:
                               name,
 
                           "guidance":
-                              guidance,
-
-                          "text":
-                              region[:1800]
+                              guidance
                       }
 
 
@@ -932,187 +814,138 @@ jobs:
 
 
           # ============================================================
-          # V7 GEWICHTETE BEWERTUNG
+          # V7-BEWERTUNG
           # ============================================================
 
-          def compare_guidance_v7(
+          def compare_v7(
               current,
               previous
           ):
 
+              if not current or not previous:
+
+                  return {
+                      "score": None,
+                      "status": "N/A",
+                      "reason":
+                          "Aktuelle oder vorherige Guidance fehlt.",
+                      "details": []
+                  }
+
+
+              cg = current[
+                  "guidance"
+              ]
+
+              pg = previous[
+                  "guidance"
+              ]
+
+              details = []
+
+
+              current_revenue = (
+                  cg.get(
+                      "revenue_mid_billions"
+                  )
+                  or cg.get(
+                      "revenue_billions"
+                  )
+              )
+
+              previous_revenue = (
+                  pg.get(
+                      "revenue_mid_billions"
+                  )
+                  or pg.get(
+                      "revenue_billions"
+                  )
+              )
+
+
               if (
-                  not current
-                  or not previous
+                  current_revenue is None
+                  or previous_revenue is None
               ):
 
                   return {
                       "score": None,
                       "status": "N/A",
                       "reason":
-                          "Aktuelle oder vorherige "
-                          "Guidance fehlt.",
-                      "details": []
+                          "Keine direkt vergleichbare Umsatz-Guidance gefunden.",
+                      "details": details
                   }
 
 
-              current_g = (
-                  current[
-                      "guidance"
-                  ]
-              )
-
-              previous_g = (
-                  previous[
-                      "guidance"
-                  ]
-              )
-
-
-              details = []
-
-
-              # ========================================================
-              # 1. REVENUE = HAUPTSIGNAL
-              #
-              # Gewicht: maximal +/- 3 Rohpunkte
-              # ========================================================
-
-              current_revenue = (
-                  current_g.get(
-                      "revenue_mid_billions"
-                  )
-                  or current_g.get(
-                      "revenue_billions"
-                  )
-              )
-
-              previous_revenue = (
-                  previous_g.get(
-                      "revenue_mid_billions"
-                  )
-                  or previous_g.get(
-                      "revenue_billions"
+              revenue_change = (
+                  percent_change(
+                      current_revenue,
+                      previous_revenue
                   )
               )
 
 
-              revenue_change = None
-              revenue_points = None
+              if revenue_change >= 10:
+                  revenue_points = 3
+
+              elif revenue_change >= 5:
+                  revenue_points = 2
+
+              elif revenue_change >= 1:
+                  revenue_points = 1
+
+              elif revenue_change > -1:
+                  revenue_points = 0
+
+              elif revenue_change > -5:
+                  revenue_points = -1
+
+              elif revenue_change > -10:
+                  revenue_points = -2
+
+              else:
+                  revenue_points = -3
 
 
-              if (
-                  current_revenue is not None
-                  and previous_revenue is not None
-              ):
+              details.append({
+                  "metric":
+                      "Revenue",
 
-                  revenue_change = (
-                      percent_change(
-                          current_revenue,
-                          previous_revenue
-                      )
-                  )
+                  "previous":
+                      previous_revenue,
 
+                  "current":
+                      current_revenue,
 
-                  # Sehr starke Verbesserung
+                  "change":
+                      revenue_change,
 
-                  if revenue_change >= 10:
+                  "raw_points":
+                      revenue_points
+              })
 
-                      revenue_points = 3
-
-
-                  # Klare Verbesserung
-
-                  elif revenue_change >= 5:
-
-                      revenue_points = 2
-
-
-                  # Leichte Verbesserung
-
-                  elif revenue_change >= 1:
-
-                      revenue_points = 1
-
-
-                  # Stabil
-
-                  elif revenue_change > -1:
-
-                      revenue_points = 0
-
-
-                  # Leichte Verschlechterung
-
-                  elif revenue_change > -5:
-
-                      revenue_points = -1
-
-
-                  # Klare Verschlechterung
-
-                  elif revenue_change > -10:
-
-                      revenue_points = -2
-
-
-                  # Sehr starke Verschlechterung
-
-                  else:
-
-                      revenue_points = -3
-
-
-                  details.append({
-
-                      "metric":
-                          "Revenue",
-
-                      "previous":
-                          previous_revenue,
-
-                      "current":
-                          current_revenue,
-
-                      "change":
-                          revenue_change,
-
-                      "raw_points":
-                          revenue_points
-                  })
-
-
-              # ========================================================
-              # 2. GROSS MARGIN
-              #
-              # Gewicht: maximal +/- 2 Rohpunkte
-              #
-              # Revenue bleibt bewusst wichtiger.
-              # ========================================================
 
               margin_change = None
-              margin_points = None
+              margin_points = 0
 
 
               if (
-                  "gross_margin_pct"
-                  in current_g
+                  "gross_margin_pct" in cg
                   and
-                  "gross_margin_pct"
-                  in previous_g
+                  "gross_margin_pct" in pg
               ):
 
                   current_margin = (
-                      current_g[
+                      cg[
                           "gross_margin_pct"
                       ]
                   )
 
                   previous_margin = (
-                      previous_g[
+                      pg[
                           "gross_margin_pct"
                       ]
                   )
-
 
                   margin_change = (
                       current_margin
@@ -1120,43 +953,23 @@ jobs:
                   )
 
 
-                  # deutliche Margenverbesserung
-
                   if margin_change >= 1.0:
-
                       margin_points = 2
 
-
-                  # moderate Verbesserung
-
                   elif margin_change >= 0.25:
-
                       margin_points = 1
 
-
-                  # weitgehend stabil
-
                   elif margin_change > -0.25:
-
                       margin_points = 0
 
-
-                  # moderate Verschlechterung
-
                   elif margin_change > -1.0:
-
                       margin_points = -1
 
-
-                  # deutliche Verschlechterung
-
                   else:
-
                       margin_points = -2
 
 
                   details.append({
-
                       "metric":
                           "Gross Margin",
 
@@ -1174,44 +987,26 @@ jobs:
                   })
 
 
-              # ========================================================
-              # 3. OPERATING EXPENSES
-              #
-              # Nur Information.
-              # Keine isolierte Wertung.
-              # ========================================================
-
               if (
-                  "operating_expenses_billions"
-                  in current_g
+                  "operating_expenses_billions" in cg
                   and
-                  "operating_expenses_billions"
-                  in previous_g
+                  "operating_expenses_billions" in pg
               ):
 
                   current_opex = (
-                      current_g[
+                      cg[
                           "operating_expenses_billions"
                       ]
                   )
 
                   previous_opex = (
-                      previous_g[
+                      pg[
                           "operating_expenses_billions"
                       ]
                   )
 
 
-                  opex_change = (
-                      percent_change(
-                          current_opex,
-                          previous_opex
-                      )
-                  )
-
-
                   details.append({
-
                       "metric":
                           "Operating Expenses",
 
@@ -1222,60 +1017,32 @@ jobs:
                           current_opex,
 
                       "change":
-                          opex_change,
+                          percent_change(
+                              current_opex,
+                              previous_opex
+                          ),
 
                       "raw_points":
                           None
                   })
 
 
-              # ========================================================
-              # KEIN REVENUE-VERGLEICH
-              #
-              # Dann keine aggressive automatische Bewertung.
-              # ========================================================
-
-              if revenue_points is None:
-
-                  return {
-                      "score": None,
-                      "status": "N/A",
-                      "reason":
-                          "Keine direkt vergleichbare "
-                          "Umsatz-Guidance gefunden.",
-                      "details":
-                          details
-                  }
-
-
-              # ========================================================
-              # ROHSCORE
-              # ========================================================
-
               raw_score = (
                   revenue_points
-                  + (
-                      margin_points
-                      if margin_points
-                      is not None
-                      else 0
-                  )
+                  + margin_points
               )
 
 
               # ========================================================
-              # SONDERLOGIK
-              #
-              # Starkes Revenue-Wachstum soll nicht wegen einer
-              # moderaten Margenverschlechterung automatisch auf
-              # "schwach/gemischt" fallen.
+              # V7 REGELN
               # ========================================================
 
               if (
-                  revenue_change is not None
-                  and revenue_change >= 10
-                  and margin_change is not None
-                  and margin_change > -1.0
+                  revenue_change >= 10
+                  and (
+                      margin_change is None
+                      or margin_change > -1.0
+                  )
               ):
 
                   score = 3
@@ -1286,13 +1053,12 @@ jobs:
 
                   reason = (
                       "Umsatz-Guidance steigt stark; "
-                      "Margen-Gegenwind bleibt moderat."
+                      "Margen-Gegenwind ist nicht dominant."
                   )
 
 
               elif (
-                  revenue_change is not None
-                  and revenue_change >= 10
+                  revenue_change >= 10
                   and margin_change is not None
                   and margin_change <= -1.0
               ):
@@ -1305,21 +1071,7 @@ jobs:
 
                   reason = (
                       "Umsatz-Guidance steigt stark, "
-                      "aber Margendruck ist deutlich."
-                  )
-
-
-              elif raw_score >= 4:
-
-                  score = 3
-
-                  status = (
-                      "STRONG_IMPROVEMENT"
-                  )
-
-                  reason = (
-                      "Guidance verbessert sich "
-                      "deutlich."
+                      "aber der Margendruck ist deutlich."
                   )
 
 
@@ -1327,9 +1079,7 @@ jobs:
 
                   score = 3
 
-                  status = (
-                      "IMPROVED"
-                  )
+                  status = "IMPROVED"
 
                   reason = (
                       "Guidance verbessert sich."
@@ -1345,8 +1095,7 @@ jobs:
                   )
 
                   reason = (
-                      "Guidance ist insgesamt "
-                      "stabil bis positiv."
+                      "Guidance ist insgesamt stabil bis positiv."
                   )
 
 
@@ -1354,13 +1103,10 @@ jobs:
 
                   score = 1
 
-                  status = (
-                      "CAUTIOUS"
-                  )
+                  status = "CAUTIOUS"
 
                   reason = (
-                      "Guidance zeigt leichten "
-                      "bis moderaten Gegenwind."
+                      "Guidance zeigt leichten bis moderaten Gegenwind."
                   )
 
 
@@ -1368,18 +1114,14 @@ jobs:
 
                   score = 0
 
-                  status = (
-                      "WEAKER"
-                  )
+                  status = "WEAKER"
 
                   reason = (
-                      "Guidance hat sich deutlich "
-                      "verschlechtert."
+                      "Guidance hat sich deutlich verschlechtert."
                   )
 
 
               return {
-
                   "score":
                       score,
 
@@ -1398,20 +1140,23 @@ jobs:
 
 
           # ============================================================
-          # HAUPTLAUF
+          # TESTLAUF
           # ============================================================
+
+          summary = []
+
 
           for symbol, cik in COMPANIES.items():
 
               print("")
-              print("=" * 105)
+              print("=" * 100)
 
               print(
-                  "BULLWERK GUIDANCE V7:",
+                  "BULLWERK GUIDANCE V7 GEGENPROBE:",
                   symbol
               )
 
-              print("=" * 105)
+              print("=" * 100)
 
 
               try:
@@ -1434,7 +1179,7 @@ jobs:
                   filings = (
                       latest_earnings_filings(
                           submissions,
-                          limit=2
+                          2
                       )
                   )
 
@@ -1447,147 +1192,97 @@ jobs:
 
                   if len(filings) < 2:
 
-                      print(
-                          "GUIDANCE SCORE: N/A"
-                      )
-
-                      print(
-                          "Grund: Weniger als zwei "
-                          "Earnings-Filings gefunden."
-                      )
-
-                      continue
-
-
-                  print("")
-                  print(
-                      "AKTUELLE GUIDANCE"
-                  )
-
-                  print("-" * 105)
-
-
-                  current = (
-                      extract_from_filing(
-                          cik,
-                          filings[0]
-                      )
-                  )
-
-
-                  print("")
-                  print(
-                      "VORHERIGE GUIDANCE"
-                  )
-
-                  print("-" * 105)
-
-
-                  previous = (
-                      extract_from_filing(
-                          cik,
-                          filings[1]
-                      )
-                  )
-
-
-                  print("")
-                  print("=" * 105)
-
-                  print(
-                      "GEWICHTETER "
-                      "GUIDANCE-VERGLEICH"
-                  )
-
-                  print("=" * 105)
-
-
-                  result = (
-                      compare_guidance_v7(
-                          current,
-                          previous
-                      )
-                  )
-
-
-                  for item in result.get(
-                      "details",
-                      []
-                  ):
-
-                      print("")
-
-                      print(
-                          "Kennzahl:",
-                          item[
-                              "metric"
-                          ]
-                      )
-
-                      print(
-                          "Vorher:",
-                          item[
-                              "previous"
-                          ]
-                      )
-
-                      print(
-                          "Aktuell:",
-                          item[
-                              "current"
-                          ]
-                      )
-
-                      print(
-                          "Veränderung:",
-                          item[
-                              "change"
-                          ]
-                      )
-
-                      print(
-                          "Rohpunkte:",
-                          item[
-                              "raw_points"
-                          ]
-                      )
-
-
-                  print("")
-                  print("=" * 105)
-
-                  print(
-                      "BULLWERK GUIDANCE "
-                      "V7 ERGEBNIS"
-                  )
-
-                  print("=" * 105)
-
-
-                  if (
-                      result[
-                          "score"
-                      ]
-                      is None
-                  ):
-
-                      print(
-                          "GUIDANCE SCORE: N/A"
-                      )
-
+                      result = {
+                          "score": None,
+                          "status": "N/A",
+                          "reason":
+                              "Weniger als zwei vergleichbare Earnings-Filings."
+                      }
 
                   else:
 
+                      print("")
                       print(
-                          "GUIDANCE SCORE:",
+                          "AKTUELLE GUIDANCE"
+                      )
+                      print("-" * 100)
+
+
+                      current = (
+                          extract_from_filing(
+                              cik,
+                              filings[0]
+                          )
+                      )
+
+
+                      print("")
+                      print(
+                          "VORHERIGE GUIDANCE"
+                      )
+                      print("-" * 100)
+
+
+                      previous = (
+                          extract_from_filing(
+                              cik,
+                              filings[1]
+                          )
+                      )
+
+
+                      result = (
+                          compare_v7(
+                              current,
+                              previous
+                          )
+                      )
+
+
+                  print("")
+                  print("=" * 100)
+
+                  print(
+                      "BULLWERK GUIDANCE V7 ERGEBNIS"
+                  )
+
+                  print("=" * 100)
+
+
+                  if result.get(
+                      "score"
+                  ) is None:
+
+                      score_text = "N/A"
+
+                  else:
+
+                      score_text = (
                           f"{result['score']}/3"
                       )
 
 
-                  if (
-                      "raw_score"
-                      in result
-                  ):
+                  print(
+                      "GUIDANCE SCORE:",
+                      score_text
+                  )
+
+                  print(
+                      "STATUS:",
+                      result.get(
+                          "status"
+                      )
+                  )
+
+                  print(
+                      "GRUND:",
+                      result.get(
+                          "reason"
+                      )
+                  )
+
+
+                  if "raw_score" in result:
 
                       print(
                           "GEWICHTETER ROHSCORE:",
@@ -1597,42 +1292,82 @@ jobs:
                       )
 
 
-                  print(
-                      "STATUS:",
-                      result[
-                          "status"
-                      ]
-                  )
+                  for item in result.get(
+                      "details",
+                      []
+                  ):
 
-                  print(
-                      "GRUND:",
-                      result[
-                          "reason"
-                      ]
-                  )
+                      print(
+                          "",
+                          item[
+                              "metric"
+                          ],
+                          "| vorher:",
+                          item[
+                              "previous"
+                          ],
+                          "| aktuell:",
+                          item[
+                              "current"
+                          ],
+                          "| Veränderung:",
+                          round(
+                              item[
+                                  "change"
+                              ],
+                              2
+                          )
+                          if item[
+                              "change"
+                          ] is not None
+                          else "N/A",
+                          "| Rohpunkte:",
+                          item[
+                              "raw_points"
+                          ]
+                      )
 
 
-                  print("")
-                  print(
-                      "WICHTIG:"
-                  )
+                  summary.append({
+                      "symbol":
+                          symbol,
 
-                  print(
-                      "V7 ist weiterhin ein "
-                      "Testmodell. Die Regeln "
-                      "werden erst nach mehreren "
-                      "Gegenproben eingefroren."
-                  )
+                      "score":
+                          score_text,
+
+                      "status":
+                          result.get(
+                              "status"
+                          ),
+
+                      "reason":
+                          result.get(
+                              "reason"
+                          )
+                  })
 
 
               except Exception as error:
 
                   print(
-                      "FEHLER bei",
-                      symbol,
-                      ":",
+                      "FEHLER:",
                       repr(error)
                   )
+
+
+                  summary.append({
+                      "symbol":
+                          symbol,
+
+                      "score":
+                          "ERROR",
+
+                      "status":
+                          "ERROR",
+
+                      "reason":
+                          repr(error)
+                  })
 
 
               print("")
@@ -1645,13 +1380,41 @@ jobs:
               time.sleep(1)
 
 
+          # ============================================================
+          # KOMPAKTE GESAMTÜBERSICHT
+          # ============================================================
+
           print("")
-          print("=" * 105)
+          print("")
+          print("=" * 100)
 
           print(
-              "Bullwerk Guidance Test V7 beendet."
+              "BULLWERK GUIDANCE V7 - GESAMTÜBERSICHT"
           )
 
-          print("=" * 105)
+          print("=" * 100)
+
+
+          for row in summary:
+
+              print(
+                  f"{row['symbol']:5} | "
+                  f"{row['score']:5} | "
+                  f"{row['status']:30} | "
+                  f"{row['reason']}"
+              )
+
+
+          print("=" * 100)
+
+          print(
+              "Gegenprobe beendet."
+          )
+
+          print(
+              "Bewertungsregeln bleiben vorerst TESTLOGIK."
+          )
+
+          print("=" * 100)
 
           PY
