@@ -1,45 +1,50 @@
-name: Bullwerk SEC Quarterly Test
+name: Bullwerk Fundamental Momentum Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  sec-quarterly-test:
+  fundamental-momentum-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SEC Quartalsdaten aufbereiten
+      - name: Fundamental Momentum berechnen
         run: |
           python3 <<'PY'
 
           import json
           import time
           import urllib.request
-          import urllib.error
           from datetime import datetime
+
 
           # ============================================================
           # BULLWERK MARKETS
-          # SEC COMPANYFACTS -> ECHTE QUARTALE
+          # FUNDAMENTAL MOMENTUM TEST
           #
-          # Testphase:
-          # Noch KEIN Bullwerk Fundamental Score.
-          # Erst prüfen wir, ob die Quartalsdaten sauber sind.
+          # Ziel:
+          # SEC Companyfacts -> echte Quartale ->
+          # YoY Wachstum -> Beschleunigung
+          #
+          # NOCH KEIN Bullwerk Score.
           # ============================================================
+
 
           companies = {
               "AAPL": "0000320193",
               "MSFT": "0000789019"
           }
 
+
           USER_AGENT = (
               "Bullwerk Markets "
               "contact: bullwerkmarkets@gmail.com"
           )
 
-          # ------------------------------------------------------------
-          # SEC laden
-          # ------------------------------------------------------------
+
+          # ============================================================
+          # SEC DATEN LADEN
+          # ============================================================
 
           def get_json(url):
 
@@ -68,9 +73,9 @@ jobs:
                   )
 
 
-          # ------------------------------------------------------------
-          # Hilfsfunktionen
-          # ------------------------------------------------------------
+          # ============================================================
+          # DATUM
+          # ============================================================
 
           def parse_date(value):
 
@@ -78,12 +83,14 @@ jobs:
                   return None
 
               try:
+
                   return datetime.strptime(
                       value,
                       "%Y-%m-%d"
                   ).date()
 
               except ValueError:
+
                   return None
 
 
@@ -105,6 +112,10 @@ jobs:
               ).days + 1
 
 
+          # ============================================================
+          # SEC CONCEPT LADEN
+          # ============================================================
+
           def get_concept_rows(
               facts,
               concepts,
@@ -123,10 +134,12 @@ jobs:
                       )
 
                   except KeyError:
+
                       continue
 
 
                   selected = None
+
 
                   for unit in preferred_units:
 
@@ -139,6 +152,7 @@ jobs:
                   if selected is None:
 
                       if units:
+
                           selected = next(
                               iter(
                                   units.values()
@@ -146,10 +160,12 @@ jobs:
                           )
 
                       else:
+
                           continue
 
 
                   rows = []
+
 
                   for row in selected:
 
@@ -159,14 +175,18 @@ jobs:
                       ):
                           continue
 
+
                       if row.get("val") is None:
                           continue
+
 
                       if not row.get("start"):
                           continue
 
+
                       if not row.get("end"):
                           continue
+
 
                       new_row = dict(row)
 
@@ -199,13 +219,14 @@ jobs:
               )
 
 
-          # ------------------------------------------------------------
-          # Doppelte SEC-Kontexte reduzieren
-          # ------------------------------------------------------------
+          # ============================================================
+          # DUPLIKATE REDUZIEREN
+          # ============================================================
 
           def dedupe_rows(rows):
 
               best = {}
+
 
               for row in rows:
 
@@ -217,9 +238,11 @@ jobs:
                       row.get("fp")
                   )
 
+
                   old = best.get(
                       key
                   )
+
 
                   if old is None:
 
@@ -237,6 +260,7 @@ jobs:
                       or ""
                   )
 
+
                   if new_filed > old_filed:
 
                       best[key] = row
@@ -247,16 +271,14 @@ jobs:
               )
 
 
-          # ------------------------------------------------------------
-          # Direkte Quartalswerte finden
-          #
-          # Dauer ungefähr 70-110 Tage.
-          # Damit schließen wir YTD- und Jahreswerte weitgehend aus.
-          # ------------------------------------------------------------
+          # ============================================================
+          # DIREKTE QUARTALE
+          # ============================================================
 
           def direct_quarters(rows):
 
               result = []
+
 
               for row in rows:
 
@@ -264,12 +286,16 @@ jobs:
                       "duration_days"
                   )
 
+
                   if days is None:
                       continue
 
+
+                  # ungefähr ein echtes Quartal
                   if 70 <= days <= 110:
 
                       result.append({
+
                           "start":
                               row.get("start"),
 
@@ -305,55 +331,20 @@ jobs:
               return result
 
 
-          # ------------------------------------------------------------
-          # Kumulierte YTD-Werte sammeln
+          # ============================================================
+          # ABGELEITETE QUARTALE
           #
-          # Typischerweise:
-          # Q1  ~ 3 Monate
-          # Q2  ~ 6 Monate
-          # Q3  ~ 9 Monate
-          # FY  ~ 12 Monate
-          # ------------------------------------------------------------
-
-          def cumulative_rows(rows):
-
-              result = []
-
-              for row in rows:
-
-                  days = row.get(
-                      "duration_days"
-                  )
-
-                  if days is None:
-                      continue
-
-                  if 150 <= days <= 380:
-
-                      result.append(
-                          row
-                      )
-
-
-              return result
-
-
-          # ------------------------------------------------------------
-          # Quartale aus kumulierten Werten ableiten
-          #
-          # Beispiel:
-          # H1 - Q1 = Q2
-          # 9M - H1 = Q3
-          #
-          # Q4 aus FY - 9M wird nur versucht, wenn passende Daten
-          # desselben Fiscal Year vorhanden sind.
-          # ------------------------------------------------------------
+          # Q2 = H1 - Q1
+          # Q3 = 9M - H1
+          # Q4 = FY - 9M
+          # ============================================================
 
           def derived_quarters(rows):
 
               result = []
 
               by_fy = {}
+
 
               for row in rows:
 
@@ -363,6 +354,7 @@ jobs:
 
                   if fy is None:
                       continue
+
 
                   by_fy.setdefault(
                       fy,
@@ -376,6 +368,7 @@ jobs:
 
                   candidates = []
 
+
                   for row in fy_rows:
 
                       days = row.get(
@@ -385,20 +378,18 @@ jobs:
                       if days is None:
                           continue
 
+
                       candidates.append(
                           row
                       )
 
 
-                  # Kürzere Perioden zuerst
                   candidates.sort(
                       key=lambda r: (
                           r.get(
                               "duration_days"
                           ) or 9999,
-                          r.get(
-                              "end"
-                          ) or ""
+                          r.get("end") or ""
                       )
                   )
 
@@ -458,7 +449,7 @@ jobs:
                           full_year = row
 
 
-                  # Q2 = H1 - Q1
+                  # Q2
                   if (
                       q1 is not None
                       and h1 is not None
@@ -467,6 +458,7 @@ jobs:
                   ):
 
                       result.append({
+
                           "start":
                               q1.get("end"),
 
@@ -489,18 +481,12 @@ jobs:
                           "filed":
                               h1.get("filed"),
 
-                          "frame":
-                              h1.get("frame"),
-
                           "source":
-                              "DERIVED_H1_MINUS_Q1",
-
-                          "duration_days":
-                              None
+                              "DERIVED_H1_MINUS_Q1"
                       })
 
 
-                  # Q3 = 9M - H1
+                  # Q3
                   if (
                       h1 is not None
                       and nine_month is not None
@@ -509,6 +495,7 @@ jobs:
                   ):
 
                       result.append({
+
                           "start":
                               h1.get("end"),
 
@@ -531,18 +518,12 @@ jobs:
                           "filed":
                               nine_month.get("filed"),
 
-                          "frame":
-                              nine_month.get("frame"),
-
                           "source":
-                              "DERIVED_9M_MINUS_H1",
-
-                          "duration_days":
-                              None
+                              "DERIVED_9M_MINUS_H1"
                       })
 
 
-                  # Q4 = FY - 9M
+                  # Q4
                   if (
                       nine_month is not None
                       and full_year is not None
@@ -551,6 +532,7 @@ jobs:
                   ):
 
                       result.append({
+
                           "start":
                               nine_month.get("end"),
 
@@ -573,23 +555,17 @@ jobs:
                           "filed":
                               full_year.get("filed"),
 
-                          "frame":
-                              full_year.get("frame"),
-
                           "source":
-                              "DERIVED_FY_MINUS_9M",
-
-                          "duration_days":
-                              None
+                              "DERIVED_FY_MINUS_9M"
                       })
 
 
               return result
 
 
-          # ------------------------------------------------------------
-          # Direkte + abgeleitete Quartale zusammenführen
-          # ------------------------------------------------------------
+          # ============================================================
+          # QUARTALE ZUSAMMENFÜHREN
+          # ============================================================
 
           def build_quarters(rows):
 
@@ -611,8 +587,6 @@ jobs:
               )
 
 
-              # Pro Quartals-Enddatum nur einen Wert behalten.
-              # Direkte SEC-Quartalswerte werden bevorzugt.
               best_by_end = {}
 
 
@@ -640,6 +614,7 @@ jobs:
                       continue
 
 
+                  # direkte Quartalsangabe bevorzugen
                   if (
                       row.get("source")
                       == "DIRECT"
@@ -656,43 +631,564 @@ jobs:
                   best_by_end.values()
               )
 
+
               quarters.sort(
                   key=lambda row:
                       row.get("end") or "",
                   reverse=True
               )
 
+
               return quarters
 
 
-          # ------------------------------------------------------------
-          # Ausgabe formatieren
-          # ------------------------------------------------------------
+          # ============================================================
+          # YOY VERGLEICH
+          #
+          # Wir vergleichen Fiscal Quarter:
+          # Q1 mit Q1 Vorjahr
+          # Q2 mit Q2 Vorjahr
+          # usw.
+          # ============================================================
 
-          def pretty_value(
-              label,
-              value
+          def find_prior_year_quarter(
+              current,
+              quarters
           ):
 
-              if value is None:
-                  return "n/a"
+              current_fy = current.get(
+                  "fy"
+              )
 
-
-              if label == "Diluted EPS":
-
-                  return (
-                      f"{value:.2f}"
-                  )
-
-
-              return (
-                  f"{value / 1_000_000_000:.3f} Mrd."
+              current_fp = current.get(
+                  "fp"
               )
 
 
-          # ------------------------------------------------------------
-          # Konzepte
-          # ------------------------------------------------------------
+              if current_fy is None:
+                  return None
+
+
+              if current_fp not in (
+                  "Q1",
+                  "Q2",
+                  "Q3",
+                  "Q4"
+              ):
+                  return None
+
+
+              target_fy = (
+                  current_fy - 1
+              )
+
+
+              for row in quarters:
+
+                  if (
+                      row.get("fy")
+                      == target_fy
+                      and row.get("fp")
+                      == current_fp
+                  ):
+
+                      return row
+
+
+              return None
+
+
+          # ============================================================
+          # YOY WACHSTUM
+          # ============================================================
+
+          def yoy_growth(
+              current_value,
+              previous_value
+          ):
+
+              if current_value is None:
+                  return None
+
+
+              if previous_value is None:
+                  return None
+
+
+              if previous_value == 0:
+                  return None
+
+
+              return (
+                  (
+                      current_value
+                      - previous_value
+                  )
+                  / abs(
+                      previous_value
+                  )
+                  * 100
+              )
+
+
+          # ============================================================
+          # YOY SERIE ERSTELLEN
+          # ============================================================
+
+          def build_yoy_series(
+              quarters
+          ):
+
+              result = []
+
+
+              for current in quarters:
+
+                  previous = (
+                      find_prior_year_quarter(
+                          current,
+                          quarters
+                      )
+                  )
+
+
+                  if previous is None:
+                      continue
+
+
+                  growth = yoy_growth(
+                      current.get("value"),
+                      previous.get("value")
+                  )
+
+
+                  if growth is None:
+                      continue
+
+
+                  result.append({
+
+                      "end":
+                          current.get("end"),
+
+                      "fy":
+                          current.get("fy"),
+
+                      "fp":
+                          current.get("fp"),
+
+                      "value":
+                          current.get("value"),
+
+                      "previous_value":
+                          previous.get("value"),
+
+                      "yoy":
+                          growth
+                  })
+
+
+              result.sort(
+                  key=lambda row:
+                      row.get("end") or "",
+                  reverse=True
+              )
+
+
+              return result
+
+
+          # ============================================================
+          # BESCHLEUNIGUNG
+          #
+          # Beispiel:
+          #
+          # aktuelles YoY = +15 %
+          # vorheriges YoY = +10 %
+          #
+          # Beschleunigung = +5 Prozentpunkte
+          # ============================================================
+
+          def add_acceleration(
+              yoy_series
+          ):
+
+              result = []
+
+
+              for index, row in enumerate(
+                  yoy_series
+              ):
+
+                  new_row = dict(
+                      row
+                  )
+
+
+                  if (
+                      index + 1
+                      < len(yoy_series)
+                  ):
+
+                      previous_yoy = (
+                          yoy_series[
+                              index + 1
+                          ].get("yoy")
+                      )
+
+
+                      if previous_yoy is not None:
+
+                          new_row[
+                              "acceleration"
+                          ] = (
+                              row["yoy"]
+                              - previous_yoy
+                          )
+
+                      else:
+
+                          new_row[
+                              "acceleration"
+                          ] = None
+
+                  else:
+
+                      new_row[
+                          "acceleration"
+                      ] = None
+
+
+                  result.append(
+                      new_row
+                  )
+
+
+              return result
+
+
+          # ============================================================
+          # OPERATIVE MARGE
+          # ============================================================
+
+          def build_margin_series(
+              revenue_quarters,
+              operating_income_quarters
+          ):
+
+              revenue_by_end = {
+                  row.get("end"): row
+                  for row in revenue_quarters
+              }
+
+
+              operating_by_end = {
+                  row.get("end"): row
+                  for row in operating_income_quarters
+              }
+
+
+              common_dates = (
+                  set(
+                      revenue_by_end.keys()
+                  )
+                  &
+                  set(
+                      operating_by_end.keys()
+                  )
+              )
+
+
+              result = []
+
+
+              for end in common_dates:
+
+                  revenue = (
+                      revenue_by_end[
+                          end
+                      ].get("value")
+                  )
+
+                  operating_income = (
+                      operating_by_end[
+                          end
+                      ].get("value")
+                  )
+
+
+                  if (
+                      revenue is None
+                      or revenue == 0
+                      or operating_income is None
+                  ):
+
+                      continue
+
+
+                  revenue_row = (
+                      revenue_by_end[
+                          end
+                      ]
+                  )
+
+
+                  margin = (
+                      operating_income
+                      / revenue
+                      * 100
+                  )
+
+
+                  result.append({
+
+                      "end":
+                          end,
+
+                      "fy":
+                          revenue_row.get("fy"),
+
+                      "fp":
+                          revenue_row.get("fp"),
+
+                      "margin":
+                          margin
+                  })
+
+
+              result.sort(
+                  key=lambda row:
+                      row.get("end") or "",
+                  reverse=True
+              )
+
+
+              return result
+
+
+          # ============================================================
+          # MARGENVERÄNDERUNG YOY
+          # ============================================================
+
+          def add_margin_yoy(
+              margin_series
+          ):
+
+              result = []
+
+
+              for current in margin_series:
+
+                  previous = None
+
+
+                  for row in margin_series:
+
+                      if (
+                          current.get("fy")
+                          is not None
+                          and row.get("fy")
+                          == current.get("fy") - 1
+                          and row.get("fp")
+                          == current.get("fp")
+                      ):
+
+                          previous = row
+                          break
+
+
+                  new_row = dict(
+                      current
+                  )
+
+
+                  if previous:
+
+                      new_row[
+                          "margin_change_pp"
+                      ] = (
+                          current["margin"]
+                          - previous["margin"]
+                      )
+
+                  else:
+
+                      new_row[
+                          "margin_change_pp"
+                      ] = None
+
+
+                  result.append(
+                      new_row
+                  )
+
+
+              return result
+
+
+          # ============================================================
+          # FREE CASH FLOW
+          # ============================================================
+
+          def build_fcf_series(
+              ocf_quarters,
+              capex_quarters
+          ):
+
+              ocf = {
+                  row.get("end"): row
+                  for row in ocf_quarters
+              }
+
+
+              capex = {
+                  row.get("end"): row
+                  for row in capex_quarters
+              }
+
+
+              common_dates = (
+                  set(
+                      ocf.keys()
+                  )
+                  &
+                  set(
+                      capex.keys()
+                  )
+              )
+
+
+              result = []
+
+
+              for end in common_dates:
+
+                  ocf_row = ocf[
+                      end
+                  ]
+
+                  capex_row = capex[
+                      end
+                  ]
+
+
+                  fcf = (
+                      ocf_row["value"]
+                      - capex_row["value"]
+                  )
+
+
+                  result.append({
+
+                      "end":
+                          end,
+
+                      "fy":
+                          ocf_row.get("fy"),
+
+                      "fp":
+                          ocf_row.get("fp"),
+
+                      "value":
+                          fcf,
+
+                      "ocf":
+                          ocf_row["value"],
+
+                      "capex":
+                          capex_row["value"]
+                  })
+
+
+              result.sort(
+                  key=lambda row:
+                      row.get("end") or "",
+                  reverse=True
+              )
+
+
+              return result
+
+
+          # ============================================================
+          # AUSGABE
+          # ============================================================
+
+          def print_growth_series(
+              title,
+              series,
+              billions=True
+          ):
+
+              print("")
+              print(
+                  f"--- {title} ---"
+              )
+
+
+              if not series:
+
+                  print(
+                      "Keine ausreichenden Daten."
+                  )
+
+                  return
+
+
+              for row in series[:6]:
+
+                  value = row.get(
+                      "value"
+                  )
+
+
+                  if billions:
+
+                      value_text = (
+                          f"{value / 1_000_000_000:.3f} Mrd."
+                      )
+
+                  else:
+
+                      value_text = (
+                          f"{value:.2f}"
+                      )
+
+
+                  acceleration = row.get(
+                      "acceleration"
+                  )
+
+
+                  if acceleration is None:
+
+                      acceleration_text = (
+                          "n/a"
+                      )
+
+                  else:
+
+                      acceleration_text = (
+                          f"{acceleration:+.2f} PP"
+                      )
+
+
+                  print(
+                      row.get("end"),
+                      "|",
+                      row.get("fp"),
+                      "| Wert:",
+                      value_text,
+                      "| YoY:",
+                      f"{row['yoy']:+.2f} %",
+                      "| Beschleunigung:",
+                      acceleration_text
+                  )
+
+
+          # ============================================================
+          # SEC CONCEPTS
+          # ============================================================
 
           concepts = {
 
@@ -754,18 +1250,18 @@ jobs:
           }
 
 
-          # ------------------------------------------------------------
-          # Unternehmen testen
-          # ------------------------------------------------------------
+          # ============================================================
+          # HAUPTPROGRAMM
+          # ============================================================
 
           for symbol, cik in companies.items():
 
               print("")
-              print("=" * 78)
+              print("=" * 82)
               print(
-                  f"BULLWERK QUARTERLY TEST: {symbol}"
+                  f"BULLWERK FUNDAMENTAL MOMENTUM TEST: {symbol}"
               )
-              print("=" * 78)
+              print("=" * 82)
 
 
               url = (
@@ -799,7 +1295,7 @@ jobs:
               )
 
 
-              company_results = {}
+              company_data = {}
 
 
               for label, (
@@ -807,28 +1303,25 @@ jobs:
                   preferred_units
               ) in concepts.items():
 
-                  concept, rows = get_concept_rows(
-                      facts,
-                      possible_concepts,
-                      preferred_units
-                  )
-
-
-                  print("")
-                  print(
-                      f"--- {label} ---"
+                  concept, rows = (
+                      get_concept_rows(
+                          facts,
+                          possible_concepts,
+                          preferred_units
+                      )
                   )
 
 
                   if not rows:
 
-                      print(
-                          "Keine SEC-Daten gefunden."
-                      )
-
-                      company_results[
+                      company_data[
                           label
                       ] = []
+
+                      print(
+                          f"{label}: "
+                          "keine Daten"
+                      )
 
                       continue
 
@@ -838,116 +1331,293 @@ jobs:
                   )
 
 
-                  company_results[
+                  company_data[
                       label
                   ] = quarters
 
 
                   print(
-                      f"Concept: {concept}"
-                  )
-
-                  print(
-                      f"Quartale gefunden: "
-                      f"{len(quarters)}"
+                      f"{label}: "
+                      f"{len(quarters)} Quartale "
+                      f"| Concept: {concept}"
                   )
 
 
-                  for quarter in quarters[:8]:
+              # ========================================================
+              # UMSATZ
+              # ========================================================
 
-                      print(
-                          quarter.get("end"),
-                          "| FY",
-                          quarter.get("fy"),
-                          "|",
-                          quarter.get("fp"),
-                          "|",
-                          pretty_value(
-                              label,
-                              quarter.get(
-                                  "value"
-                              )
-                          ),
-                          "|",
-                          quarter.get(
-                              "source"
+              revenue_yoy = (
+                  add_acceleration(
+                      build_yoy_series(
+                          company_data.get(
+                              "Revenue",
+                              []
                           )
                       )
+                  )
+              )
 
 
-              # --------------------------------------------------------
-              # FCF aus OCF - CapEx
-              # --------------------------------------------------------
+              print_growth_series(
+                  "UMSATZ MOMENTUM",
+                  revenue_yoy
+              )
+
+
+              # ========================================================
+              # NET INCOME
+              # ========================================================
+
+              income_yoy = (
+                  add_acceleration(
+                      build_yoy_series(
+                          company_data.get(
+                              "Net Income",
+                              []
+                          )
+                      )
+                  )
+              )
+
+
+              print_growth_series(
+                  "GEWINN MOMENTUM",
+                  income_yoy
+              )
+
+
+              # ========================================================
+              # EPS
+              # ========================================================
+
+              eps_yoy = (
+                  add_acceleration(
+                      build_yoy_series(
+                          company_data.get(
+                              "Diluted EPS",
+                              []
+                          )
+                      )
+                  )
+              )
+
+
+              print_growth_series(
+                  "EPS MOMENTUM",
+                  eps_yoy,
+                  billions=False
+              )
+
+
+              # ========================================================
+              # OPERATIVE MARGE
+              # ========================================================
+
+              margins = (
+                  add_margin_yoy(
+                      build_margin_series(
+                          company_data.get(
+                              "Revenue",
+                              []
+                          ),
+                          company_data.get(
+                              "Operating Income",
+                              []
+                          )
+                      )
+                  )
+              )
+
 
               print("")
               print(
-                  "--- FREE CASH FLOW ---"
+                  "--- OPERATIVE MARGE ---"
               )
 
 
-              ocf = {
-                  row.get("end"):
-                      row
-                  for row in company_results.get(
-                      "Operating Cash Flow",
-                      []
+              if not margins:
+
+                  print(
+                      "Keine ausreichenden Daten."
                   )
-              }
 
 
-              capex = {
-                  row.get("end"):
-                      row
-                  for row in company_results.get(
-                      "Capital Expenditure",
-                      []
+              for row in margins[:6]:
+
+                  change = row.get(
+                      "margin_change_pp"
                   )
-              }
 
 
-              common_dates = sorted(
-                  set(
-                      ocf.keys()
+                  if change is None:
+
+                      change_text = "n/a"
+
+                  else:
+
+                      change_text = (
+                          f"{change:+.2f} PP"
+                      )
+
+
+                  print(
+                      row.get("end"),
+                      "|",
+                      row.get("fp"),
+                      "| Marge:",
+                      f"{row['margin']:.2f} %",
+                      "| YoY Veränderung:",
+                      change_text
                   )
-                  & set(
-                      capex.keys()
-                  ),
-                  reverse=True
+
+
+              # ========================================================
+              # FREE CASH FLOW
+              # ========================================================
+
+              fcf_quarters = (
+                  build_fcf_series(
+                      company_data.get(
+                          "Operating Cash Flow",
+                          []
+                      ),
+                      company_data.get(
+                          "Capital Expenditure",
+                          []
+                      )
+                  )
               )
 
 
-              if not common_dates:
+              fcf_yoy = (
+                  add_acceleration(
+                      build_yoy_series(
+                          fcf_quarters
+                      )
+                  )
+              )
+
+
+              print_growth_series(
+                  "FREE CASH FLOW MOMENTUM",
+                  fcf_yoy
+              )
+
+
+              # ========================================================
+              # AKTUELLER MOMENTUM SNAPSHOT
+              # ========================================================
+
+              print("")
+              print(
+                  "--- AKTUELLER FUNDAMENTAL SNAPSHOT ---"
+              )
+
+
+              def latest(series):
+
+                  if series:
+                      return series[0]
+
+                  return None
+
+
+              rev = latest(
+                  revenue_yoy
+              )
+
+              inc = latest(
+                  income_yoy
+              )
+
+              eps = latest(
+                  eps_yoy
+              )
+
+              margin = latest(
+                  margins
+              )
+
+              fcf = latest(
+                  fcf_yoy
+              )
+
+
+              if rev:
 
                   print(
-                      "Keine gemeinsamen Quartale "
-                      "für FCF gefunden."
+                      "Umsatz YoY:",
+                      f"{rev['yoy']:+.2f} %",
+                      "| Beschleunigung:",
+                      (
+                          f"{rev['acceleration']:+.2f} PP"
+                          if rev.get("acceleration")
+                          is not None
+                          else "n/a"
+                      )
                   )
 
 
-              for end in common_dates[:8]:
-
-                  operating_cf = (
-                      ocf[end]["value"]
-                  )
-
-                  capital_expenditure = (
-                      capex[end]["value"]
-                  )
-
-                  free_cash_flow = (
-                      operating_cf
-                      - capital_expenditure
-                  )
-
+              if inc:
 
                   print(
-                      end,
-                      "| OCF:",
-                      f"{operating_cf / 1_000_000_000:.3f} Mrd.",
-                      "| CapEx:",
-                      f"{capital_expenditure / 1_000_000_000:.3f} Mrd.",
-                      "| FCF:",
-                      f"{free_cash_flow / 1_000_000_000:.3f} Mrd."
+                      "Gewinn YoY:",
+                      f"{inc['yoy']:+.2f} %",
+                      "| Beschleunigung:",
+                      (
+                          f"{inc['acceleration']:+.2f} PP"
+                          if inc.get("acceleration")
+                          is not None
+                          else "n/a"
+                      )
+                  )
+
+
+              if eps:
+
+                  print(
+                      "EPS YoY:",
+                      f"{eps['yoy']:+.2f} %",
+                      "| Beschleunigung:",
+                      (
+                          f"{eps['acceleration']:+.2f} PP"
+                          if eps.get("acceleration")
+                          is not None
+                          else "n/a"
+                      )
+                  )
+
+
+              if margin:
+
+                  print(
+                      "Operative Marge:",
+                      f"{margin['margin']:.2f} %",
+                      "| YoY:",
+                      (
+                          f"{margin['margin_change_pp']:+.2f} PP"
+                          if margin.get(
+                              "margin_change_pp"
+                          )
+                          is not None
+                          else "n/a"
+                      )
+                  )
+
+
+              if fcf:
+
+                  print(
+                      "FCF YoY:",
+                      f"{fcf['yoy']:+.2f} %",
+                      "| Beschleunigung:",
+                      (
+                          f"{fcf['acceleration']:+.2f} PP"
+                          if fcf.get("acceleration")
+                          is not None
+                          else "n/a"
+                      )
                   )
 
 
@@ -961,10 +1631,10 @@ jobs:
 
 
           print("")
-          print("=" * 78)
+          print("=" * 82)
           print(
-              "Bullwerk SEC Quarterly Test beendet."
+              "Bullwerk Fundamental Momentum Test beendet."
           )
-          print("=" * 78)
+          print("=" * 82)
 
           PY
