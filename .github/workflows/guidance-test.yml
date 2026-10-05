@@ -1,4 +1,4 @@
-name: Bullwerk Guidance Test V1
+name: Bullwerk Guidance Test V2
 
 on:
   workflow_dispatch:
@@ -8,36 +8,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Guidance Quellen testen
+      - name: Guidance Texte aus SEC Earnings Filings testen
         run: |
           python3 <<'PY'
 
           import json
-          import urllib.request
+          import re
           import time
-          from datetime import datetime
+          import urllib.request
+          from html import unescape
 
 
           # ============================================================
           # BULLWERK MARKETS
-          # GUIDANCE TEST V1
+          # GUIDANCE TEST V2
           #
           # Ziel:
-          # - offizielle SEC Company Submissions laden
-          # - aktuelle 8-K Meldungen finden
-          # - earnings-/guidance-relevante 8-Ks markieren
-          # - noch KEINE automatische Punktevergabe
+          # 1. SEC Submissions laden
+          # 2. jüngste echte Earnings-8-K mit Item 2.02 finden
+          # 3. Filing-Verzeichnis öffnen
+          # 4. relevante HTML-Exhibits finden
+          # 5. Guidance-/Outlook-Textstellen ausgeben
           #
-          # Später:
-          # Guidance erhöht  -> 3
-          # Guidance bestätigt/stark -> 2
-          # vorsichtig/unklar -> 1
-          # Guidance gesenkt -> 0
-          # nicht vorhanden -> N/A
+          # Noch KEINE Punktevergabe.
           # ============================================================
 
 
-          companies = {
+          COMPANIES = {
               "AAPL": "0000320193",
               "MSFT": "0000789019"
           }
@@ -49,17 +46,36 @@ jobs:
           )
 
 
+          GUIDANCE_TERMS = [
+              "guidance",
+              "outlook",
+              "we expect",
+              "we anticipate",
+              "we forecast",
+              "expects",
+              "expected",
+              "anticipates",
+              "forecast",
+              "next quarter",
+              "next fiscal",
+              "fiscal year",
+              "revenue growth",
+              "operating margin",
+              "gross margin"
+          ]
+
+
           # ============================================================
           # HTTP
           # ============================================================
 
-          def get_json(url):
+          def request_bytes(url, accept="*/*"):
 
               request = urllib.request.Request(
                   url,
                   headers={
                       "User-Agent": USER_AGENT,
-                      "Accept": "application/json",
+                      "Accept": accept,
                       "Accept-Encoding": "identity"
                   }
               )
@@ -70,15 +86,75 @@ jobs:
               ) as response:
 
                   print(
-                      "HTTP Status:",
-                      response.status
+                      "HTTP",
+                      response.status,
+                      url
                   )
 
-                  return json.loads(
-                      response.read().decode(
-                          "utf-8"
-                      )
+                  return response.read()
+
+
+          def get_json(url):
+
+              raw = request_bytes(
+                  url,
+                  "application/json"
+              )
+
+              return json.loads(
+                  raw.decode(
+                      "utf-8",
+                      errors="replace"
                   )
+              )
+
+
+          def get_text(url):
+
+              raw = request_bytes(
+                  url,
+                  "text/html,*/*"
+              )
+
+              return raw.decode(
+                  "utf-8",
+                  errors="replace"
+              )
+
+
+          # ============================================================
+          # HTML -> TEXT
+          # ============================================================
+
+          def html_to_text(html):
+
+              html = re.sub(
+                  r"(?is)<script.*?>.*?</script>",
+                  " ",
+                  html
+              )
+
+              html = re.sub(
+                  r"(?is)<style.*?>.*?</style>",
+                  " ",
+                  html
+              )
+
+              html = re.sub(
+                  r"(?is)<[^>]+>",
+                  " ",
+                  html
+              )
+
+              text = unescape(html)
+
+              text = re.sub(
+                  r"\s+",
+                  " ",
+                  text
+              )
+
+              return text.strip()
 
 
           # ============================================================
@@ -87,201 +163,113 @@ jobs:
 
           def load_submissions(cik):
 
-              url = (
+              return get_json(
                   "https://data.sec.gov/"
                   "submissions/"
                   f"CIK{cik}.json"
               )
 
-              return get_json(url)
-
 
           # ============================================================
-          # RECENT FILINGS NORMALISIEREN
+          # JÜNGSTE EARNINGS 8-K
           # ============================================================
 
-          def build_recent_filings(data):
+          def latest_earnings_8k(data):
 
               recent = (
-                  data.get(
-                      "filings",
-                      {}
-                  ).get(
-                      "recent",
-                      {}
-                  )
+                  data.get("filings", {})
+                      .get("recent", {})
               )
 
 
-              accession = recent.get(
+              accession_numbers = recent.get(
                   "accessionNumber",
                   []
               )
 
-              filing_date = recent.get(
+              filing_dates = recent.get(
                   "filingDate",
                   []
               )
 
-              report_date = recent.get(
+              report_dates = recent.get(
                   "reportDate",
                   []
               )
 
-              form = recent.get(
+              forms = recent.get(
                   "form",
                   []
               )
 
-              primary_document = recent.get(
-                  "primaryDocument",
-                  []
-              )
-
-              primary_description = recent.get(
-                  "primaryDocDescription",
-                  []
-              )
-
-              items = recent.get(
+              items_list = recent.get(
                   "items",
+                  []
+              )
+
+              documents = recent.get(
+                  "primaryDocument",
                   []
               )
 
 
               count = min(
-                  len(accession),
-                  len(filing_date),
-                  len(form),
-                  len(primary_document)
+                  len(accession_numbers),
+                  len(filing_dates),
+                  len(forms),
+                  len(documents)
               )
-
-
-              filings = []
 
 
               for i in range(count):
 
-                  filings.append({
+                  form = forms[i]
 
-                      "accession":
-                          accession[i],
-
-                      "filing_date":
-                          filing_date[i],
-
-                      "report_date":
-                          (
-                              report_date[i]
-                              if i < len(report_date)
-                              else ""
-                          ),
-
-                      "form":
-                          form[i],
-
-                      "document":
-                          primary_document[i],
-
-                      "description":
-                          (
-                              primary_description[i]
-                              if i < len(
-                                  primary_description
-                              )
-                              else ""
-                          ),
-
-                      "items":
-                          (
-                              items[i]
-                              if i < len(items)
-                              else ""
-                          )
-                  })
-
-
-              return filings
-
-
-          # ============================================================
-          # GUIDANCE / EARNINGS RELEVANZ
-          #
-          # 8-K Item 2.02:
-          # Results of Operations and Financial Condition
-          #
-          # Item 7.01:
-          # Regulation FD Disclosure
-          #
-          # Beide sind für Earnings/Guidance interessant.
-          # ============================================================
-
-          def is_relevant_8k(filing):
-
-              if filing.get(
-                  "form"
-              ) not in (
-                  "8-K",
-                  "8-K/A"
-              ):
-
-                  return False
-
-
-              items = (
-                  filing.get(
-                      "items"
+                  items = (
+                      items_list[i]
+                      if i < len(items_list)
+                      else ""
                   )
-                  or ""
-              )
 
 
-              relevant_items = (
-                  "2.02",
-                  "7.01"
-              )
+                  if (
+                      form in ("8-K", "8-K/A")
+                      and "2.02" in items
+                  ):
+
+                      return {
+                          "accession":
+                              accession_numbers[i],
+
+                          "filing_date":
+                              filing_dates[i],
+
+                          "report_date":
+                              (
+                                  report_dates[i]
+                                  if i < len(report_dates)
+                                  else ""
+                              ),
+
+                          "form":
+                              form,
+
+                          "items":
+                              items,
+
+                          "primary_document":
+                              documents[i]
+                      }
 
 
-              if any(
-                  item in items
-                  for item in relevant_items
-              ):
-
-                  return True
-
-
-              description = (
-                  filing.get(
-                      "description"
-                  )
-                  or ""
-              ).lower()
-
-
-              keywords = (
-                  "earnings",
-                  "results",
-                  "financial",
-                  "guidance",
-                  "outlook"
-              )
-
-
-              return any(
-                  word in description
-                  for word in keywords
-              )
+              return None
 
 
           # ============================================================
-          # SEC ARCHIVE URL
+          # SEC ARCHIVE BASIS
           # ============================================================
 
-          def filing_url(
-              cik,
-              accession,
-              document
-          ):
+          def archive_base(cik, accession):
 
               cik_number = str(
                   int(cik)
@@ -294,149 +282,507 @@ jobs:
                   )
               )
 
-
               return (
                   "https://www.sec.gov/"
                   "Archives/edgar/data/"
                   f"{cik_number}/"
                   f"{accession_clean}/"
-                  f"{document}"
               )
+
+
+          # ============================================================
+          # FILING INDEX
+          # ============================================================
+
+          def load_filing_index(cik, accession):
+
+              base = archive_base(
+                  cik,
+                  accession
+              )
+
+              index_url = (
+                  base + "index.json"
+              )
+
+              return (
+                  base,
+                  get_json(index_url)
+              )
+
+
+          # ============================================================
+          # HTML-DOKUMENTE AUS INDEX
+          # ============================================================
+
+          def get_html_files(index_data):
+
+              items = (
+                  index_data
+                  .get("directory", {})
+                  .get("item", [])
+              )
+
+
+              html_files = []
+
+
+              for item in items:
+
+                  name = (
+                      item.get("name")
+                      or ""
+                  )
+
+                  lower = name.lower()
+
+
+                  if lower.endswith(
+                      (".htm", ".html")
+                  ):
+
+                      html_files.append(
+                          name
+                      )
+
+
+              return html_files
+
+
+          # ============================================================
+          # DOKUMENT PRIORISIEREN
+          #
+          # Exhibit 99 / earnings release zuerst.
+          # Danach übrige HTML-Dateien.
+          # ============================================================
+
+          def document_priority(name):
+
+              lower = name.lower()
+
+
+              score = 0
+
+
+              if "ex99" in lower:
+                  score += 100
+
+              if "exhibit99" in lower:
+                  score += 100
+
+              if "99-1" in lower:
+                  score += 90
+
+              if "99_1" in lower:
+                  score += 90
+
+              if "99.1" in lower:
+                  score += 90
+
+              if "earn" in lower:
+                  score += 50
+
+              if "release" in lower:
+                  score += 40
+
+
+              # SEC Inline-XBRL Hilfsdateien nach hinten
+              if lower.startswith("r"):
+                  score -= 10
+
+              if "index" in lower:
+                  score -= 20
+
+
+              return score
+
+
+          # ============================================================
+          # GUIDANCE TEXTSTELLEN
+          # ============================================================
+
+          def find_guidance_snippets(
+              text,
+              max_snippets=12
+          ):
+
+              lower = text.lower()
+
+              matches = []
+
+
+              for term in GUIDANCE_TERMS:
+
+                  term_lower = term.lower()
+
+                  start = 0
+
+
+                  while True:
+
+                      pos = lower.find(
+                          term_lower,
+                          start
+                      )
+
+
+                      if pos == -1:
+                          break
+
+
+                      left = max(
+                          0,
+                          pos - 220
+                      )
+
+                      right = min(
+                          len(text),
+                          pos + len(term) + 320
+                      )
+
+
+                      snippet = (
+                          text[left:right]
+                          .strip()
+                      )
+
+
+                      matches.append(
+                          (
+                              pos,
+                              term,
+                              snippet
+                          )
+                      )
+
+
+                      start = (
+                          pos
+                          + len(term_lower)
+                      )
+
+
+              # chronologisch im Dokument
+              matches.sort(
+                  key=lambda x: x[0]
+              )
+
+
+              # ähnliche/überlappende Treffer entfernen
+              unique = []
+
+              last_position = -10000
+
+
+              for position, term, snippet in matches:
+
+                  if (
+                      position
+                      - last_position
+                      < 180
+                  ):
+                      continue
+
+
+                  unique.append(
+                      (
+                          position,
+                          term,
+                          snippet
+                      )
+                  )
+
+                  last_position = position
+
+
+                  if (
+                      len(unique)
+                      >= max_snippets
+                  ):
+                      break
+
+
+              return unique
 
 
           # ============================================================
           # HAUPTLAUF
           # ============================================================
 
-          for symbol, cik in companies.items():
+          for symbol, cik in COMPANIES.items():
 
               print("")
-              print("=" * 90)
+              print("=" * 100)
 
               print(
-                  "BULLWERK GUIDANCE TEST:",
+                  "BULLWERK GUIDANCE V2:",
                   symbol
               )
 
-              print("=" * 90)
+              print("=" * 100)
 
 
               try:
 
-                  data = load_submissions(
-                      cik
+                  submissions = (
+                      load_submissions(cik)
                   )
 
-              except Exception as error:
 
                   print(
-                      "SEC FEHLER:",
-                      error
+                      "Unternehmen:",
+                      submissions.get("name")
                   )
 
-                  continue
 
-
-              print(
-                  "Unternehmen:",
-                  data.get("name")
-              )
-
-
-              filings = (
-                  build_recent_filings(
-                      data
+                  filing = (
+                      latest_earnings_8k(
+                          submissions
+                      )
                   )
-              )
 
 
-              relevant = [
+                  if not filing:
 
-                  filing
+                      print(
+                          "Keine aktuelle "
+                          "Earnings-8-K mit "
+                          "Item 2.02 gefunden."
+                      )
 
-                  for filing in filings
-
-                  if is_relevant_8k(
-                      filing
-                  )
-              ]
-
-
-              print(
-                  "Relevante aktuelle "
-                  "8-K Meldungen:",
-                  len(relevant)
-              )
+                      continue
 
 
-              print("")
-
-
-              if not relevant:
-
+                  print("")
                   print(
-                      "Keine relevanten "
-                      "8-K Meldungen gefunden."
+                      "Jüngste Earnings-8-K:"
                   )
-
-
-              for filing in relevant[:10]:
-
-                  print("-" * 80)
 
                   print(
                       "Filing Date:",
-                      filing.get(
+                      filing[
                           "filing_date"
-                      )
+                      ]
                   )
 
                   print(
                       "Report Date:",
-                      filing.get(
+                      filing[
                           "report_date"
-                      )
-                  )
-
-                  print(
-                      "Form:",
-                      filing.get(
-                          "form"
-                      )
+                      ]
                   )
 
                   print(
                       "Items:",
-                      filing.get(
+                      filing[
                           "items"
-                      )
+                      ]
                   )
 
                   print(
-                      "Beschreibung:",
-                      filing.get(
-                          "description"
-                      )
+                      "Primary Document:",
+                      filing[
+                          "primary_document"
+                      ]
                   )
 
-                  print(
-                      "Dokument:",
-                      filing.get(
-                          "document"
-                      )
-                  )
 
-                  print(
-                      "URL:",
-                      filing_url(
+                  base, index_data = (
+                      load_filing_index(
                           cik,
-                          filing.get(
+                          filing[
                               "accession"
-                          ),
-                          filing.get(
-                              "document"
+                          ]
+                      )
+                  )
+
+
+                  html_files = (
+                      get_html_files(
+                          index_data
+                      )
+                  )
+
+
+                  html_files.sort(
+                      key=document_priority,
+                      reverse=True
+                  )
+
+
+                  print("")
+                  print(
+                      "HTML-Dokumente im Filing:",
+                      len(html_files)
+                  )
+
+
+                  print(
+                      "Priorisierte Dateien:"
+                  )
+
+
+                  for name in html_files[:10]:
+
+                      print(
+                          " -",
+                          name,
+                          "| Priorität:",
+                          document_priority(
+                              name
                           )
                       )
+
+
+                  print("")
+                  print(
+                      "GUIDANCE-/OUTLOOK-SUCHE"
+                  )
+
+                  print("-" * 100)
+
+
+                  total_snippets = 0
+
+
+                  # Nur die ersten priorisierten Dokumente prüfen.
+                  # Das verhindert unnötig viele SEC Requests.
+                  for name in html_files[:8]:
+
+                      url = (
+                          base + name
+                      )
+
+
+                      try:
+
+                          html = get_text(
+                              url
+                          )
+
+                      except Exception as error:
+
+                          print(
+                              "Dokument konnte "
+                              "nicht geladen werden:",
+                              name,
+                              error
+                          )
+
+                          continue
+
+
+                      text = html_to_text(
+                          html
+                      )
+
+
+                      snippets = (
+                          find_guidance_snippets(
+                              text
+                          )
+                      )
+
+
+                      if not snippets:
+                          continue
+
+
+                      print("")
+                      print(
+                          "DOKUMENT:",
+                          name
+                      )
+
+                      print(
+                          "URL:",
+                          url
+                      )
+
+                      print(
+                          "Treffer:",
+                          len(snippets)
+                      )
+
+
+                      for number, (
+                          position,
+                          term,
+                          snippet
+                      ) in enumerate(
+                          snippets,
+                          start=1
+                      ):
+
+                          print("")
+                          print(
+                              f"[{number}] "
+                              f"Begriff: {term}"
+                          )
+
+                          print(
+                              snippet
+                          )
+
+
+                      total_snippets += (
+                          len(snippets)
+                      )
+
+
+                      # Wenn wir in einem stark
+                      # priorisierten Exhibit bereits
+                      # gute Treffer haben, reicht es
+                      # für diesen Test.
+                      if (
+                          document_priority(name)
+                          >= 90
+                          and snippets
+                      ):
+                          break
+
+
+                  print("")
+                  print("-" * 100)
+
+
+                  if total_snippets == 0:
+
+                      print(
+                          "ERGEBNIS:",
+                          "Keine eindeutigen "
+                          "Guidance-/Outlook-"
+                          "Textstellen gefunden."
+                      )
+
+                      print(
+                          "STATUS: N/A - "
+                          "NICHT als 0 Punkte werten."
+                      )
+
+                  else:
+
+                      print(
+                          "ERGEBNIS:",
+                          total_snippets,
+                          "potenziell relevante "
+                          "Textstellen gefunden."
+                      )
+
+                      print(
+                          "STATUS:",
+                          "MANUELLE PRÜFUNG "
+                          "ERFORDERLICH"
+                      )
+
+
+              except Exception as error:
+
+                  print(
+                      "FEHLER bei",
+                      symbol,
+                      ":",
+                      repr(error)
                   )
 
 
@@ -451,12 +797,12 @@ jobs:
 
 
           print("")
-          print("=" * 90)
+          print("=" * 100)
 
           print(
-              "Bullwerk Guidance Test V1 beendet."
+              "Bullwerk Guidance Test V2 beendet."
           )
 
-          print("=" * 90)
+          print("=" * 100)
 
           PY
