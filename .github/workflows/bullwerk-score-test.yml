@@ -1,0 +1,193 @@
+name: Bullwerk Score Integration Test V1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bullwerk-score-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Technical und Fundamental verbinden
+        run: |
+          python3 <<'PY'
+
+          import json
+
+          # ==================================================
+          # BULLWERK SCORE – INTEGRATIONSTEST V1
+          #
+          # Ziel:
+          # Technical Setup / Darvas     0–20
+          # Fundamental Momentum         0–20
+          # ---------------------------------
+          # Erster Teilscore             0–40
+          #
+          # Fundamentalwerte stammen aus dem bereits
+          # erfolgreich getesteten Fundamental-V5.
+          # ==================================================
+
+          fundamental_scores = {
+              "AAPL": 18.6,
+              "MSFT": 11.4
+          }
+
+          # ==================================================
+          # Technische Daten laden
+          # ==================================================
+
+          with open(
+              "data/market-data.json",
+              "r",
+              encoding="utf-8"
+          ) as file:
+
+              market_data = json.load(file)
+
+          stocks = market_data.get(
+              "stocks",
+              []
+          )
+
+          print("")
+          print("=" * 70)
+          print("BULLWERK SCORE – INTEGRATIONSTEST V1")
+          print("=" * 70)
+
+          results = []
+
+          # ==================================================
+          # Aktien durchlaufen
+          # ==================================================
+
+          for stock in stocks:
+
+              symbol = stock.get("symbol")
+
+              technical = stock.get(
+                  "technical",
+                  {}
+              )
+
+              technical_score = technical.get(
+                  "technicalScore"
+              )
+
+              fundamental_score = (
+                  fundamental_scores.get(symbol)
+              )
+
+              # ==============================================
+              # Teilscore 0–40
+              # Nur berechnen, wenn beide Säulen vorhanden
+              # ==============================================
+
+              partial_score_40 = None
+
+              if (
+                  technical_score is not None
+                  and fundamental_score is not None
+              ):
+
+                  partial_score_40 = round(
+                      float(technical_score)
+                      + float(fundamental_score),
+                      1
+                  )
+
+              result = {
+
+                  "symbol":
+                      symbol,
+
+                  "technicalScore":
+                      technical_score,
+
+                  "fundamentalScore":
+                      fundamental_score,
+
+                  "partialScore40":
+                      partial_score_40,
+
+                  "available":
+                      partial_score_40 is not None
+
+              }
+
+              results.append(result)
+
+              # ==============================================
+              # GitHub Log
+              # ==============================================
+
+              if partial_score_40 is not None:
+
+                  print(
+                      f"{symbol}: "
+                      f"Technik={technical_score}/20 | "
+                      f"Fundamental={fundamental_score}/20 | "
+                      f"TEILSCORE={partial_score_40}/40"
+                  )
+
+              else:
+
+                  print(
+                      f"{symbol}: "
+                      f"Technik={technical_score}/20 | "
+                      f"Fundamental=N/A | "
+                      f"TEILSCORE=N/A"
+                  )
+
+          # ==================================================
+          # Testdatei erzeugen
+          # ==================================================
+
+          output = {
+
+              "version":
+                  "bullwerk-score-integration-v1",
+
+              "maxScoreCurrentlyAvailable":
+                  40,
+
+              "pillarsCurrentlyConnected": [
+                  "Technical Setup / Darvas",
+                  "Fundamental Momentum"
+              ],
+
+              "stocks":
+                  results
+
+          }
+
+          with open(
+              "bullwerk-score-test.json",
+              "w",
+              encoding="utf-8"
+          ) as file:
+
+              json.dump(
+                  output,
+                  file,
+                  ensure_ascii=False,
+                  indent=2
+              )
+
+          print("")
+          print("=" * 70)
+          print("Integrationstest abgeschlossen.")
+          print("=" * 70)
+
+          PY
+
+      - name: Ergebnis anzeigen
+        run: |
+          echo ""
+          echo "===== bullwerk-score-test.json ====="
+          cat bullwerk-score-test.json
