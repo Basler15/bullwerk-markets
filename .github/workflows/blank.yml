@@ -1,0 +1,219 @@
+name: Bullwerk Orders Backlog Test V1
+
+on:
+  workflow_dispatch:
+
+jobs:
+  orders-backlog-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test Orders and Backlog
+        shell: python
+        run: |
+          import requests
+          import re
+          import time
+
+          # ---------------------------------------------------------
+          # BULLWERK MARKETS
+          # Orders / Backlog Test V1
+          #
+          # Ziel:
+          # Nur prüfen, ob aktuelle SEC-Unterlagen brauchbare
+          # Aussagen zu Auftragseingang / Backlog enthalten.
+          #
+          # Spätere einfache Bewertung:
+          # 3/3 = deutlich positiv
+          # 2/3 = stabil / moderat positiv
+          # 0/3 = klar negativ
+          # N/A = nicht sinnvoll berichtet -> keine Bestrafung
+          # ---------------------------------------------------------
+
+          companies = {
+              "NVDA": "0001045810",
+              "MSFT": "0000789019",
+              "AVGO": "0001730168",
+              "MU":   "0000723125",
+              "ORCL": "0001341439",
+              "AAPL": "0000320193",
+          }
+
+          headers = {
+              "User-Agent": "Bullwerk Markets research bullwerk-markets@example.com",
+              "Accept-Encoding": "gzip, deflate",
+          }
+
+          keywords = [
+              "backlog",
+              "order backlog",
+              "orders",
+              "order growth",
+              "bookings",
+              "book-to-bill",
+              "remaining performance obligations",
+              "remaining performance obligation",
+              "RPO",
+              "contracted backlog",
+          ]
+
+          def clean_html(text):
+              text = re.sub(r"<script.*?</script>", " ", text,
+                            flags=re.I | re.S)
+              text = re.sub(r"<style.*?</style>", " ", text,
+                            flags=re.I | re.S)
+              text = re.sub(r"<[^>]+>", " ", text)
+              text = text.replace("&nbsp;", " ")
+              text = text.replace("&amp;", "&")
+              text = re.sub(r"\s+", " ", text)
+              return text.strip()
+
+          def find_matches(text):
+              matches = []
+
+              sentences = re.split(r"(?<=[.!?])\s+", text)
+
+              for sentence in sentences:
+                  lower = sentence.lower()
+
+                  for keyword in keywords:
+                      if keyword.lower() in lower:
+                          sentence_clean = sentence.strip()
+
+                          if 30 <= len(sentence_clean) <= 900:
+                              matches.append(sentence_clean)
+                          break
+
+              # Duplikate entfernen
+              unique = []
+              seen = set()
+
+              for item in matches:
+                  key = item.lower()
+
+                  if key not in seen:
+                      seen.add(key)
+                      unique.append(item)
+
+              return unique[:12]
+
+          for ticker, cik in companies.items():
+
+              print("")
+              print("=" * 80)
+              print(f"{ticker} | CIK {cik}")
+              print("=" * 80)
+
+              submissions_url = (
+                  f"https://data.sec.gov/submissions/CIK{cik}.json"
+              )
+
+              response = requests.get(
+                  submissions_url,
+                  headers=headers,
+                  timeout=30
+              )
+
+              print("SEC Submissions HTTP:", response.status_code)
+
+              if response.status_code != 200:
+                  print("Keine SEC-Daten verfügbar.")
+                  continue
+
+              data = response.json()
+              recent = data.get("filings", {}).get("recent", {})
+
+              forms = recent.get("form", [])
+              accessions = recent.get("accessionNumber", [])
+              primary_docs = recent.get("primaryDocument", [])
+              filing_dates = recent.get("filingDate", [])
+
+              candidates = []
+
+              for form, accession, doc, filing_date in zip(
+                  forms,
+                  accessions,
+                  primary_docs,
+                  filing_dates
+              ):
+                  if form in ["10-Q", "10-K", "8-K"]:
+                      candidates.append(
+                          (form, accession, doc, filing_date)
+                      )
+
+                  if len(candidates) >= 6:
+                      break
+
+              total_matches = []
+
+              for form, accession, doc, filing_date in candidates:
+
+                  accession_clean = accession.replace("-", "")
+                  cik_number = str(int(cik))
+
+                  document_url = (
+                      "https://www.sec.gov/Archives/edgar/data/"
+                      f"{cik_number}/{accession_clean}/{doc}"
+                  )
+
+                  doc_response = requests.get(
+                      document_url,
+                      headers=headers,
+                      timeout=30
+                  )
+
+                  print("")
+                  print(
+                      f"{filing_date} | {form} | "
+                      f"HTTP {doc_response.status_code}"
+                  )
+
+                  if doc_response.status_code != 200:
+                      continue
+
+                  text = clean_html(doc_response.text)
+                  matches = find_matches(text)
+
+                  if matches:
+                      print(
+                          f"Gefundene Orders/Backlog-Aussagen: "
+                          f"{len(matches)}"
+                      )
+
+                      for match in matches[:5]:
+                          print(" -", match[:700])
+
+                      total_matches.extend(matches)
+
+                  else:
+                      print("Keine passende Aussage gefunden.")
+
+                  time.sleep(0.15)
+
+              print("")
+              print("--- BULLWERK ERGEBNIS ---")
+
+              if total_matches:
+                  print(
+                      "STATUS: DATEN GEFUNDEN"
+                  )
+                  print(
+                      "Für dieses Unternehmen können wir "
+                      "Orders/Backlog grundsätzlich auswerten."
+                  )
+              else:
+                  print("STATUS: N/A")
+                  print(
+                      "Keine brauchbaren Orders/Backlog-Daten gefunden."
+                  )
+                  print(
+                      "WICHTIG: N/A wird später NICHT als 0 gewertet."
+                  )
+
+              time.sleep(0.25)
+
+          print("")
+          print("=" * 80)
+          print("Bullwerk Orders/Backlog Test V1 beendet.")
+          print("Noch KEINE automatische 0-3 Bewertung.")
+          print("=" * 80)
