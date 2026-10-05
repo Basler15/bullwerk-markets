@@ -23,18 +23,19 @@ jobs:
           # BULLWERK MARKETS
           # GUIDANCE TEST V3
           #
-          # Ziel:
-          # - jüngste Earnings-8-K mit Item 2.02 finden
-          # - Exhibit 99.1 / Earnings Release öffnen
-          # - echte NEUE Zukunftsaussagen erkennen
-          # - historische Guidance möglichst herausfiltern
-          # - KEINE Punktevergabe
+          # Testunternehmen:
+          # AAPL = Gegenprobe ohne klare SEC-Guidance
+          # MSFT = Test historischer Guidance-Verweise
+          # NVDA = Gegenprobe für echte numerische Forward-Guidance
+          #
+          # Noch KEINE Punktevergabe.
           # ============================================================
 
 
           COMPANIES = {
               "AAPL": "0000320193",
-              "MSFT": "0000789019"
+              "MSFT": "0000789019",
+              "NVDA": "0001045810"
           }
 
 
@@ -45,7 +46,7 @@ jobs:
 
 
           # ============================================================
-          # POSITIVE ZUKUNFTS-SIGNALE
+          # ECHTE ZUKUNFTS-SIGNALE
           # ============================================================
 
           STRONG_FORWARD_PATTERNS = [
@@ -92,9 +93,7 @@ jobs:
 
 
           # ============================================================
-          # HISTORISCHE / RÜCKBLICKENDE GUIDANCE
-          #
-          # Solche Formulierungen sollen NICHT als neue Guidance gelten.
+          # HISTORISCHE GUIDANCE / RÜCKBLICK
           # ============================================================
 
           HISTORICAL_PATTERNS = [
@@ -125,7 +124,7 @@ jobs:
 
 
           # ============================================================
-          # BEGRIFFE, DIE DEN INHALT INTERESSANT MACHEN
+          # FUNDAMENTALE BEGRIFFE
           # ============================================================
 
           BUSINESS_TERMS = [
@@ -144,7 +143,9 @@ jobs:
               "capex",
               "expenses",
               "cloud",
-              "services"
+              "services",
+              "data center",
+              "gaming"
           ]
 
 
@@ -279,7 +280,7 @@ jobs:
 
 
           # ============================================================
-          # JÜNGSTE EARNINGS 8-K
+          # JÜNGSTE EARNINGS-8-K MIT ITEM 2.02
           # ============================================================
 
           def latest_earnings_8k(data):
@@ -288,7 +289,6 @@ jobs:
                   data.get("filings", {})
                       .get("recent", {})
               )
-
 
               accession_numbers = recent.get(
                   "accessionNumber",
@@ -375,7 +375,7 @@ jobs:
 
 
           # ============================================================
-          # ARCHIVE BASIS
+          # SEC ARCHIVE
           # ============================================================
 
           def archive_base(cik, accession):
@@ -399,10 +399,6 @@ jobs:
               )
 
 
-          # ============================================================
-          # FILING INDEX
-          # ============================================================
-
           def load_filing_index(cik, accession):
 
               base = archive_base(
@@ -421,7 +417,7 @@ jobs:
 
 
           # ============================================================
-          # HTML DATEIEN
+          # HTML-DATEIEN
           # ============================================================
 
           def get_html_files(index_data):
@@ -431,7 +427,6 @@ jobs:
                   .get("directory", {})
                   .get("item", [])
               )
-
 
               result = []
 
@@ -485,7 +480,6 @@ jobs:
               if "release" in lower:
                   score += 40
 
-
               if "index" in lower:
                   score -= 20
 
@@ -494,20 +488,15 @@ jobs:
 
 
           # ============================================================
-          # TEXT IN SINNVOLLE BLÖCKE TEILEN
+          # TEXTBLÖCKE
           # ============================================================
 
           def split_blocks(text):
-
-              # Satzähnliche Trennung.
-              # Nicht perfekt, aber deutlich besser
-              # als reine Keyword-Suche.
 
               raw_blocks = re.split(
                   r"(?<=[.!?])\s+",
                   text
               )
-
 
               blocks = []
 
@@ -547,13 +536,10 @@ jobs:
 
 
           # ============================================================
-          # PATTERN TEST
+          # REGEX TEST
           # ============================================================
 
-          def matches_any(
-              text,
-              patterns
-          ):
+          def matches_any(text, patterns):
 
               lower = text.lower()
 
@@ -573,7 +559,7 @@ jobs:
 
 
           # ============================================================
-          # BUSINESS TERM TEST
+          # BUSINESS RELEVANZ
           # ============================================================
 
           def business_relevance(text):
@@ -595,7 +581,7 @@ jobs:
 
 
           # ============================================================
-          # ZAHL / RANGE ERKENNEN
+          # ZAHLEN / GUIDANCE RANGE
           # ============================================================
 
           def has_numeric_target(text):
@@ -625,7 +611,7 @@ jobs:
 
 
           # ============================================================
-          # FORWARD BLOCKS FINDEN
+          # FORWARD GUIDANCE ERKENNEN
           # ============================================================
 
           def find_forward_guidance(text):
@@ -633,7 +619,6 @@ jobs:
               blocks = split_blocks(
                   text
               )
-
 
               results = []
 
@@ -648,11 +633,11 @@ jobs:
                       continue
 
 
-                  # Kontext: vorheriger + aktueller + nächster Satz
                   context_parts = []
 
 
                   if index > 0:
+
                       context_parts.append(
                           blocks[index - 1]
                       )
@@ -664,6 +649,7 @@ jobs:
 
 
                   if index + 1 < len(blocks):
+
                       context_parts.append(
                           blocks[index + 1]
                       )
@@ -694,23 +680,6 @@ jobs:
                   )
 
 
-                  # --------------------------------------------
-                  # CONFIDENCE
-                  #
-                  # HIGH:
-                  # echte Forward-Formulierung,
-                  # kein historischer Kontext,
-                  # Business-Kennzahl,
-                  # Zahl/Range vorhanden
-                  #
-                  # MEDIUM:
-                  # Forward + Business,
-                  # aber keine konkrete Zahl
-                  #
-                  # REJECT:
-                  # historischer Guidance-Kontext
-                  # --------------------------------------------
-
                   if historical:
 
                       status = (
@@ -722,21 +691,15 @@ jobs:
                       and numeric
                   ):
 
-                      status = (
-                          "HIGH"
-                      )
+                      status = "HIGH"
 
                   elif business_hits:
 
-                      status = (
-                          "MEDIUM"
-                      )
+                      status = "MEDIUM"
 
                   else:
 
-                      status = (
-                          "LOW"
-                      )
+                      status = "LOW"
 
 
                   results.append({
@@ -755,7 +718,8 @@ jobs:
                   })
 
 
-              # Duplikate reduzieren
+              # Duplikate entfernen
+
               unique = []
 
               seen = set()
@@ -924,8 +888,6 @@ jobs:
                       )
 
 
-                      # Für Guidance bevorzugen wir
-                      # Earnings Exhibits.
                       if priority < 40:
                           continue
 
@@ -1043,8 +1005,6 @@ jobs:
                               found_usable = True
 
 
-                      # Exhibit 99.1 reicht für
-                      # diesen Test normalerweise aus.
                       if priority >= 90:
                           break
 
@@ -1111,7 +1071,8 @@ jobs:
           print("=" * 100)
 
           print(
-              "Bullwerk Guidance Test V3 beendet."
+              "Bullwerk Guidance Test V3 "
+              "mit NVIDIA beendet."
           )
 
           print("=" * 100)
