@@ -1,18 +1,25 @@
-name: Bullwerk Fundamental Momentum Score V6
+name: Bullwerk Fundamental Momentum Score V7
 
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   fundamental-momentum-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fundamental Momentum V5 berechnen
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Fundamental Momentum V7 berechnen und speichern
         run: |
           python3 <<'PY'
 
           import json
+          import os
           import time
           import urllib.request
           from datetime import datetime
@@ -1375,6 +1382,8 @@ jobs:
           # HAUPTLAUF
           # ============================================================
 
+          fundamental_results = []
+
           for symbol, cik in (
               companies.items()
           ):
@@ -1889,6 +1898,25 @@ jobs:
                   )
 
 
+              fundamental_results.append({
+                  "symbol": symbol,
+                  "fundamentalScore": (
+                      round(fundamental_score, 1)
+                      if fundamental_score is not None
+                      else None
+                  ),
+                  "rawPoints": earned,
+                  "availableMax": available_max,
+                  "breakdown": {
+                      "revenue": revenue_score,
+                      "profitEps": profit_eps_score,
+                      "margin": margin_score,
+                      "fcf": fcf_score,
+                      "guidance": guidance_score,
+                      "ordersBacklog": orders_backlog_score
+                  }
+              })
+
               print("")
               print(
                   symbol,
@@ -1899,14 +1927,57 @@ jobs:
               time.sleep(1)
 
 
+          os.makedirs(
+              "data",
+              exist_ok=True
+          )
+
+          output = {
+              "updated": datetime.utcnow().isoformat() + "Z",
+              "version": "bullwerk-fundamental-data-v7",
+              "scoreVersion": "bullwerk-fundamental-v1",
+              "maxScore": 20,
+              "stocks": fundamental_results
+          }
+
+          with open(
+              "data/fundamental-data.json",
+              "w",
+              encoding="utf-8"
+          ) as file:
+              json.dump(
+                  output,
+                  file,
+                  ensure_ascii=False,
+                  indent=2
+              )
+
+          print("")
+          print("data/fundamental-data.json gespeichert.")
+          print(f"{len(fundamental_results)} Aktien gespeichert.")
+
           print("")
           print("=" * 90)
 
           print(
               "Bullwerk Fundamental "
-              "Momentum Score V5 beendet."
+              "Momentum Score V7 beendet."
           )
 
           print("=" * 90)
 
           PY
+
+      - name: Fundamentaldaten im Repository speichern
+        run: |
+          git config user.name "Bullwerk Data Bot"
+          git config user.email "actions@github.com"
+
+          git add data/fundamental-data.json
+
+          if git diff --cached --quiet; then
+            echo "Keine neuen Fundamentaldaten."
+          else
+            git commit -m "Update Bullwerk fundamental data v7"
+            git push
+          fi
