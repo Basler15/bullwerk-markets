@@ -1,4 +1,4 @@
-name: Bullwerk Fundamental Momentum Test V3
+name: Bullwerk Fundamental Momentum Test V4
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fundamental Momentum V3 berechnen
+      - name: Fundamental Momentum V4 berechnen
         run: |
           python3 <<'PY'
 
@@ -20,16 +20,25 @@ jobs:
 
           # ============================================================
           # BULLWERK MARKETS
-          # FUNDAMENTAL MOMENTUM TEST V3
+          # FUNDAMENTAL MOMENTUM TEST V4
           #
-          # Ziel:
-          # - SEC Einzelquartale sauber normalisieren
-          # - echte Perioden-Enddaten für Reihenfolge verwenden
-          # - FY/FP nur zur Quartalsidentifikation nutzen
-          # - keine falsche Beschleunigung über Periodenlücken
-          # - FCF aus passenden OCF/CapEx Quartalen bilden
+          # WICHTIGE ÄNDERUNG:
           #
-          # Noch KEIN Bullwerk 0-20 Score.
+          # SEC FY/FP wird NICHT mehr für die zeitliche Reihenfolge
+          # der Quartale verwendet.
+          #
+          # Die Reihenfolge entsteht aus dem tatsächlichen Enddatum.
+          #
+          # Bullwerk erzeugt daraus:
+          # BQ1, BQ2, BQ3 ... = chronologische Quartalsfolge.
+          #
+          # YoY:
+          # aktuelles Quartal gegen Quartal 4 Positionen davor.
+          #
+          # Beschleunigung:
+          # aktuelles YoY minus YoY des direkt vorherigen Quartals.
+          #
+          # Noch KEIN 0-20 Fundamental Score.
           # ============================================================
 
 
@@ -45,45 +54,8 @@ jobs:
           )
 
 
-          QUARTER_ORDER = {
-              "Q1": 1,
-              "Q2": 2,
-              "Q3": 3,
-              "Q4": 4
-          }
-
-
           # ============================================================
-          # SEC LADEN
-          # ============================================================
-
-          def get_json(url):
-
-              request = urllib.request.Request(
-                  url,
-                  headers={
-                      "User-Agent": USER_AGENT,
-                      "Accept": "application/json",
-                      "Accept-Encoding": "identity"
-                  }
-              )
-
-              with urllib.request.urlopen(
-                  request,
-                  timeout=30
-              ) as response:
-
-                  print(
-                      f"HTTP Status: {response.status}"
-                  )
-
-                  return json.loads(
-                      response.read().decode("utf-8")
-                  )
-
-
-          # ============================================================
-          # DATUM-HILFEN
+          # DATUM
           # ============================================================
 
           def parse_date(value):
@@ -120,66 +92,98 @@ jobs:
 
 
           def date_gap_days(
-              newer_end,
-              older_end
+              newer,
+              older
           ):
 
-              newer = parse_date(
-                  newer_end
-              )
+              a = parse_date(newer)
+              b = parse_date(older)
 
-              older = parse_date(
-                  older_end
-              )
-
-              if not newer or not older:
+              if not a or not b:
                   return None
 
               return (
-                  newer - older
+                  a - b
               ).days
 
 
           def starts_match(
-              row_a,
-              row_b,
+              a,
+              b,
               tolerance=7
           ):
-
-              if not row_a or not row_b:
-                  return False
-
-              a = parse_date(
-                  row_a.get("start")
-              )
-
-              b = parse_date(
-                  row_b.get("start")
-              )
 
               if not a or not b:
                   return False
 
+              da = parse_date(
+                  a.get("start")
+              )
+
+              db = parse_date(
+                  b.get("start")
+              )
+
+              if not da or not db:
+                  return False
+
               return abs(
-                  (a - b).days
+                  (da - db).days
               ) <= tolerance
 
 
           # ============================================================
-          # SEC CONCEPT LADEN
+          # SEC
+          # ============================================================
+
+          def get_json(url):
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent":
+                          USER_AGENT,
+
+                      "Accept":
+                          "application/json",
+
+                      "Accept-Encoding":
+                          "identity"
+                  }
+              )
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+
+                  print(
+                      "HTTP Status:",
+                      response.status
+                  )
+
+                  return json.loads(
+                      response.read().decode(
+                          "utf-8"
+                      )
+                  )
+
+
+          # ============================================================
+          # CONCEPT LADEN
           # ============================================================
 
           def get_concept_rows(
               facts,
               concepts,
-              preferred_units
+              units
           ):
 
               for concept in concepts:
 
                   try:
 
-                      units = (
+                      available = (
                           facts["facts"]
                           ["us-gaap"]
                           [concept]
@@ -194,25 +198,25 @@ jobs:
                   selected = None
 
 
-                  for unit in preferred_units:
+                  for unit in units:
 
-                      if unit in units:
+                      if unit in available:
 
-                          selected = units[
-                              unit
-                          ]
+                          selected = (
+                              available[unit]
+                          )
 
                           break
 
 
                   if selected is None:
 
-                      if not units:
+                      if not available:
                           continue
 
                       selected = next(
                           iter(
-                              units.values()
+                              available.values()
                           )
                       )
 
@@ -246,22 +250,16 @@ jobs:
                           continue
 
 
-                      new_row = dict(
-                          row
-                      )
+                      item = dict(row)
 
-                      new_row[
-                          "concept"
-                      ] = concept
-
-                      new_row[
+                      item[
                           "duration_days"
                       ] = duration_days(
-                          row
+                          item
                       )
 
                       rows.append(
-                          new_row
+                          item
                       )
 
 
@@ -300,9 +298,7 @@ jobs:
                   )
 
 
-                  old = best.get(
-                      key
-                  )
+                  old = best.get(key)
 
 
                   if old is None:
@@ -343,13 +339,18 @@ jobs:
                       "duration_days"
                   )
 
-                  fp = row.get(
-                      "fp"
-                  )
-
 
                   if days is None:
                       continue
+
+
+                  if not (
+                      70 <= days <= 110
+                  ):
+                      continue
+
+
+                  fp = row.get("fp")
 
 
                   if fp not in (
@@ -361,16 +362,7 @@ jobs:
                       continue
 
 
-                  if not (
-                      70 <= days <= 110
-                  ):
-                      continue
-
-
                   result.append({
-
-                      "start":
-                          row.get("start"),
 
                       "end":
                           row.get("end"),
@@ -378,17 +370,14 @@ jobs:
                       "value":
                           row.get("val"),
 
-                      "fy":
+                      "sec_fy":
                           row.get("fy"),
 
-                      "fp":
+                      "sec_fp":
                           fp,
 
                       "filed":
                           row.get("filed"),
-
-                      "form":
-                          row.get("form"),
 
                       "source":
                           "DIRECT"
@@ -399,7 +388,7 @@ jobs:
 
 
           # ============================================================
-          # KUMULATIVE PERIODEN EINES SEC FY
+          # KUMULATIVE PERIODEN
           # ============================================================
 
           def find_periods_for_fy(
@@ -409,15 +398,13 @@ jobs:
 
               q1 = []
               h1 = []
-              nine_month = []
-              full_year = []
+              nine = []
+              full = []
 
 
               for row in rows:
 
-                  if row.get(
-                      "fy"
-                  ) != fy:
+                  if row.get("fy") != fy:
                       continue
 
 
@@ -430,76 +417,49 @@ jobs:
                       continue
 
 
-                  fp = row.get(
-                      "fp"
-                  )
-
-
                   if (
                       70 <= days <= 110
-                      and fp == "Q1"
+                      and row.get("fp")
+                      == "Q1"
                   ):
 
-                      q1.append(
-                          row
-                      )
+                      q1.append(row)
 
 
                   elif (
                       150 <= days <= 220
-                      and fp in (
-                          "Q2",
-                          "Q3"
-                      )
                   ):
 
-                      h1.append(
-                          row
-                      )
+                      h1.append(row)
 
 
                   elif (
                       230 <= days <= 310
-                      and fp in (
-                          "Q3",
-                          "FY"
-                      )
                   ):
 
-                      nine_month.append(
-                          row
-                      )
+                      nine.append(row)
 
 
                   elif (
                       330 <= days <= 380
-                      and row.get(
-                          "form"
-                      ) == "10-K"
+                      and row.get("form")
+                      == "10-K"
                   ):
 
-                      full_year.append(
-                          row
-                      )
+                      full.append(row)
 
 
               def newest(items):
 
                   if not items:
-
                       return None
-
 
                   return sorted(
                       items,
                       key=lambda x: (
-                          x.get(
-                              "filed"
-                          )
+                          x.get("filed")
                           or "",
-                          x.get(
-                              "end"
-                          )
+                          x.get("end")
                           or ""
                       ),
                       reverse=True
@@ -513,15 +473,11 @@ jobs:
                   "h1":
                       newest(h1),
 
-                  "nine_month":
-                      newest(
-                          nine_month
-                      ),
+                  "nine":
+                      newest(nine),
 
-                  "full_year":
-                      newest(
-                          full_year
-                      )
+                  "full":
+                      newest(full)
               }
 
 
@@ -534,46 +490,32 @@ jobs:
               result = []
 
 
-              fiscal_years = sorted({
+              fiscal_years = {
 
                   row.get("fy")
 
                   for row in rows
 
-                  if row.get(
-                      "fy"
-                  ) is not None
-              })
+                  if row.get("fy")
+                  is not None
+              }
 
 
               for fy in fiscal_years:
 
-                  periods = (
-                      find_periods_for_fy(
-                          rows,
-                          fy
-                      )
+                  p = find_periods_for_fy(
+                      rows,
+                      fy
                   )
 
 
-                  q1 = periods[
-                      "q1"
-                  ]
-
-                  h1 = periods[
-                      "h1"
-                  ]
-
-                  nine = periods[
-                      "nine_month"
-                  ]
-
-                  full_year = periods[
-                      "full_year"
-                  ]
+                  q1 = p["q1"]
+                  h1 = p["h1"]
+                  nine = p["nine"]
+                  full = p["full"]
 
 
-                  # Q2 = H1 - Q1
+                  # Q2
                   if (
                       q1
                       and h1
@@ -585,35 +527,28 @@ jobs:
 
                       result.append({
 
-                          "start":
-                              None,
-
                           "end":
-                              h1.get(
-                                  "end"
-                              ),
+                              h1.get("end"),
 
                           "value":
                               h1["val"]
                               - q1["val"],
 
-                          "fy":
+                          "sec_fy":
                               fy,
 
-                          "fp":
+                          "sec_fp":
                               "Q2",
 
                           "filed":
-                              h1.get(
-                                  "filed"
-                              ),
+                              h1.get("filed"),
 
                           "source":
                               "DERIVED_H1_MINUS_Q1"
                       })
 
 
-                  # Q3 = 9M - H1
+                  # Q3
                   if (
                       h1
                       and nine
@@ -625,68 +560,54 @@ jobs:
 
                       result.append({
 
-                          "start":
-                              None,
-
                           "end":
-                              nine.get(
-                                  "end"
-                              ),
+                              nine.get("end"),
 
                           "value":
                               nine["val"]
                               - h1["val"],
 
-                          "fy":
+                          "sec_fy":
                               fy,
 
-                          "fp":
+                          "sec_fp":
                               "Q3",
 
                           "filed":
-                              nine.get(
-                                  "filed"
-                              ),
+                              nine.get("filed"),
 
                           "source":
                               "DERIVED_9M_MINUS_H1"
                       })
 
 
-                  # Q4 = FY - 9M
+                  # Q4
                   if (
                       nine
-                      and full_year
+                      and full
                       and starts_match(
                           nine,
-                          full_year
+                          full
                       )
                   ):
 
                       result.append({
 
-                          "start":
-                              None,
-
                           "end":
-                              full_year.get(
-                                  "end"
-                              ),
+                              full.get("end"),
 
                           "value":
-                              full_year["val"]
+                              full["val"]
                               - nine["val"],
 
-                          "fy":
+                          "sec_fy":
                               fy,
 
-                          "fp":
+                          "sec_fp":
                               "Q4",
 
                           "filed":
-                              full_year.get(
-                                  "filed"
-                              ),
+                              full.get("filed"),
 
                           "source":
                               "DERIVED_FY_MINUS_9M"
@@ -697,162 +618,170 @@ jobs:
 
 
           # ============================================================
-          # QUARTALE NORMALISIEREN
+          # QUARTALE NACH ECHTEM ENDDATUM
           #
-          # WICHTIG:
-          # Ein FY/FP darf nur EIN Quartal besitzen.
-          # DIRECT wird bevorzugt.
+          # Hier liegt die wichtigste V4-Änderung.
+          # Ein Enddatum = eine wirtschaftliche Periode.
           # ============================================================
 
           def build_quarters(rows):
 
-              rows = dedupe_rows(
-                  rows
-              )
+              rows = dedupe_rows(rows)
 
 
               candidates = (
-                  derived_quarters(
-                      rows
-                  )
+                  derived_quarters(rows)
                   +
-                  direct_quarters(
-                      rows
-                  )
+                  direct_quarters(rows)
               )
 
 
-              best = {}
+              best_by_end = {}
 
 
               for row in candidates:
 
-                  fy = row.get(
-                      "fy"
-                  )
-
-                  fp = row.get(
-                      "fp"
-                  )
+                  end = row.get("end")
 
 
-                  if (
-                      fy is None
-                      or fp not in QUARTER_ORDER
-                  ):
+                  if not end:
                       continue
 
 
-                  key = (
-                      fy,
-                      fp
-                  )
-
-
-                  old = best.get(
-                      key
+                  old = best_by_end.get(
+                      end
                   )
 
 
                   if old is None:
 
-                      best[key] = row
+                      best_by_end[end] = row
 
                       continue
 
 
-                  # DIRECT vor DERIVED
+                  # Direktes Einzelquartal
+                  # bevorzugen.
                   if (
-                      row.get(
-                          "source"
-                      ) == "DIRECT"
-                      and old.get(
-                          "source"
-                      ) != "DIRECT"
+                      row.get("source")
+                      == "DIRECT"
+                      and old.get("source")
+                      != "DIRECT"
                   ):
 
-                      best[key] = row
+                      best_by_end[end] = row
 
                       continue
 
 
-                  # Bei gleichem Typ:
-                  # neueste Einreichung
+                  # Neueste Einreichung
                   if (
-                      row.get(
-                          "source"
-                      )
-                      == old.get(
-                          "source"
-                      )
+                      row.get("source")
+                      == old.get("source")
                       and (
-                          row.get(
-                              "filed"
-                          )
+                          row.get("filed")
                           or ""
                       ) > (
-                          old.get(
-                              "filed"
-                          )
+                          old.get("filed")
                           or ""
                       )
                   ):
 
-                      best[key] = row
+                      best_by_end[end] = row
 
 
               quarters = list(
-                  best.values()
+                  best_by_end.values()
               )
 
 
-              # Tatsächliches Perioden-Enddatum
-              # bestimmt die Chronologie.
               quarters.sort(
                   key=lambda x:
-                      x.get(
-                          "end"
-                      )
+                      x.get("end")
+                      or ""
+              )
+
+
+              # --------------------------------------------------------
+              # Quartalsfolge prüfen.
+              #
+              # Nur Perioden behalten, deren Abstand
+              # zu benachbarten Quartalen plausibel ist.
+              # --------------------------------------------------------
+
+              clean = []
+
+
+              for row in quarters:
+
+                  if not clean:
+
+                      clean.append(row)
+
+                      continue
+
+
+                  gap = date_gap_days(
+                      row.get("end"),
+                      clean[-1].get("end")
+                  )
+
+
+                  if gap is None:
+                      continue
+
+
+                  # Gleiche/fast gleiche Periode
+                  if gap < 45:
+
+                      # neueren Kandidaten verwenden
+                      clean[-1] = row
+
+                      continue
+
+
+                  clean.append(row)
+
+
+              # Bullwerk Sequence
+              for index, row in enumerate(
+                  clean
+              ):
+
+                  row[
+                      "sequence"
+                  ] = index + 1
+
+
+              clean.sort(
+                  key=lambda x:
+                      x.get("end")
                       or "",
                   reverse=True
               )
 
 
-              return quarters
+              return clean
 
 
           # ============================================================
-          # PRIOR-YEAR QUARTER
+          # YOY NACH ECHTEM DATUM
           #
-          # Nicht blind fy - 1 verwenden.
-          #
-          # Gesucht wird:
-          # - gleiches FP
-          # - Enddatum ungefähr 1 Jahr vorher
+          # Wir suchen ein Quartal ca. 1 Jahr zurück.
+          # SEC FY spielt hier KEINE Rolle.
           # ============================================================
 
-          def find_prior_year_quarter(
+          def find_prior_year(
               current,
               quarters
           ):
 
               current_end = parse_date(
-                  current.get(
-                      "end"
-                  )
-              )
-
-              current_fp = current.get(
-                  "fp"
+                  current.get("end")
               )
 
 
-              if (
-                  not current_end
-                  or current_fp
-                      not in QUARTER_ORDER
-              ):
-
+              if not current_end:
                   return None
 
 
@@ -865,31 +794,21 @@ jobs:
                       continue
 
 
-                  if row.get(
-                      "fp"
-                  ) != current_fp:
-                      continue
-
-
-                  row_end = parse_date(
-                      row.get(
-                          "end"
-                      )
+                  older_end = parse_date(
+                      row.get("end")
                   )
 
 
-                  if not row_end:
+                  if not older_end:
                       continue
 
 
                   gap = (
                       current_end
-                      - row_end
+                      - older_end
                   ).days
 
 
-                  # 52/53 Wochen Geschäftsjahre
-                  # zulassen.
                   if (
                       330 <= gap <= 400
                   ):
@@ -905,7 +824,6 @@ jobs:
 
 
               if not candidates:
-
                   return None
 
 
@@ -915,9 +833,7 @@ jobs:
               )
 
 
-              return candidates[
-                  0
-              ][1]
+              return candidates[0][1]
 
 
           # ============================================================
@@ -944,9 +860,7 @@ jobs:
                       current
                       - previous
                   )
-                  / abs(
-                      previous
-                  )
+                  / abs(previous)
                   * 100
               )
 
@@ -961,24 +875,20 @@ jobs:
               for current in quarters:
 
                   previous = (
-                      find_prior_year_quarter(
+                      find_prior_year(
                           current,
                           quarters
                       )
                   )
 
 
-                  if previous is None:
+                  if not previous:
                       continue
 
 
                   growth = yoy_growth(
-                      current.get(
-                          "value"
-                      ),
-                      previous.get(
-                          "value"
-                      )
+                      current.get("value"),
+                      previous.get("value")
                   )
 
 
@@ -989,18 +899,11 @@ jobs:
                   result.append({
 
                       "end":
-                          current.get(
-                              "end"
-                          ),
+                          current.get("end"),
 
-                      "fy":
+                      "sequence":
                           current.get(
-                              "fy"
-                          ),
-
-                      "fp":
-                          current.get(
-                              "fp"
+                              "sequence"
                           ),
 
                       "value":
@@ -1019,15 +922,23 @@ jobs:
                           ),
 
                       "yoy":
-                          growth
+                          growth,
+
+                      "sec_fy":
+                          current.get(
+                              "sec_fy"
+                          ),
+
+                      "sec_fp":
+                          current.get(
+                              "sec_fp"
+                          )
                   })
 
 
               result.sort(
                   key=lambda x:
-                      x.get(
-                          "end"
-                      )
+                      x.get("end")
                       or "",
                   reverse=True
               )
@@ -1039,9 +950,7 @@ jobs:
           # ============================================================
           # BESCHLEUNIGUNG
           #
-          # Nur wenn zwei verfügbare Quartale
-          # tatsächlich ungefähr 1 Quartal
-          # auseinanderliegen.
+          # Nur das unmittelbar vorherige echte Quartal.
           # ============================================================
 
           def add_acceleration(
@@ -1055,18 +964,14 @@ jobs:
                   series
               ):
 
-                  new_row = dict(
-                      row
-                  )
+                  new_row = dict(row)
 
                   new_row[
                       "acceleration"
                   ] = None
 
 
-                  if i + 1 < len(
-                      series
-                  ):
+                  if i + 1 < len(series):
 
                       older = series[
                           i + 1
@@ -1074,17 +979,11 @@ jobs:
 
 
                       gap = date_gap_days(
-                          row.get(
-                              "end"
-                          ),
-                          older.get(
-                              "end"
-                          )
+                          row.get("end"),
+                          older.get("end")
                       )
 
 
-                      # Quartale typischerweise
-                      # ca. 90 Tage auseinander.
                       if (
                           gap is not None
                           and 60 <= gap <= 120
@@ -1093,13 +992,8 @@ jobs:
                           new_row[
                               "acceleration"
                           ] = (
-                              row[
-                                  "yoy"
-                              ]
-                              -
-                              older[
-                                  "yoy"
-                              ]
+                              row["yoy"]
+                              - older["yoy"]
                           )
 
 
@@ -1113,9 +1007,6 @@ jobs:
 
           # ============================================================
           # OPERATIVE MARGE
-          #
-          # Revenue und Operating Income
-          # über echtes Quartals-Enddatum verbinden.
           # ============================================================
 
           def build_margin_series(
@@ -1123,20 +1014,14 @@ jobs:
               operating_income
           ):
 
-              op_by_end = {}
+              op_lookup = {
 
+                  row.get("end"): row
 
-              for row in operating_income:
+                  for row in operating_income
 
-                  end = row.get(
-                      "end"
-                  )
-
-                  if end:
-
-                      op_by_end[
-                          end
-                      ] = row
+                  if row.get("end")
+              }
 
 
               result = []
@@ -1144,13 +1029,9 @@ jobs:
 
               for rev in revenue:
 
-                  end = rev.get(
-                      "end"
-                  )
+                  end = rev.get("end")
 
-                  op = op_by_end.get(
-                      end
-                  )
+                  op = op_lookup.get(end)
 
 
                   if not op:
@@ -1158,15 +1039,11 @@ jobs:
 
 
                   revenue_value = (
-                      rev.get(
-                          "value"
-                      )
+                      rev.get("value")
                   )
 
                   operating_value = (
-                      op.get(
-                          "value"
-                      )
+                      op.get("value")
                   )
 
 
@@ -1174,16 +1051,9 @@ jobs:
                       revenue_value is None
                       or revenue_value == 0
                       or operating_value
-                          is None
+                      is None
                   ):
                       continue
-
-
-                  margin = (
-                      operating_value
-                      / revenue_value
-                      * 100
-                  )
 
 
                   result.append({
@@ -1191,26 +1061,23 @@ jobs:
                       "end":
                           end,
 
-                      "fy":
+                      "sequence":
                           rev.get(
-                              "fy"
-                          ),
-
-                      "fp":
-                          rev.get(
-                              "fp"
+                              "sequence"
                           ),
 
                       "margin":
-                          margin
+                          (
+                              operating_value
+                              / revenue_value
+                              * 100
+                          )
                   })
 
 
               result.sort(
                   key=lambda x:
-                      x.get(
-                          "end"
-                      )
+                      x.get("end")
                       or "",
                   reverse=True
               )
@@ -1218,24 +1085,21 @@ jobs:
 
               for row in result:
 
-                  prior = (
-                      find_prior_year_quarter(
+                  previous = (
+                      find_prior_year(
                           row,
                           result
                       )
                   )
 
 
-                  if prior:
+                  if previous:
 
                       row[
                           "margin_change_pp"
                       ] = (
-                          row[
-                              "margin"
-                          ]
-                          -
-                          prior[
+                          row["margin"]
+                          - previous[
                               "margin"
                           ]
                       )
@@ -1252,10 +1116,6 @@ jobs:
 
           # ============================================================
           # FREE CASH FLOW
-          #
-          # Primär tatsächliches Perioden-Enddatum.
-          # Nur Quartale kombinieren, die
-          # wirklich dieselbe Berichtsperiode haben.
           # ============================================================
 
           def build_fcf_series(
@@ -1263,20 +1123,14 @@ jobs:
               capex
           ):
 
-              capex_by_end = {}
+              capex_lookup = {
 
+                  row.get("end"): row
 
-              for row in capex:
+                  for row in capex
 
-                  end = row.get(
-                      "end"
-                  )
-
-                  if end:
-
-                      capex_by_end[
-                          end
-                      ] = row
+                  if row.get("end")
+              }
 
 
               result = []
@@ -1284,14 +1138,10 @@ jobs:
 
               for ocf_row in ocf:
 
-                  end = ocf_row.get(
-                      "end"
-                  )
+                  end = ocf_row.get("end")
 
                   capex_row = (
-                      capex_by_end.get(
-                          end
-                      )
+                      capex_lookup.get(end)
                   )
 
 
@@ -1300,15 +1150,11 @@ jobs:
 
 
                   ocf_value = (
-                      ocf_row.get(
-                          "value"
-                      )
+                      ocf_row.get("value")
                   )
 
                   capex_value = (
-                      capex_row.get(
-                          "value"
-                      )
+                      capex_row.get("value")
                   )
 
 
@@ -1319,43 +1165,21 @@ jobs:
                       continue
 
 
-                  # Sicherheitscheck:
-                  # FY/FP müssen ebenfalls
-                  # zusammenpassen, sofern vorhanden.
-                  if (
-                      ocf_row.get(
-                          "fp"
-                      )
-                      != capex_row.get(
-                          "fp"
-                      )
-                  ):
-                      continue
-
-
-                  fcf = (
-                      ocf_value
-                      - capex_value
-                  )
-
-
                   result.append({
 
                       "end":
                           end,
 
-                      "fy":
+                      "sequence":
                           ocf_row.get(
-                              "fy"
-                          ),
-
-                      "fp":
-                          ocf_row.get(
-                              "fp"
+                              "sequence"
                           ),
 
                       "value":
-                          fcf,
+                          (
+                              ocf_value
+                              - capex_value
+                          ),
 
                       "ocf":
                           ocf_value,
@@ -1363,23 +1187,39 @@ jobs:
                       "capex":
                           capex_value,
 
-                      "ocf_source":
-                          ocf_row.get(
-                              "source"
-                          ),
-
-                      "capex_source":
-                          capex_row.get(
-                              "source"
+                      "source":
+                          (
+                              ocf_row.get(
+                                  "source"
+                              )
+                              + " / "
+                              + capex_row.get(
+                                  "source"
+                              )
                           )
                   })
 
 
               result.sort(
                   key=lambda x:
-                      x.get(
-                          "end"
-                      )
+                      x.get("end")
+                      or ""
+              )
+
+
+              # eigene lückenlose Reihenfolge
+              for index, row in enumerate(
+                  result
+              ):
+
+                  row[
+                      "sequence"
+                  ] = index + 1
+
+
+              result.sort(
+                  key=lambda x:
+                      x.get("end")
                       or "",
                   reverse=True
               )
@@ -1397,9 +1237,7 @@ jobs:
           ):
 
               if value is None:
-
                   return "n/a"
-
 
               return (
                   f"{value:+.2f} PP"
@@ -1448,16 +1286,19 @@ jobs:
 
 
                   print(
+                      row.get("end"),
+                      "| BQ",
                       row.get(
-                          "end"
+                          "sequence"
                       ),
-                      "| FY",
+                      "| SEC:",
                       row.get(
-                          "fy"
+                          "sec_fy",
+                          "-"
                       ),
-                      "|",
                       row.get(
-                          "fp"
+                          "sec_fp",
+                          "-"
                       ),
                       "| Wert:",
                       value_text,
@@ -1473,7 +1314,7 @@ jobs:
 
 
           # ============================================================
-          # SEC CONCEPTS
+          # CONCEPTS
           # ============================================================
 
           concepts = {
@@ -1533,18 +1374,14 @@ jobs:
           ):
 
               print("")
-              print(
-                  "=" * 86
-              )
+              print("=" * 90)
 
               print(
                   "BULLWERK FUNDAMENTAL "
-                  f"MOMENTUM V3: {symbol}"
+                  f"MOMENTUM V4: {symbol}"
               )
 
-              print(
-                  "=" * 86
-              )
+              print("=" * 90)
 
 
               url = (
@@ -1563,8 +1400,8 @@ jobs:
               except Exception as error:
 
                   print(
-                      f"SEC FEHLER bei "
-                      f"{symbol}: {error}"
+                      "SEC FEHLER:",
+                      error
                   )
 
                   continue
@@ -1582,23 +1419,21 @@ jobs:
 
 
               for label, (
-                  possible_concepts,
+                  concept_names,
                   units
               ) in concepts.items():
 
                   concept, rows = (
                       get_concept_rows(
                           facts,
-                          possible_concepts,
+                          concept_names,
                           units
                       )
                   )
 
 
                   quarters = (
-                      build_quarters(
-                          rows
-                      )
+                      build_quarters(rows)
                       if rows
                       else []
                   )
@@ -1612,9 +1447,7 @@ jobs:
                   print(
                       label,
                       ":",
-                      len(
-                          quarters
-                      ),
+                      len(quarters),
                       "Quartale",
                       "| Concept:",
                       concept
@@ -1625,7 +1458,7 @@ jobs:
               # UMSATZ
               # ========================================================
 
-              revenue_yoy = (
+              revenue = (
                   add_acceleration(
                       build_yoy_series(
                           company_data[
@@ -1638,7 +1471,7 @@ jobs:
 
               print_growth(
                   "UMSATZ MOMENTUM",
-                  revenue_yoy
+                  revenue
               )
 
 
@@ -1646,7 +1479,7 @@ jobs:
               # GEWINN
               # ========================================================
 
-              income_yoy = (
+              income = (
                   add_acceleration(
                       build_yoy_series(
                           company_data[
@@ -1659,7 +1492,7 @@ jobs:
 
               print_growth(
                   "GEWINN MOMENTUM",
-                  income_yoy
+                  income
               )
 
 
@@ -1667,7 +1500,7 @@ jobs:
               # EPS
               # ========================================================
 
-              eps_yoy = (
+              eps = (
                   add_acceleration(
                       build_yoy_series(
                           company_data[
@@ -1680,7 +1513,7 @@ jobs:
 
               print_growth(
                   "EPS MOMENTUM",
-                  eps_yoy,
+                  eps,
                   billions=False
               )
 
@@ -1715,20 +1548,14 @@ jobs:
 
 
                   print(
+                      row.get("end"),
+                      "| BQ",
                       row.get(
-                          "end"
-                      ),
-                      "| FY",
-                      row.get(
-                          "fy"
-                      ),
-                      "|",
-                      row.get(
-                          "fp"
+                          "sequence"
                       ),
                       "| Marge:",
                       f"{row['margin']:.2f} %",
-                      "| YoY Veränderung:",
+                      "| YoY:",
                       (
                           f"{change:+.2f} PP"
                           if change
@@ -1760,29 +1587,15 @@ jobs:
               )
 
 
-              if not fcf_quarters:
-
-                  print(
-                      "Keine vollständigen "
-                      "OCF/CapEx Quartalspaare."
-                  )
-
-
               for row in (
                   fcf_quarters[:12]
               ):
 
                   print(
+                      row.get("end"),
+                      "| BQ",
                       row.get(
-                          "end"
-                      ),
-                      "| FY",
-                      row.get(
-                          "fy"
-                      ),
-                      "|",
-                      row.get(
-                          "fp"
+                          "sequence"
                       ),
                       "| FCF:",
                       f"{row['value'] / 1_000_000_000:.3f} Mrd.",
@@ -1790,18 +1603,12 @@ jobs:
                       f"{row['ocf'] / 1_000_000_000:.3f}",
                       "| CapEx:",
                       f"{row['capex'] / 1_000_000_000:.3f}",
-                      "| Quellen:",
-                      row.get(
-                          "ocf_source"
-                      ),
-                      "/",
-                      row.get(
-                          "capex_source"
-                      )
+                      "|",
+                      row.get("source")
                   )
 
 
-              fcf_yoy = (
+              fcf = (
                   add_acceleration(
                       build_yoy_series(
                           fcf_quarters
@@ -1812,7 +1619,7 @@ jobs:
 
               print_growth(
                   "FREE CASH FLOW MOMENTUM",
-                  fcf_yoy
+                  fcf
               )
 
 
@@ -1829,86 +1636,87 @@ jobs:
 
               def latest(series):
 
-                  return (
-                      series[0]
-                      if series
-                      else None
-                  )
+                  if not series:
+                      return None
+
+                  return series[0]
 
 
-              rev = latest(
-                  revenue_yoy
+              current_revenue = (
+                  latest(revenue)
               )
 
-              inc = latest(
-                  income_yoy
+              current_income = (
+                  latest(income)
               )
 
-              eps = latest(
-                  eps_yoy
+              current_eps = (
+                  latest(eps)
               )
 
-              margin = latest(
-                  margins
+              current_margin = (
+                  latest(margins)
               )
 
-              fcf = latest(
-                  fcf_yoy
+              current_fcf = (
+                  latest(fcf)
               )
 
 
-              if rev:
+              if current_revenue:
 
                   print(
                       "Umsatz YoY:",
-                      f"{rev['yoy']:+.2f} %",
+                      f"{current_revenue['yoy']:+.2f} %",
                       "| Beschleunigung:",
                       format_acceleration(
-                          rev.get(
+                          current_revenue.get(
                               "acceleration"
                           )
                       )
                   )
 
 
-              if inc:
+              if current_income:
 
                   print(
                       "Gewinn YoY:",
-                      f"{inc['yoy']:+.2f} %",
+                      f"{current_income['yoy']:+.2f} %",
                       "| Beschleunigung:",
                       format_acceleration(
-                          inc.get(
+                          current_income.get(
                               "acceleration"
                           )
                       )
                   )
 
 
-              if eps:
+              if current_eps:
 
                   print(
                       "EPS YoY:",
-                      f"{eps['yoy']:+.2f} %",
+                      f"{current_eps['yoy']:+.2f} %",
                       "| Beschleunigung:",
                       format_acceleration(
-                          eps.get(
+                          current_eps.get(
                               "acceleration"
                           )
                       )
                   )
 
 
-              if margin:
+              if current_margin:
 
-                  change = margin.get(
-                      "margin_change_pp"
+                  change = (
+                      current_margin.get(
+                          "margin_change_pp"
+                      )
                   )
 
 
                   print(
                       "Operative Marge:",
-                      f"{margin['margin']:.2f} %",
+                      f"{current_margin['margin']:.2f} %",
                       "| YoY:",
                       (
                           f"{change:+.2f} PP"
@@ -1919,31 +1727,24 @@ jobs:
                   )
 
 
-              if fcf:
+              if current_fcf:
 
                   print(
                       "FCF YoY:",
-                      f"{fcf['yoy']:+.2f} %",
+                      f"{current_fcf['yoy']:+.2f} %",
                       "| Beschleunigung:",
                       format_acceleration(
-                          fcf.get(
+                          current_fcf.get(
                               "acceleration"
                           )
                       )
                   )
 
-              else:
-
-                  print(
-                      "FCF Momentum: "
-                      "nicht ausreichend "
-                      "verlässliche Quartale"
-                  )
-
 
               print("")
               print(
-                  f"{symbol} abgeschlossen."
+                  symbol,
+                  "abgeschlossen."
               )
 
 
@@ -1951,17 +1752,13 @@ jobs:
 
 
           print("")
-          print(
-              "=" * 86
-          )
+          print("=" * 90)
 
           print(
               "Bullwerk Fundamental "
-              "Momentum Test V3 beendet."
+              "Momentum Test V4 beendet."
           )
 
-          print(
-              "=" * 86
-          )
+          print("=" * 90)
 
           PY
