@@ -1,0 +1,120 @@
+{
+  "updated": "2026-10-05T14:19:42.250088Z",
+  "version": "bullwerk-fundamental-data-v7",
+  "scoreVersion": "bullwerk-fundamental-v1",
+  "maxScore": 20,
+  "stocks": [
+    {
+      "symbol": "AAPL",
+      "fundamentalScore": 18.6,
+      "rawPoints": 13,
+      "availableMax": 14,
+      "breakdown": {
+        "revenue": 3,
+        "profitEps": 4,
+        "margin": 3,
+        "fcf": 3,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    },
+    {
+      "symbol": "MSFT",
+      "fundamentalScore": 11.4,
+      "rawPoints": 8,
+      "availableMax": 14,
+      "breakdown": {
+        "revenue": 3,
+        "profitEps": 4,
+        "margin": 1,
+        "fcf": 0,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    },
+    {
+      "symbol": "NVDA",
+      "fundamentalScore": 14.3,
+      "rawPoints": 5,
+      "availableMax": 7,
+      "breakdown": {
+        "revenue": null,
+        "profitEps": 2,
+        "margin": null,
+        "fcf": 3,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    },
+    {
+      "symbol": "AMD",
+      "fundamentalScore": 15.7,
+      "rawPoints": 11,
+      "availableMax": 14,
+      "breakdown": {
+        "revenue": 4,
+        "profitEps": 4,
+        "margin": 3,
+        "fcf": 0,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    },
+    {
+      "symbol": "AMZN",
+      "fundamentalScore": 15.7,
+      "rawPoints": 11,
+      "availableMax": 14,
+      "breakdown": {
+        "revenue": 4,
+        "profitEps": 4,
+        "margin": 3,
+        "fcf": 0,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    },
+    {
+      "symbol": "META",
+      "fundamentalScore": 4.3,
+      "rawPoints": 3,
+      "availableMax": 14,
+      "breakdown": {
+        "revenue": 3,
+        "profitEps": 0,
+        "margin": 0,
+        "fcf": 0,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    },
+    {
+      "symbol": "GOOGL",
+      "fundamentalScore": 14.3,
+      "rawPoints": 10,
+      "availableMax": 14,
+      "breakdown": {
+        "revenue": 3,
+        "profitEps": 4,
+        "margin": 3,
+        "fcf": 0,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    },
+    {
+      "symbol": "PLTR",
+      "fundamentalScore": 14.3,
+      "rawPoints": 10,
+      "availableMax": 14,
+      "breakdown": {
+        "revenue": 4,
+        "profitEps": 2,
+        "margin": 3,
+        "fcf": 1,
+        "guidance": null,
+        "ordersBacklog": null
+      }
+    }
+  ]
+}
