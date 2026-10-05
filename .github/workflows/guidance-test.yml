@@ -1,4 +1,4 @@
-name: Bullwerk Guidance Test V2
+name: Bullwerk Guidance Test V3
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Guidance Texte aus SEC Earnings Filings testen
+      - name: Echte Forward Guidance erkennen
         run: |
           python3 <<'PY'
 
@@ -21,16 +21,14 @@ jobs:
 
           # ============================================================
           # BULLWERK MARKETS
-          # GUIDANCE TEST V2
+          # GUIDANCE TEST V3
           #
           # Ziel:
-          # 1. SEC Submissions laden
-          # 2. jüngste echte Earnings-8-K mit Item 2.02 finden
-          # 3. Filing-Verzeichnis öffnen
-          # 4. relevante HTML-Exhibits finden
-          # 5. Guidance-/Outlook-Textstellen ausgeben
-          #
-          # Noch KEINE Punktevergabe.
+          # - jüngste Earnings-8-K mit Item 2.02 finden
+          # - Exhibit 99.1 / Earnings Release öffnen
+          # - echte NEUE Zukunftsaussagen erkennen
+          # - historische Guidance möglichst herausfiltern
+          # - KEINE Punktevergabe
           # ============================================================
 
 
@@ -46,22 +44,107 @@ jobs:
           )
 
 
-          GUIDANCE_TERMS = [
-              "guidance",
-              "outlook",
-              "we expect",
-              "we anticipate",
-              "we forecast",
-              "expects",
-              "expected",
-              "anticipates",
-              "forecast",
-              "next quarter",
-              "next fiscal",
-              "fiscal year",
-              "revenue growth",
+          # ============================================================
+          # POSITIVE ZUKUNFTS-SIGNALE
+          # ============================================================
+
+          STRONG_FORWARD_PATTERNS = [
+
+              r"\bwe expect\b",
+              r"\bwe anticipate\b",
+              r"\bwe forecast\b",
+              r"\bwe project\b",
+              r"\bwe estimate\b",
+
+              r"\bcompany expects\b",
+              r"\bcompany anticipates\b",
+              r"\bcompany forecasts\b",
+
+              r"\bmanagement expects\b",
+              r"\bmanagement anticipates\b",
+
+              r"\bfor the next quarter\b",
+              r"\bfor the upcoming quarter\b",
+              r"\bfor the coming quarter\b",
+
+              r"\bnext quarter\b",
+              r"\bnext fiscal year\b",
+              r"\bnext fiscal quarter\b",
+
+              r"\bfull[- ]year outlook\b",
+              r"\bquarterly outlook\b",
+
+              r"\bguidance for\b",
+              r"\boutlook for\b",
+
+              r"\bexpects revenue\b",
+              r"\bexpect revenue\b",
+
+              r"\bexpects.*operating margin\b",
+              r"\bexpect.*operating margin\b",
+
+              r"\bexpects.*gross margin\b",
+              r"\bexpect.*gross margin\b",
+
+              r"\bexpects.*earnings\b",
+              r"\bexpect.*earnings\b"
+          ]
+
+
+          # ============================================================
+          # HISTORISCHE / RÜCKBLICKENDE GUIDANCE
+          #
+          # Solche Formulierungen sollen NICHT als neue Guidance gelten.
+          # ============================================================
+
+          HISTORICAL_PATTERNS = [
+
+              r"\bguidance provided\b",
+              r"\bpreviously provided guidance\b",
+              r"\bprevious guidance\b",
+              r"\bprior guidance\b",
+
+              r"\bcompared to our guidance\b",
+              r"\bcompared with our guidance\b",
+
+              r"\bversus our guidance\b",
+
+              r"\bprovided on\b",
+
+              r"\bpreviously announced\b",
+
+              r"\blower[- ]than[- ]expected\b",
+              r"\bhigher[- ]than[- ]expected\b",
+
+              r"\bexceeded expectations\b",
+              r"\bbelow expectations\b",
+
+              r"\bresults.*compared\b",
+              r"\bresults.*versus\b"
+          ]
+
+
+          # ============================================================
+          # BEGRIFFE, DIE DEN INHALT INTERESSANT MACHEN
+          # ============================================================
+
+          BUSINESS_TERMS = [
+
+              "revenue",
+              "sales",
+              "growth",
+              "gross margin",
               "operating margin",
-              "gross margin"
+              "operating income",
+              "earnings",
+              "eps",
+              "free cash flow",
+              "cash flow",
+              "capital expenditures",
+              "capex",
+              "expenses",
+              "cloud",
+              "services"
           ]
 
 
@@ -141,12 +224,35 @@ jobs:
               )
 
               html = re.sub(
+                  r"(?i)<br\s*/?>",
+                  ". ",
+                  html
+              )
+
+              html = re.sub(
+                  r"(?i)</p>",
+                  ". ",
+                  html
+              )
+
+              html = re.sub(
+                  r"(?i)</div>",
+                  ". ",
+                  html
+              )
+
+              html = re.sub(
                   r"(?is)<[^>]+>",
                   " ",
                   html
               )
 
               text = unescape(html)
+
+              text = text.replace(
+                  "\xa0",
+                  " "
+              )
 
               text = re.sub(
                   r"\s+",
@@ -163,11 +269,13 @@ jobs:
 
           def load_submissions(cik):
 
-              return get_json(
+              url = (
                   "https://data.sec.gov/"
                   "submissions/"
                   f"CIK{cik}.json"
               )
+
+              return get_json(url)
 
 
           # ============================================================
@@ -238,6 +346,7 @@ jobs:
                   ):
 
                       return {
+
                           "accession":
                               accession_numbers[i],
 
@@ -266,7 +375,7 @@ jobs:
 
 
           # ============================================================
-          # SEC ARCHIVE BASIS
+          # ARCHIVE BASIS
           # ============================================================
 
           def archive_base(cik, accession):
@@ -312,7 +421,7 @@ jobs:
 
 
           # ============================================================
-          # HTML-DOKUMENTE AUS INDEX
+          # HTML DATEIEN
           # ============================================================
 
           def get_html_files(index_data):
@@ -324,7 +433,7 @@ jobs:
               )
 
 
-              html_files = []
+              result = []
 
 
               for item in items:
@@ -334,32 +443,23 @@ jobs:
                       or ""
                   )
 
-                  lower = name.lower()
-
-
-                  if lower.endswith(
+                  if name.lower().endswith(
                       (".htm", ".html")
                   ):
 
-                      html_files.append(
-                          name
-                      )
+                      result.append(name)
 
 
-              return html_files
+              return result
 
 
           # ============================================================
-          # DOKUMENT PRIORISIEREN
-          #
-          # Exhibit 99 / earnings release zuerst.
-          # Danach übrige HTML-Dateien.
+          # EXHIBIT PRIORITÄT
           # ============================================================
 
           def document_priority(name):
 
               lower = name.lower()
-
 
               score = 0
 
@@ -371,13 +471,13 @@ jobs:
                   score += 100
 
               if "99-1" in lower:
-                  score += 90
+                  score += 95
 
               if "99_1" in lower:
-                  score += 90
+                  score += 95
 
               if "99.1" in lower:
-                  score += 90
+                  score += 95
 
               if "earn" in lower:
                   score += 50
@@ -385,10 +485,6 @@ jobs:
               if "release" in lower:
                   score += 40
 
-
-              # SEC Inline-XBRL Hilfsdateien nach hinten
-              if lower.startswith("r"):
-                  score -= 10
 
               if "index" in lower:
                   score -= 20
@@ -398,111 +494,293 @@ jobs:
 
 
           # ============================================================
-          # GUIDANCE TEXTSTELLEN
+          # TEXT IN SINNVOLLE BLÖCKE TEILEN
           # ============================================================
 
-          def find_guidance_snippets(
+          def split_blocks(text):
+
+              # Satzähnliche Trennung.
+              # Nicht perfekt, aber deutlich besser
+              # als reine Keyword-Suche.
+
+              raw_blocks = re.split(
+                  r"(?<=[.!?])\s+",
+                  text
+              )
+
+
+              blocks = []
+
+
+              for block in raw_blocks:
+
+                  block = block.strip()
+
+
+                  if len(block) < 30:
+                      continue
+
+
+                  if len(block) > 1800:
+
+                      pieces = [
+                          block[i:i + 1000]
+                          for i in range(
+                              0,
+                              len(block),
+                              1000
+                          )
+                      ]
+
+                      blocks.extend(
+                          pieces
+                      )
+
+                  else:
+
+                      blocks.append(
+                          block
+                      )
+
+
+              return blocks
+
+
+          # ============================================================
+          # PATTERN TEST
+          # ============================================================
+
+          def matches_any(
               text,
-              max_snippets=12
+              patterns
           ):
 
               lower = text.lower()
 
-              matches = []
+
+              for pattern in patterns:
+
+                  if re.search(
+                      pattern,
+                      lower,
+                      flags=re.I
+                  ):
+
+                      return True
 
 
-              for term in GUIDANCE_TERMS:
-
-                  term_lower = term.lower()
-
-                  start = 0
+              return False
 
 
-                  while True:
+          # ============================================================
+          # BUSINESS TERM TEST
+          # ============================================================
 
-                      pos = lower.find(
-                          term_lower,
-                          start
-                      )
+          def business_relevance(text):
 
-
-                      if pos == -1:
-                          break
+              lower = text.lower()
 
 
-                      left = max(
-                          0,
-                          pos - 220
-                      )
+              hits = [
 
-                      right = min(
-                          len(text),
-                          pos + len(term) + 320
-                      )
+                  term
 
+                  for term in BUSINESS_TERMS
 
-                      snippet = (
-                          text[left:right]
-                          .strip()
-                      )
+                  if term in lower
+              ]
 
 
-                      matches.append(
-                          (
-                              pos,
-                              term,
-                              snippet
-                          )
-                      )
+              return hits
 
 
-                      start = (
-                          pos
-                          + len(term_lower)
-                      )
+          # ============================================================
+          # ZAHL / RANGE ERKENNEN
+          # ============================================================
+
+          def has_numeric_target(text):
+
+              patterns = [
+
+                  r"\$\s?\d",
+
+                  r"\d+(?:\.\d+)?\s?%",
+
+                  r"\d+(?:\.\d+)?\s*(?:billion|million)",
+
+                  r"\d+(?:\.\d+)?\s*(?:to|-)\s*\d+(?:\.\d+)?\s?%",
+
+                  r"\$\s?\d+(?:\.\d+)?\s*(?:to|-)\s*\$?\s?\d+(?:\.\d+)?"
+              ]
 
 
-              # chronologisch im Dokument
-              matches.sort(
-                  key=lambda x: x[0]
+              return any(
+                  re.search(
+                      pattern,
+                      text,
+                      flags=re.I
+                  )
+                  for pattern in patterns
               )
 
 
-              # ähnliche/überlappende Treffer entfernen
-              unique = []
+          # ============================================================
+          # FORWARD BLOCKS FINDEN
+          # ============================================================
 
-              last_position = -10000
+          def find_forward_guidance(text):
+
+              blocks = split_blocks(
+                  text
+              )
 
 
-              for position, term, snippet in matches:
+              results = []
 
-                  if (
-                      position
-                      - last_position
-                      < 180
+
+              for index, block in enumerate(blocks):
+
+                  if not matches_any(
+                      block,
+                      STRONG_FORWARD_PATTERNS
                   ):
+
                       continue
 
 
-                  unique.append(
-                      (
-                          position,
-                          term,
-                          snippet
+                  # Kontext: vorheriger + aktueller + nächster Satz
+                  context_parts = []
+
+
+                  if index > 0:
+                      context_parts.append(
+                          blocks[index - 1]
+                      )
+
+
+                  context_parts.append(
+                      block
+                  )
+
+
+                  if index + 1 < len(blocks):
+                      context_parts.append(
+                          blocks[index + 1]
+                      )
+
+
+                  context = " ".join(
+                      context_parts
+                  )
+
+
+                  historical = matches_any(
+                      context,
+                      HISTORICAL_PATTERNS
+                  )
+
+
+                  business_hits = (
+                      business_relevance(
+                          context
                       )
                   )
 
-                  last_position = position
+
+                  numeric = (
+                      has_numeric_target(
+                          context
+                      )
+                  )
 
 
-                  if (
-                      len(unique)
-                      >= max_snippets
+                  # --------------------------------------------
+                  # CONFIDENCE
+                  #
+                  # HIGH:
+                  # echte Forward-Formulierung,
+                  # kein historischer Kontext,
+                  # Business-Kennzahl,
+                  # Zahl/Range vorhanden
+                  #
+                  # MEDIUM:
+                  # Forward + Business,
+                  # aber keine konkrete Zahl
+                  #
+                  # REJECT:
+                  # historischer Guidance-Kontext
+                  # --------------------------------------------
+
+                  if historical:
+
+                      status = (
+                          "REJECT_HISTORICAL"
+                      )
+
+                  elif (
+                      business_hits
+                      and numeric
                   ):
-                      break
+
+                      status = (
+                          "HIGH"
+                      )
+
+                  elif business_hits:
+
+                      status = (
+                          "MEDIUM"
+                      )
+
+                  else:
+
+                      status = (
+                          "LOW"
+                      )
 
 
-              return unique
+                  results.append({
+
+                      "status":
+                          status,
+
+                      "numeric":
+                          numeric,
+
+                      "business_hits":
+                          business_hits,
+
+                      "text":
+                          context
+                  })
+
+
+              # Duplikate reduzieren
+              unique = []
+
+              seen = set()
+
+
+              for item in results:
+
+                  key = (
+                      item["text"][:250]
+                      .lower()
+                  )
+
+
+                  if key in seen:
+                      continue
+
+
+                  seen.add(key)
+
+                  unique.append(
+                      item
+                  )
+
+
+              return unique[:15]
 
 
           # ============================================================
@@ -515,7 +793,7 @@ jobs:
               print("=" * 100)
 
               print(
-                  "BULLWERK GUIDANCE V2:",
+                  "BULLWERK GUIDANCE V3:",
                   symbol
               )
 
@@ -525,13 +803,17 @@ jobs:
               try:
 
                   submissions = (
-                      load_submissions(cik)
+                      load_submissions(
+                          cik
+                      )
                   )
 
 
                   print(
                       "Unternehmen:",
-                      submissions.get("name")
+                      submissions.get(
+                          "name"
+                      )
                   )
 
 
@@ -545,9 +827,8 @@ jobs:
                   if not filing:
 
                       print(
-                          "Keine aktuelle "
-                          "Earnings-8-K mit "
-                          "Item 2.02 gefunden."
+                          "Keine Earnings-8-K "
+                          "mit Item 2.02 gefunden."
                       )
 
                       continue
@@ -555,7 +836,7 @@ jobs:
 
                   print("")
                   print(
-                      "Jüngste Earnings-8-K:"
+                      "Jüngste Earnings-8-K"
                   )
 
                   print(
@@ -576,13 +857,6 @@ jobs:
                       "Items:",
                       filing[
                           "items"
-                      ]
-                  )
-
-                  print(
-                      "Primary Document:",
-                      filing[
-                          "primary_document"
                       ]
                   )
 
@@ -612,20 +886,14 @@ jobs:
 
                   print("")
                   print(
-                      "HTML-Dokumente im Filing:",
-                      len(html_files)
+                      "Priorisierte Dokumente:"
                   )
 
 
-                  print(
-                      "Priorisierte Dateien:"
-                  )
-
-
-                  for name in html_files[:10]:
+                  for name in html_files[:8]:
 
                       print(
-                          " -",
+                          "-",
                           name,
                           "| Priorität:",
                           document_priority(
@@ -635,19 +903,32 @@ jobs:
 
 
                   print("")
+                  print("=" * 100)
+
                   print(
-                      "GUIDANCE-/OUTLOOK-SUCHE"
+                      "ECHTE FORWARD-GUIDANCE-SUCHE"
                   )
 
-                  print("-" * 100)
+                  print("=" * 100)
 
 
-                  total_snippets = 0
+                  found_usable = False
 
 
-                  # Nur die ersten priorisierten Dokumente prüfen.
-                  # Das verhindert unnötig viele SEC Requests.
                   for name in html_files[:8]:
+
+                      priority = (
+                          document_priority(
+                              name
+                          )
+                      )
+
+
+                      # Für Guidance bevorzugen wir
+                      # Earnings Exhibits.
+                      if priority < 40:
+                          continue
+
 
                       url = (
                           base + name
@@ -663,8 +944,7 @@ jobs:
                       except Exception as error:
 
                           print(
-                              "Dokument konnte "
-                              "nicht geladen werden:",
+                              "Fehler beim Laden:",
                               name,
                               error
                           )
@@ -677,15 +957,11 @@ jobs:
                       )
 
 
-                      snippets = (
-                          find_guidance_snippets(
+                      results = (
+                          find_forward_guidance(
                               text
                           )
                       )
-
-
-                      if not snippets:
-                          continue
 
 
                       print("")
@@ -700,45 +976,76 @@ jobs:
                       )
 
                       print(
-                          "Treffer:",
-                          len(snippets)
+                          "Forward-Kandidaten:",
+                          len(results)
                       )
 
 
-                      for number, (
-                          position,
-                          term,
-                          snippet
-                      ) in enumerate(
-                          snippets,
+                      if not results:
+
+                          print(
+                              "Keine Kandidaten."
+                          )
+
+                          continue
+
+
+                      for number, item in enumerate(
+                          results,
                           start=1
                       ):
 
                           print("")
                           print(
                               f"[{number}] "
-                              f"Begriff: {term}"
+                              f"STATUS: "
+                              f"{item['status']}"
                           )
 
                           print(
-                              snippet
+                              "Konkrete Zahl/Range:",
+                              item[
+                                  "numeric"
+                              ]
+                          )
+
+                          print(
+                              "Business-Begriffe:",
+                              ", ".join(
+                                  item[
+                                      "business_hits"
+                                  ]
+                              )
+                              if item[
+                                  "business_hits"
+                              ]
+                              else "-"
+                          )
+
+                          print(
+                              "TEXT:"
+                          )
+
+                          print(
+                              item[
+                                  "text"
+                              ]
                           )
 
 
-                      total_snippets += (
-                          len(snippets)
-                      )
+                          if item[
+                              "status"
+                          ] in (
+                              "HIGH",
+                              "MEDIUM"
+                          ):
+
+                              found_usable = True
 
 
-                      # Wenn wir in einem stark
-                      # priorisierten Exhibit bereits
-                      # gute Treffer haben, reicht es
-                      # für diesen Test.
-                      if (
-                          document_priority(name)
-                          >= 90
-                          and snippets
-                      ):
+                      # Exhibit 99.1 reicht für
+                      # diesen Test normalerweise aus.
+                      if priority >= 90:
                           break
 
 
@@ -746,33 +1053,37 @@ jobs:
                   print("-" * 100)
 
 
-                  if total_snippets == 0:
+                  if found_usable:
 
                       print(
-                          "ERGEBNIS:",
-                          "Keine eindeutigen "
-                          "Guidance-/Outlook-"
-                          "Textstellen gefunden."
+                          "BULLWERK ERGEBNIS:",
+                          "Neue Forward-Guidance "
+                          "möglicherweise vorhanden."
                       )
 
                       print(
-                          "STATUS: N/A - "
-                          "NICHT als 0 Punkte werten."
+                          "STATUS:",
+                          "PRÜFEN"
                       )
 
                   else:
 
                       print(
-                          "ERGEBNIS:",
-                          total_snippets,
-                          "potenziell relevante "
-                          "Textstellen gefunden."
+                          "BULLWERK ERGEBNIS:",
+                          "Keine belastbare neue "
+                          "Forward-Guidance im "
+                          "Earnings Release erkannt."
                       )
 
                       print(
                           "STATUS:",
-                          "MANUELLE PRÜFUNG "
-                          "ERFORDERLICH"
+                          "N/A"
+                      )
+
+                      print(
+                          "WICHTIG:",
+                          "N/A bedeutet NICHT "
+                          "0 Punkte."
                       )
 
 
@@ -800,7 +1111,7 @@ jobs:
           print("=" * 100)
 
           print(
-              "Bullwerk Guidance Test V2 beendet."
+              "Bullwerk Guidance Test V3 beendet."
           )
 
           print("=" * 100)
