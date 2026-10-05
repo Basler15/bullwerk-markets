@@ -46,6 +46,29 @@ jobs:
 
           stocks = []
 
+          # ==================================================
+          # MARKTKONTEXT V6
+          # Getrennt von den Scanner-Aktien.
+          # Keine Darvas-/Aktienbewertung für diese ETFs.
+          # ==================================================
+
+          market_context_symbols = {
+              "QQQ": "Nasdaq 100",
+              "XLK": "Technology",
+              "SMH": "Semiconductors",
+              "IGV": "Software",
+              "XLY": "Consumer Discretionary",
+              "XLI": "Industrials",
+              "XLE": "Energy",
+              "XLF": "Financials",
+              "XLV": "Health Care",
+              "XLP": "Consumer Staples",
+              "XLU": "Utilities",
+              "XLB": "Materials"
+          }
+
+          market_context = []
+
 
           # ==================================================
           # Hilfsfunktionen
@@ -1243,7 +1266,167 @@ jobs:
 
 
           # ==================================================
-          # 28. JSON erzeugen
+          # 28. MARKTKONTEXT / SEKTOR-ETFs
+          # ==================================================
+
+          for context_symbol, context_name in market_context_symbols.items():
+
+              print("")
+              print("=" * 60)
+              print(f"Marktkontext: {context_symbol} - {context_name}")
+              print("=" * 60)
+
+              context_quote = {}
+              context_history = []
+
+              try:
+                  quote_url = (
+                      "https://financialmodelingprep.com/"
+                      "stable/quote"
+                      f"?symbol={urllib.parse.quote(context_symbol)}"
+                      f"&apikey={urllib.parse.quote(api_key)}"
+                  )
+                  quote_result = get_json(quote_url)
+
+                  if isinstance(quote_result, list) and quote_result:
+                      context_quote = quote_result[0]
+                  elif isinstance(quote_result, dict):
+                      context_quote = quote_result
+
+              except Exception as error:
+                  print(
+                      f"Quote-Fehler bei {context_symbol}: "
+                      f"{error}"
+                  )
+
+              try:
+                  history_url = (
+                      "https://financialmodelingprep.com/"
+                      "stable/historical-price-eod/full"
+                      f"?symbol={urllib.parse.quote(context_symbol)}"
+                      f"&from={history_start.isoformat()}"
+                      f"&to={today.isoformat()}"
+                      f"&apikey={urllib.parse.quote(api_key)}"
+                  )
+                  history_result = get_json(history_url)
+
+                  if isinstance(history_result, list):
+                      context_history = history_result
+                  elif isinstance(history_result, dict):
+                      if isinstance(
+                          history_result.get("historical"),
+                          list
+                      ):
+                          context_history = history_result["historical"]
+                      elif isinstance(
+                          history_result.get("data"),
+                          list
+                      ):
+                          context_history = history_result["data"]
+
+              except Exception as error:
+                  print(
+                      f"History-Fehler bei {context_symbol}: "
+                      f"{error}"
+                  )
+
+              context_history = [
+                  row
+                  for row in context_history
+                  if isinstance(row, dict) and row.get("date")
+              ]
+
+              context_history.sort(
+                  key=lambda row: row.get("date", ""),
+                  reverse=True
+              )
+
+              if (
+                  context_history
+                  and context_history[0].get("date") == today_string
+              ):
+                  context_previous = context_history[1:]
+              else:
+                  context_previous = context_history
+
+              context_price = safe_number(
+                  context_quote.get("price")
+              )
+
+              closes_50_context = [
+                  safe_number(row.get("close"))
+                  for row in context_previous[:50]
+              ]
+
+              closes_200_context = [
+                  safe_number(row.get("close"))
+                  for row in context_previous[:200]
+              ]
+
+              ma50_context = average(closes_50_context)
+              ma200_context = average(closes_200_context)
+
+              above_ma50_context = (
+                  context_price is not None
+                  and ma50_context is not None
+                  and context_price > ma50_context
+              )
+
+              above_ma200_context = (
+                  context_price is not None
+                  and ma200_context is not None
+                  and context_price > ma200_context
+              )
+
+              ma50_above_ma200_context = (
+                  ma50_context is not None
+                  and ma200_context is not None
+                  and ma50_context > ma200_context
+              )
+
+              compact_context_history = []
+
+              for row in context_history[:260]:
+                  compact_context_history.append({
+                      "date": row.get("date"),
+                      "open": safe_number(row.get("open")),
+                      "high": safe_number(row.get("high")),
+                      "low": safe_number(row.get("low")),
+                      "close": safe_number(row.get("close")),
+                      "volume": safe_number(row.get("volume"))
+                  })
+
+              market_context.append({
+                  "symbol": context_symbol,
+                  "name": context_name,
+                  "price": context_price,
+                  "change": safe_number(
+                      context_quote.get("change")
+                  ),
+                  "changePercentage": safe_number(
+                      context_quote.get("changePercentage")
+                  ),
+                  "ma50": ma50_context,
+                  "ma200": ma200_context,
+                  "aboveMA50": above_ma50_context,
+                  "aboveMA200": above_ma200_context,
+                  "ma50AboveMA200": ma50_above_ma200_context,
+                  "historyDays": len(context_history),
+                  "history": compact_context_history
+              })
+
+              print(
+                  f"{context_symbol}: "
+                  f"Preis={context_price} | "
+                  f"MA50={ma50_context} | "
+                  f"MA200={ma200_context} | "
+                  f">MA50={above_ma50_context} | "
+                  f">MA200={above_ma200_context}"
+              )
+
+
+          # ==================================================
+          # 29. JSON erzeugen
           # ==================================================
 
           output = {
@@ -1257,13 +1440,16 @@ jobs:
                   "Financial Modeling Prep",
 
               "version":
-                  "bullwerk-market-data-v5",
+                  "bullwerk-market-data-v6",
 
               "scoreVersion":
                   "bullwerk-technical-v1",
 
               "stocks":
-                  stocks
+                  stocks,
+
+              "marketContext":
+                  market_context
 
           }
 
@@ -1294,7 +1480,10 @@ jobs:
               f"{len(stocks)} Aktien gespeichert."
           )
           print(
-              "Bullwerk Market Data V5 erstellt."
+              f"{len(market_context)} Markt-/Sektor-ETFs gespeichert."
+          )
+          print(
+              "Bullwerk Market Data V6 erstellt."
           )
           print(
               "Technische Bullwerk-Säule: 0–20 Punkte."
@@ -1323,7 +1512,7 @@ jobs:
           else
 
             git commit \
-              -m "Update Bullwerk market data v5"
+              -m "Update Bullwerk market data v6"
 
             git push
 
