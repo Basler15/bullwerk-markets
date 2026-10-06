@@ -1,4 +1,4 @@
-name: Bullwerk Orders Backlog Test V2
+name: Bullwerk Orders Backlog Test V3
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Orders and Backlog V2
+      - name: Test Orders and Backlog V3
         shell: python
         run: |
           import requests
@@ -18,24 +18,22 @@ jobs:
 
           # ============================================================
           # BULLWERK MARKETS
-          # ORDERS / BACKLOG TEST V2
+          # ORDERS / BACKLOG TEST V3
           #
           # Ziel:
-          # Aktuelle SEC-Unterlagen nach belastbaren Aussagen zu
-          # Orders / Backlog / Bookings / RPO durchsuchen.
+          # Nur belastbare Orders-/Backlog-Signale aus SEC-Unterlagen.
           #
-          # Bewertung:
           # 3/3 = deutlich positiv
-          # 2/3 = stabil bis moderat positiv
-          # 1/3 = vorsichtig / leichter Gegenwind
+          # 2/3 = stabil / moderat positiv
+          # 1/3 = leichter Gegenwind
           # 0/3 = klar negativ
           # N/A = nicht zuverlässig bewertbar
           #
           # WICHTIG:
-          # N/A wird später NICHT als 0 gewertet.
+          # N/A wird NICHT als 0 gewertet.
           # ============================================================
 
-          companies = {
+          COMPANIES = {
               "NVDA": "0001045810",
               "MSFT": "0000789019",
               "AVGO": "0001730168",
@@ -44,95 +42,65 @@ jobs:
               "AAPL": "0000320193",
           }
 
-          headers = {
+          HEADERS = {
               "User-Agent":
                   "Bullwerk Markets contact: bullwerkmarkets@gmail.com",
               "Accept-Encoding": "gzip, deflate",
           }
 
-          # ============================================================
-          # SUCHBEGRIFFE
-          # ============================================================
+          # ------------------------------------------------------------
+          # V3: NUR SPEZIFISCHE BEGRIFFE
+          #
+          # Das allgemeine Wort "orders" ist bewusst NICHT enthalten.
+          # ------------------------------------------------------------
 
-          keywords = [
-              "backlog",
+          METRICS = [
               "order backlog",
-              "orders",
-              "order growth",
+              "backlog",
               "bookings",
               "book-to-bill",
               "remaining performance obligations",
               "remaining performance obligation",
-              "rpo",
               "contracted backlog",
-          ]
-
-          # Begriffe, die häufig eine positive Entwicklung anzeigen.
-          positive_words = [
-              "increased",
-              "increase",
-              "grew",
-              "growth",
-              "record",
-              "strong",
-              "higher",
-              "improved",
-              "expanded",
-              "rose",
-              "up",
-          ]
-
-          # Begriffe, die häufig eine negative Entwicklung anzeigen.
-          negative_words = [
-              "decreased",
-              "decrease",
-              "declined",
-              "decline",
-              "lower",
-              "weaker",
-              "reduced",
-              "fell",
-              "down",
-              "deteriorated",
           ]
 
           # ============================================================
           # HTML -> TEXT
           # ============================================================
 
-          def clean_html(text):
+          def clean_html(html):
 
-              text = re.sub(
+              html = re.sub(
                   r"(?is)<script.*?>.*?</script>",
                   " ",
-                  text
+                  html
               )
 
-              text = re.sub(
+              html = re.sub(
                   r"(?is)<style.*?>.*?</style>",
                   " ",
-                  text
+                  html
               )
 
-              text = re.sub(
+              html = re.sub(
                   r"(?i)<br\s*/?>",
                   ". ",
-                  text
+                  html
               )
 
-              text = re.sub(
+              html = re.sub(
                   r"(?i)</(?:p|div|tr|li|h1|h2|h3)>",
                   ". ",
-                  text
+                  html
               )
 
-              text = re.sub(
+              html = re.sub(
                   r"(?is)<[^>]+>",
                   " ",
-                  text
+                  html
               )
 
-              text = unescape(text)
+              text = unescape(html)
 
               text = text.replace(
                   "\xa0",
@@ -148,295 +116,569 @@ jobs:
               return text.strip()
 
           # ============================================================
-          # RELEVANTE SÄTZE
+          # RELEVANTE PASSAGEN
           # ============================================================
 
-          def find_matches(text):
+          def find_relevant_passages(text):
 
-              matches = []
+              passages = []
 
-              sentences = re.split(
+              # Etwas größere Textstücke als nur einzelne Sätze.
+              chunks = re.split(
                   r"(?<=[.!?])\s+",
                   text
               )
 
-              for sentence in sentences:
+              for i, sentence in enumerate(chunks):
 
                   lower = sentence.lower()
 
                   if not any(
-                      keyword.lower() in lower
-                      for keyword in keywords
+                      metric in lower
+                      for metric in METRICS
                   ):
                       continue
 
-                  sentence_clean = sentence.strip()
+                  # Vorheriger + aktueller + nächster Satz
+                  start = max(
+                      0,
+                      i - 1
+                  )
+
+                  end = min(
+                      len(chunks),
+                      i + 2
+                  )
+
+                  passage = " ".join(
+                      chunks[start:end]
+                  ).strip()
 
                   if (
-                      30
-                      <= len(sentence_clean)
-                      <= 1200
+                      40
+                      <= len(passage)
+                      <= 2500
                   ):
-                      matches.append(
-                          sentence_clean
+                      passages.append(
+                          passage
                       )
 
               # Duplikate entfernen
               unique = []
               seen = set()
 
-              for item in matches:
+              for passage in passages:
 
-                  key = item.lower()
+                  key = passage.lower()
 
                   if key not in seen:
 
                       seen.add(key)
-                      unique.append(item)
+                      unique.append(
+                          passage
+                      )
 
-              return unique[:20]
+              return unique[:15]
 
           # ============================================================
-          # PROZENTWERTE AUS SATZ EXTRAHIEREN
+          # DIREKTE VERÄNDERUNGEN
           # ============================================================
 
-          def extract_percentages(sentence):
+          def extract_direction(passage):
 
-              values = []
+              lower = passage.lower()
 
-              patterns = [
-                  r"(?:increased|grew|rose|up)"
-                  r".{0,80}?(\d+(?:\.\d+)?)\s*%",
+              signals = []
 
-                  r"(?:decreased|declined|fell|down)"
-                  r".{0,80}?(\d+(?:\.\d+)?)\s*%",
+              # --------------------------------------------------------
+              # Prozentuale Veränderungen
+              # --------------------------------------------------------
 
+              positive_patterns = [
+                  r"(?:backlog|bookings|remaining performance obligations)"
+                  r".{0,180}?"
+                  r"(?:increased|grew|rose|were up|was up)"
+                  r".{0,80}?"
+                  r"(\d+(?:\.\d+)?)\s*%",
+
+                  r"(?:increased|grew|rose)"
+                  r".{0,80}?"
                   r"(\d+(?:\.\d+)?)\s*%"
+                  r".{0,180}?"
+                  r"(?:backlog|bookings|remaining performance obligations)"
               ]
 
-              for pattern in patterns:
+              negative_patterns = [
+                  r"(?:backlog|bookings|remaining performance obligations)"
+                  r".{0,180}?"
+                  r"(?:decreased|declined|fell|were down|was down)"
+                  r".{0,80}?"
+                  r"(\d+(?:\.\d+)?)\s*%",
 
-                  found = re.findall(
+                  r"(?:decreased|declined|fell)"
+                  r".{0,80}?"
+                  r"(\d+(?:\.\d+)?)\s*%"
+                  r".{0,180}?"
+                  r"(?:backlog|bookings|remaining performance obligations)"
+              ]
+
+              for pattern in positive_patterns:
+
+                  match = re.search(
                       pattern,
-                      sentence,
+                      passage,
                       flags=re.I
                   )
 
-                  for value in found:
+                  if match:
 
-                      try:
-                          number = float(value)
+                      value = float(
+                          match.group(1)
+                      )
 
-                          if 0 <= number <= 500:
-                              values.append(number)
+                      signals.append({
+                          "type":
+                              "PERCENT_CHANGE",
+                          "direction":
+                              "POSITIVE",
+                          "change":
+                              value,
+                          "strength":
+                              score_change(value)
+                      })
 
-                      except ValueError:
-                          pass
+              for pattern in negative_patterns:
 
-              return values
+                  match = re.search(
+                      pattern,
+                      passage,
+                      flags=re.I
+                  )
+
+                  if match:
+
+                      value = float(
+                          match.group(1)
+                      )
+
+                      signals.append({
+                          "type":
+                              "PERCENT_CHANGE",
+                          "direction":
+                              "NEGATIVE",
+                          "change":
+                              -value,
+                          "strength":
+                              -score_change(value)
+                      })
+
+              # --------------------------------------------------------
+              # Explizite YoY / year-over-year Formulierungen
+              # --------------------------------------------------------
+
+              yoy_patterns = [
+                  (
+                      "POSITIVE",
+                      r"(?:backlog|bookings|remaining performance obligations)"
+                      r".{0,200}?"
+                      r"(?:year.over.year|year over year|yoy)"
+                      r".{0,100}?"
+                      r"(?:increased|grew|rose|up)"
+                      r".{0,60}?"
+                      r"(\d+(?:\.\d+)?)\s*%"
+                  ),
+
+                  (
+                      "NEGATIVE",
+                      r"(?:backlog|bookings|remaining performance obligations)"
+                      r".{0,200}?"
+                      r"(?:year.over.year|year over year|yoy)"
+                      r".{0,100}?"
+                      r"(?:decreased|declined|fell|down)"
+                      r".{0,60}?"
+                      r"(\d+(?:\.\d+)?)\s*%"
+                  )
+              ]
+
+              for direction, pattern in yoy_patterns:
+
+                  match = re.search(
+                      pattern,
+                      passage,
+                      flags=re.I
+                  )
+
+                  if match:
+
+                      value = float(
+                          match.group(1)
+                      )
+
+                      signed = (
+                          value
+                          if direction == "POSITIVE"
+                          else -value
+                      )
+
+                      strength = (
+                          score_change(value)
+                          if direction == "POSITIVE"
+                          else -score_change(value)
+                      )
+
+                      signals.append({
+                          "type":
+                              "YOY_CHANGE",
+                          "direction":
+                              direction,
+                          "change":
+                              signed,
+                          "strength":
+                              strength
+                      })
+
+              return signals
 
           # ============================================================
-          # EINEN SATZ BEWERTEN
+          # STÄRKE DER VERÄNDERUNG
           # ============================================================
 
-          def evaluate_sentence(sentence):
+          def score_change(value):
 
-              lower = sentence.lower()
+              if value >= 15:
+                  return 3
 
-              positive = any(
-                  word in lower
-                  for word in positive_words
-              )
+              if value >= 5:
+                  return 2
 
-              negative = any(
-                  word in lower
-                  for word in negative_words
-              )
-
-              percentages = (
-                  extract_percentages(sentence)
-              )
-
-              max_percentage = (
-                  max(percentages)
-                  if percentages
-                  else None
-              )
-
-              # ----------------------------------------
-              # Negativ
-              # ----------------------------------------
-
-              if negative and not positive:
-
-                  if (
-                      max_percentage is not None
-                      and max_percentage >= 10
-                  ):
-                      return -3
-
-                  if (
-                      max_percentage is not None
-                      and max_percentage >= 3
-                  ):
-                      return -2
-
-                  return -1
-
-              # ----------------------------------------
-              # Positiv
-              # ----------------------------------------
-
-              if positive and not negative:
-
-                  if (
-                      max_percentage is not None
-                      and max_percentage >= 10
-                  ):
-                      return 3
-
-                  if (
-                      max_percentage is not None
-                      and max_percentage >= 3
-                  ):
-                      return 2
-
+              if value > 0:
                   return 1
 
               return 0
 
           # ============================================================
-          # GESAMTBEWERTUNG EINES FILINGS
+          # TEXTUELLE RICHTUNG
+          #
+          # Nur verwenden, wenn der relevante Begriff UND eine
+          # eindeutige Entwicklungsformulierung eng zusammenstehen.
           # ============================================================
 
-          def evaluate_matches(matches):
+          def textual_signal(passage):
 
-              if not matches:
+              lower = passage.lower()
+
+              positive_patterns = [
+                  r"(?:record|strong|growing|increased|higher|expanded)"
+                  r".{0,80}?"
+                  r"(?:backlog|bookings)",
+
+                  r"(?:backlog|bookings)"
+                  r".{0,80}?"
+                  r"(?:record|strong|growing|increased|higher|expanded)",
+
+                  r"(?:remaining performance obligations)"
+                  r".{0,80}?"
+                  r"(?:increased|grew|higher|expanded)"
+              ]
+
+              negative_patterns = [
+                  r"(?:declining|decreased|lower|weaker|reduced)"
+                  r".{0,80}?"
+                  r"(?:backlog|bookings)",
+
+                  r"(?:backlog|bookings)"
+                  r".{0,80}?"
+                  r"(?:declining|decreased|lower|weaker|reduced)",
+
+                  r"(?:remaining performance obligations)"
+                  r".{0,80}?"
+                  r"(?:declined|decreased|lower|reduced)"
+              ]
+
+              positive = any(
+                  re.search(
+                      pattern,
+                      lower
+                  )
+                  for pattern
+                  in positive_patterns
+              )
+
+              negative = any(
+                  re.search(
+                      pattern,
+                      lower
+                  )
+                  for pattern
+                  in negative_patterns
+              )
+
+              if positive and not negative:
 
                   return {
-                      "raw": None,
-                      "score": None,
-                      "status": "N/A",
-                      "reason":
-                          "Keine belastbaren Orders-/Backlog-Aussagen gefunden."
+                      "type":
+                          "TEXT_DIRECTION",
+                      "direction":
+                          "POSITIVE",
+                      "change":
+                          None,
+                      "strength":
+                          1
                   }
 
-              sentence_scores = []
+              if negative and not positive:
 
-              for sentence in matches:
+                  return {
+                      "type":
+                          "TEXT_DIRECTION",
+                      "direction":
+                          "NEGATIVE",
+                      "change":
+                          None,
+                      "strength":
+                          -1
+                  }
 
-                  value = evaluate_sentence(
-                      sentence
+              return None
+
+          # ============================================================
+          # FILING BEWERTEN
+          # ============================================================
+
+          def evaluate_passages(passages):
+
+              signals = []
+
+              for passage in passages:
+
+                  numeric = (
+                      extract_direction(
+                          passage
+                      )
                   )
 
-                  if value != 0:
+                  signals.extend(
+                      numeric
+                  )
 
-                      sentence_scores.append(
-                          value
+                  # Textsignal nur ergänzen, wenn
+                  # keine numerische Aussage erkannt wurde.
+                  if not numeric:
+
+                      text_signal = (
+                          textual_signal(
+                              passage
+                          )
                       )
 
-              if not sentence_scores:
+                      if text_signal:
+
+                          signals.append(
+                              text_signal
+                          )
+
+              if not signals:
 
                   return {
-                      "raw": 0,
-                      "score": None,
-                      "status": "N/A",
+                      "score":
+                          None,
+                      "status":
+                          "N/A",
                       "reason":
-                          "Orders-/Backlog-Aussagen vorhanden, "
-                          "aber keine eindeutige Entwicklungsrichtung."
+                          "Keine belastbare Veränderung von "
+                          "Orders/Backlog/RPO gefunden.",
+                      "signals":
+                          []
                   }
 
-              # Wir vermeiden, dass viele fast identische
-              # Sätze den Score künstlich aufblasen.
-              #
-              # Deshalb betrachten wir die stärksten
-              # positiven und negativen Signale.
+              positive = [
+                  s
+                  for s in signals
+                  if s["strength"] > 0
+              ]
+
+              negative = [
+                  s
+                  for s in signals
+                  if s["strength"] < 0
+              ]
 
               strongest_positive = max(
                   [
-                      x
-                      for x in sentence_scores
-                      if x > 0
+                      s["strength"]
+                      for s in positive
                   ],
                   default=0
               )
 
               strongest_negative = min(
                   [
-                      x
-                      for x in sentence_scores
-                      if x < 0
+                      s["strength"]
+                      for s in negative
                   ],
                   default=0
               )
 
-              raw = (
-                  strongest_positive
-                  + strongest_negative
-              )
+              # --------------------------------------------------------
+              # Konfliktprüfung
+              # --------------------------------------------------------
 
-              # ----------------------------------------
-              # Bullwerk 0-3
-              # ----------------------------------------
+              if positive and negative:
 
-              if raw >= 2:
+                  raw = (
+                      strongest_positive
+                      + strongest_negative
+                  )
+
+                  if raw >= 2:
+
+                      return {
+                          "score":
+                              3,
+                          "status":
+                              "STRONG_POSITIVE",
+                          "reason":
+                              "Positive Orders-/Backlog-Signale "
+                              "überwiegen deutlich.",
+                          "signals":
+                              signals
+                      }
+
+                  if raw >= 0:
+
+                      return {
+                          "score":
+                              2,
+                          "status":
+                              "MIXED_TO_POSITIVE",
+                          "reason":
+                              "Gemischte Signale, insgesamt "
+                              "stabil bis positiv.",
+                          "signals":
+                              signals
+                      }
+
+                  if raw >= -2:
+
+                      return {
+                          "score":
+                              1,
+                          "status":
+                              "CAUTIOUS",
+                          "reason":
+                              "Gemischte Signale mit "
+                              "überwiegendem Gegenwind.",
+                          "signals":
+                              signals
+                      }
 
                   return {
-                      "raw": raw,
-                      "score": 3,
+                      "score":
+                          0,
                       "status":
-                          "STRONG_POSITIVE",
+                          "WEAKER",
                       "reason":
-                          "Orders/Backlog zeigen eine deutliche positive Entwicklung."
+                          "Negative Orders-/Backlog-Signale "
+                          "überwiegen deutlich.",
+                      "signals":
+                          signals
                   }
 
-              if raw >= 1:
+              # --------------------------------------------------------
+              # Nur positive Signale
+              # --------------------------------------------------------
+
+              if positive:
+
+                  if strongest_positive >= 3:
+
+                      score = 3
+                      status = "STRONG_POSITIVE"
+                      reason = (
+                          "Orders/Backlog zeigen "
+                          "deutliches Wachstum."
+                      )
+
+                  elif strongest_positive >= 2:
+
+                      score = 3
+                      status = "POSITIVE"
+                      reason = (
+                          "Orders/Backlog entwickeln "
+                          "sich klar positiv."
+                      )
+
+                  else:
+
+                      score = 2
+                      status = "STABLE_TO_POSITIVE"
+                      reason = (
+                          "Orders/Backlog zeigen "
+                          "eine moderate positive Entwicklung."
+                      )
 
                   return {
-                      "raw": raw,
-                      "score": 2,
+                      "score":
+                          score,
                       "status":
-                          "STABLE_TO_POSITIVE",
+                          status,
                       "reason":
-                          "Orders/Backlog sind stabil bis positiv."
+                          reason,
+                      "signals":
+                          signals
                   }
 
-              if raw == 0:
+              # --------------------------------------------------------
+              # Nur negative Signale
+              # --------------------------------------------------------
+
+              if negative:
+
+                  if strongest_negative <= -3:
+
+                      score = 0
+                      status = "WEAKER"
+                      reason = (
+                          "Orders/Backlog haben sich "
+                          "deutlich verschlechtert."
+                      )
+
+                  else:
+
+                      score = 1
+                      status = "CAUTIOUS"
+                      reason = (
+                          "Orders/Backlog zeigen "
+                          "leichten bis moderaten Gegenwind."
+                      )
 
                   return {
-                      "raw": raw,
-                      "score": 2,
+                      "score":
+                          score,
                       "status":
-                          "MIXED_STABLE",
+                          status,
                       "reason":
-                          "Positive und negative Signale gleichen sich weitgehend aus."
-                  }
-
-              if raw >= -2:
-
-                  return {
-                      "raw": raw,
-                      "score": 1,
-                      "status":
-                          "CAUTIOUS",
-                      "reason":
-                          "Orders/Backlog zeigen leichten bis moderaten Gegenwind."
+                          reason,
+                      "signals":
+                          signals
                   }
 
               return {
-                  "raw": raw,
-                  "score": 0,
+                  "score":
+                      None,
                   "status":
-                      "WEAKER",
+                      "N/A",
                   "reason":
-                      "Orders/Backlog haben sich deutlich verschlechtert."
+                      "Keine zuverlässige Bewertung möglich.",
+                  "signals":
+                      signals
               }
 
           # ============================================================
           # SEC SUBMISSIONS
           # ============================================================
 
-          def get_recent_filings(cik):
+          def load_submissions(cik):
 
               url = (
                   "https://data.sec.gov/"
@@ -445,7 +687,7 @@ jobs:
 
               response = requests.get(
                   url,
-                  headers=headers,
+                  headers=HEADERS,
                   timeout=30
               )
 
@@ -475,65 +717,65 @@ jobs:
                   []
               )
 
-              primary_docs = recent.get(
+              docs = recent.get(
                   "primaryDocument",
                   []
               )
 
-              filing_dates = recent.get(
+              dates = recent.get(
                   "filingDate",
                   []
               )
 
-              candidates = []
+              filings = []
 
+              # V3 bevorzugt 10-Q und 10-K.
+              # 8-K wird nur ergänzend geprüft.
               for (
                   form,
                   accession,
-                  doc,
+                  document,
                   filing_date
               ) in zip(
                   forms,
                   accessions,
-                  primary_docs,
-                  filing_dates
+                  docs,
+                  dates
               ):
 
-                  if form in (
+                  if form not in (
                       "10-Q",
                       "10-K",
                       "8-K"
                   ):
+                      continue
 
-                      candidates.append({
-                          "form":
-                              form,
+                  filings.append({
+                      "form":
+                          form,
+                      "accession":
+                          accession,
+                      "document":
+                          document,
+                      "filing_date":
+                          filing_date
+                  })
 
-                          "accession":
-                              accession,
-
-                          "document":
-                              doc,
-
-                          "filing_date":
-                              filing_date
-                      })
-
-                  if len(candidates) >= 6:
+                  if len(filings) >= 10:
                       break
 
-              return candidates
+              return filings
 
           # ============================================================
-          # FILING LADEN
+          # SEC DOKUMENT LADEN
           # ============================================================
 
-          def load_filing(
+          def load_document(
               cik,
               filing
           ):
 
-              accession_clean = (
+              accession = (
                   filing[
                       "accession"
                   ].replace(
@@ -546,28 +788,24 @@ jobs:
                   int(cik)
               )
 
-              document_url = (
+              url = (
                   "https://www.sec.gov/"
                   "Archives/edgar/data/"
                   f"{cik_number}/"
-                  f"{accession_clean}/"
+                  f"{accession}/"
                   f"{filing['document']}"
               )
 
               response = requests.get(
-                  document_url,
-                  headers=headers,
+                  url,
+                  headers=HEADERS,
                   timeout=30
               )
 
               print(
-                  filing[
-                      "filing_date"
-                  ],
+                  filing["filing_date"],
                   "|",
-                  filing[
-                      "form"
-                  ],
+                  filing["form"],
                   "| HTTP",
                   response.status_code
               )
@@ -579,42 +817,41 @@ jobs:
                   response.text
               )
 
-              matches = find_matches(
-                  text
+              passages = (
+                  find_relevant_passages(
+                      text
+                  )
+              )
+
+              evaluation = (
+                  evaluate_passages(
+                      passages
+                  )
               )
 
               return {
                   "filing_date":
-                      filing[
-                          "filing_date"
-                      ],
-
+                      filing["filing_date"],
                   "form":
-                      filing[
-                          "form"
-                      ],
-
-                  "matches":
-                      matches,
-
+                      filing["form"],
+                  "passages":
+                      passages,
                   "evaluation":
-                      evaluate_matches(
-                          matches
-                      )
+                      evaluation
               }
 
           # ============================================================
           # HAUPTLAUF
           # ============================================================
 
-          for ticker, cik in companies.items():
+          for ticker, cik in COMPANIES.items():
 
               print("")
               print("=" * 90)
 
               print(
-                  f"BULLWERK ORDERS/BACKLOG V2: "
-                  f"{ticker}"
+                  "BULLWERK ORDERS/BACKLOG V3:",
+                  ticker
               )
 
               print("=" * 90)
@@ -622,74 +859,75 @@ jobs:
               try:
 
                   filings = (
-                      get_recent_filings(
+                      load_submissions(
                           cik
                       )
                   )
 
-                  results = []
+                  usable = []
 
                   for filing in filings:
 
                       result = (
-                          load_filing(
+                          load_document(
                               cik,
                               filing
                           )
                       )
 
-                      if not result:
+                      if result is None:
                           continue
 
-                      if result[
-                          "matches"
-                      ]:
+                      passages = (
+                          result[
+                              "passages"
+                          ]
+                      )
 
-                          results.append(
-                              result
-                          )
+                      evaluation = (
+                          result[
+                              "evaluation"
+                          ]
+                      )
 
-                          print(
-                              "Gefundene Aussagen:",
-                              len(
-                                  result[
-                                      "matches"
-                                  ]
-                              )
-                          )
+                      print(
+                          "Relevante Passagen:",
+                          len(passages)
+                      )
 
-                          for sentence in (
-                              result[
-                                  "matches"
-                              ][:3]
+                      if passages:
+
+                          for passage in (
+                              passages[:2]
                           ):
 
                               print(
                                   " -",
-                                  sentence[:700]
+                                  passage[:900]
                               )
 
-                          evaluation = (
-                              result[
-                                  "evaluation"
-                              ]
-                          )
+                      print(
+                          "Bewertung:",
+                          evaluation[
+                              "status"
+                          ],
+                          "| Score:",
+                          evaluation[
+                              "score"
+                          ]
+                      )
 
-                          print(
-                              "Vorläufig:",
-                              evaluation[
-                                  "status"
-                              ],
-                              "|",
-                              evaluation[
-                                  "score"
-                              ]
-                          )
+                      # Nur wirklich bewertbare
+                      # Filings aufnehmen.
+                      if (
+                          evaluation[
+                              "score"
+                          ]
+                          is not None
+                      ):
 
-                      else:
-
-                          print(
-                              "Keine passende Aussage gefunden."
+                          usable.append(
+                              result
                           )
 
                       time.sleep(0.2)
@@ -699,7 +937,7 @@ jobs:
                       "--- BULLWERK ERGEBNIS ---"
                   )
 
-                  if not results:
+                  if not usable:
 
                       print(
                           "ORDERS/BACKLOG SCORE: N/A"
@@ -710,37 +948,22 @@ jobs:
                       )
 
                       print(
-                          "Keine zuverlässig bewertbaren "
-                          "Orders-/Backlog-Daten."
+                          "GRUND: Keine belastbare "
+                          "Orders-/Backlog-Entwicklung "
+                          "aus SEC-Unterlagen ableitbar."
                       )
 
                   else:
 
-                      # Das neueste Filing mit
-                      # brauchbaren Aussagen verwenden.
-                      latest = results[0]
+                      # Neueste belastbare
+                      # Information verwenden.
+                      latest = usable[0]
 
                       evaluation = (
                           latest[
                               "evaluation"
                           ]
                       )
-
-                      score = (
-                          evaluation[
-                              "score"
-                          ]
-                      )
-
-                      if score is None:
-
-                          score_text = "N/A"
-
-                      else:
-
-                          score_text = (
-                              f"{score}/3"
-                          )
 
                       print(
                           "VERWENDE FILING:",
@@ -754,7 +977,7 @@ jobs:
 
                       print(
                           "ORDERS/BACKLOG SCORE:",
-                          score_text
+                          f"{evaluation['score']}/3"
                       )
 
                       print(
@@ -772,11 +995,24 @@ jobs:
                       )
 
                       print(
-                          "ROHSCORE:",
-                          evaluation[
-                              "raw"
-                          ]
+                          "SIGNALANZAHL:",
+                          len(
+                              evaluation[
+                                  "signals"
+                              ]
+                          )
                       )
+
+                      for signal in (
+                          evaluation[
+                              "signals"
+                          ][:5]
+                      ):
+
+                          print(
+                              "SIGNAL:",
+                              signal
+                          )
 
               except Exception as error:
 
@@ -796,10 +1032,10 @@ jobs:
           print("")
           print("=" * 90)
           print(
-              "Bullwerk Orders/Backlog Test V2 beendet."
+              "Bullwerk Orders/Backlog Test V3 beendet."
           )
           print(
-              "Automatische 0-3 Bewertung aktiviert."
+              "Nur spezifische Orders-/Backlog-/RPO-Signale."
           )
           print(
               "N/A wird NICHT als 0 gewertet."
