@@ -1,4 +1,4 @@
-name: Bullwerk Orders Backlog Test V1
+name: Bullwerk Orders Backlog Test V2
 
 on:
   workflow_dispatch:
@@ -8,27 +8,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Orders and Backlog
+      - name: Test Orders and Backlog V2
         shell: python
         run: |
           import requests
           import re
           import time
+          from html import unescape
 
-          # ---------------------------------------------------------
+          # ============================================================
           # BULLWERK MARKETS
-          # Orders / Backlog Test V1
+          # ORDERS / BACKLOG TEST V2
           #
           # Ziel:
-          # Nur prüfen, ob aktuelle SEC-Unterlagen brauchbare
-          # Aussagen zu Auftragseingang / Backlog enthalten.
+          # Aktuelle SEC-Unterlagen nach belastbaren Aussagen zu
+          # Orders / Backlog / Bookings / RPO durchsuchen.
           #
-          # Spätere einfache Bewertung:
+          # Bewertung:
           # 3/3 = deutlich positiv
-          # 2/3 = stabil / moderat positiv
+          # 2/3 = stabil bis moderat positiv
+          # 1/3 = vorsichtig / leichter Gegenwind
           # 0/3 = klar negativ
-          # N/A = nicht sinnvoll berichtet -> keine Bestrafung
-          # ---------------------------------------------------------
+          # N/A = nicht zuverlässig bewertbar
+          #
+          # WICHTIG:
+          # N/A wird später NICHT als 0 gewertet.
+          # ============================================================
 
           companies = {
               "NVDA": "0001045810",
@@ -40,9 +45,14 @@ jobs:
           }
 
           headers = {
-              "User-Agent": "Bullwerk Markets research bullwerk-markets@example.com",
+              "User-Agent":
+                  "Bullwerk Markets contact: bullwerkmarkets@gmail.com",
               "Accept-Encoding": "gzip, deflate",
           }
+
+          # ============================================================
+          # SUCHBEGRIFFE
+          # ============================================================
 
           keywords = [
               "backlog",
@@ -53,167 +63,745 @@ jobs:
               "book-to-bill",
               "remaining performance obligations",
               "remaining performance obligation",
-              "RPO",
+              "rpo",
               "contracted backlog",
           ]
 
+          # Begriffe, die häufig eine positive Entwicklung anzeigen.
+          positive_words = [
+              "increased",
+              "increase",
+              "grew",
+              "growth",
+              "record",
+              "strong",
+              "higher",
+              "improved",
+              "expanded",
+              "rose",
+              "up",
+          ]
+
+          # Begriffe, die häufig eine negative Entwicklung anzeigen.
+          negative_words = [
+              "decreased",
+              "decrease",
+              "declined",
+              "decline",
+              "lower",
+              "weaker",
+              "reduced",
+              "fell",
+              "down",
+              "deteriorated",
+          ]
+
+          # ============================================================
+          # HTML -> TEXT
+          # ============================================================
+
           def clean_html(text):
-              text = re.sub(r"<script.*?</script>", " ", text,
-                            flags=re.I | re.S)
-              text = re.sub(r"<style.*?</style>", " ", text,
-                            flags=re.I | re.S)
-              text = re.sub(r"<[^>]+>", " ", text)
-              text = text.replace("&nbsp;", " ")
-              text = text.replace("&amp;", "&")
-              text = re.sub(r"\s+", " ", text)
+
+              text = re.sub(
+                  r"(?is)<script.*?>.*?</script>",
+                  " ",
+                  text
+              )
+
+              text = re.sub(
+                  r"(?is)<style.*?>.*?</style>",
+                  " ",
+                  text
+              )
+
+              text = re.sub(
+                  r"(?i)<br\s*/?>",
+                  ". ",
+                  text
+              )
+
+              text = re.sub(
+                  r"(?i)</(?:p|div|tr|li|h1|h2|h3)>",
+                  ". ",
+                  text
+              )
+
+              text = re.sub(
+                  r"(?is)<[^>]+>",
+                  " ",
+                  text
+              )
+
+              text = unescape(text)
+
+              text = text.replace(
+                  "\xa0",
+                  " "
+              )
+
+              text = re.sub(
+                  r"\s+",
+                  " ",
+                  text
+              )
+
               return text.strip()
 
+          # ============================================================
+          # RELEVANTE SÄTZE
+          # ============================================================
+
           def find_matches(text):
+
               matches = []
 
-              sentences = re.split(r"(?<=[.!?])\s+", text)
+              sentences = re.split(
+                  r"(?<=[.!?])\s+",
+                  text
+              )
 
               for sentence in sentences:
+
                   lower = sentence.lower()
 
-                  for keyword in keywords:
-                      if keyword.lower() in lower:
-                          sentence_clean = sentence.strip()
+                  if not any(
+                      keyword.lower() in lower
+                      for keyword in keywords
+                  ):
+                      continue
 
-                          if 30 <= len(sentence_clean) <= 900:
-                              matches.append(sentence_clean)
-                          break
+                  sentence_clean = sentence.strip()
+
+                  if (
+                      30
+                      <= len(sentence_clean)
+                      <= 1200
+                  ):
+                      matches.append(
+                          sentence_clean
+                      )
 
               # Duplikate entfernen
               unique = []
               seen = set()
 
               for item in matches:
+
                   key = item.lower()
 
                   if key not in seen:
+
                       seen.add(key)
                       unique.append(item)
 
-              return unique[:12]
+              return unique[:20]
 
-          for ticker, cik in companies.items():
+          # ============================================================
+          # PROZENTWERTE AUS SATZ EXTRAHIEREN
+          # ============================================================
 
-              print("")
-              print("=" * 80)
-              print(f"{ticker} | CIK {cik}")
-              print("=" * 80)
+          def extract_percentages(sentence):
 
-              submissions_url = (
-                  f"https://data.sec.gov/submissions/CIK{cik}.json"
+              values = []
+
+              patterns = [
+                  r"(?:increased|grew|rose|up)"
+                  r".{0,80}?(\d+(?:\.\d+)?)\s*%",
+
+                  r"(?:decreased|declined|fell|down)"
+                  r".{0,80}?(\d+(?:\.\d+)?)\s*%",
+
+                  r"(\d+(?:\.\d+)?)\s*%"
+              ]
+
+              for pattern in patterns:
+
+                  found = re.findall(
+                      pattern,
+                      sentence,
+                      flags=re.I
+                  )
+
+                  for value in found:
+
+                      try:
+                          number = float(value)
+
+                          if 0 <= number <= 500:
+                              values.append(number)
+
+                      except ValueError:
+                          pass
+
+              return values
+
+          # ============================================================
+          # EINEN SATZ BEWERTEN
+          # ============================================================
+
+          def evaluate_sentence(sentence):
+
+              lower = sentence.lower()
+
+              positive = any(
+                  word in lower
+                  for word in positive_words
+              )
+
+              negative = any(
+                  word in lower
+                  for word in negative_words
+              )
+
+              percentages = (
+                  extract_percentages(sentence)
+              )
+
+              max_percentage = (
+                  max(percentages)
+                  if percentages
+                  else None
+              )
+
+              # ----------------------------------------
+              # Negativ
+              # ----------------------------------------
+
+              if negative and not positive:
+
+                  if (
+                      max_percentage is not None
+                      and max_percentage >= 10
+                  ):
+                      return -3
+
+                  if (
+                      max_percentage is not None
+                      and max_percentage >= 3
+                  ):
+                      return -2
+
+                  return -1
+
+              # ----------------------------------------
+              # Positiv
+              # ----------------------------------------
+
+              if positive and not negative:
+
+                  if (
+                      max_percentage is not None
+                      and max_percentage >= 10
+                  ):
+                      return 3
+
+                  if (
+                      max_percentage is not None
+                      and max_percentage >= 3
+                  ):
+                      return 2
+
+                  return 1
+
+              return 0
+
+          # ============================================================
+          # GESAMTBEWERTUNG EINES FILINGS
+          # ============================================================
+
+          def evaluate_matches(matches):
+
+              if not matches:
+
+                  return {
+                      "raw": None,
+                      "score": None,
+                      "status": "N/A",
+                      "reason":
+                          "Keine belastbaren Orders-/Backlog-Aussagen gefunden."
+                  }
+
+              sentence_scores = []
+
+              for sentence in matches:
+
+                  value = evaluate_sentence(
+                      sentence
+                  )
+
+                  if value != 0:
+
+                      sentence_scores.append(
+                          value
+                      )
+
+              if not sentence_scores:
+
+                  return {
+                      "raw": 0,
+                      "score": None,
+                      "status": "N/A",
+                      "reason":
+                          "Orders-/Backlog-Aussagen vorhanden, "
+                          "aber keine eindeutige Entwicklungsrichtung."
+                  }
+
+              # Wir vermeiden, dass viele fast identische
+              # Sätze den Score künstlich aufblasen.
+              #
+              # Deshalb betrachten wir die stärksten
+              # positiven und negativen Signale.
+
+              strongest_positive = max(
+                  [
+                      x
+                      for x in sentence_scores
+                      if x > 0
+                  ],
+                  default=0
+              )
+
+              strongest_negative = min(
+                  [
+                      x
+                      for x in sentence_scores
+                      if x < 0
+                  ],
+                  default=0
+              )
+
+              raw = (
+                  strongest_positive
+                  + strongest_negative
+              )
+
+              # ----------------------------------------
+              # Bullwerk 0-3
+              # ----------------------------------------
+
+              if raw >= 2:
+
+                  return {
+                      "raw": raw,
+                      "score": 3,
+                      "status":
+                          "STRONG_POSITIVE",
+                      "reason":
+                          "Orders/Backlog zeigen eine deutliche positive Entwicklung."
+                  }
+
+              if raw >= 1:
+
+                  return {
+                      "raw": raw,
+                      "score": 2,
+                      "status":
+                          "STABLE_TO_POSITIVE",
+                      "reason":
+                          "Orders/Backlog sind stabil bis positiv."
+                  }
+
+              if raw == 0:
+
+                  return {
+                      "raw": raw,
+                      "score": 2,
+                      "status":
+                          "MIXED_STABLE",
+                      "reason":
+                          "Positive und negative Signale gleichen sich weitgehend aus."
+                  }
+
+              if raw >= -2:
+
+                  return {
+                      "raw": raw,
+                      "score": 1,
+                      "status":
+                          "CAUTIOUS",
+                      "reason":
+                          "Orders/Backlog zeigen leichten bis moderaten Gegenwind."
+                  }
+
+              return {
+                  "raw": raw,
+                  "score": 0,
+                  "status":
+                      "WEAKER",
+                  "reason":
+                      "Orders/Backlog haben sich deutlich verschlechtert."
+              }
+
+          # ============================================================
+          # SEC SUBMISSIONS
+          # ============================================================
+
+          def get_recent_filings(cik):
+
+              url = (
+                  "https://data.sec.gov/"
+                  f"submissions/CIK{cik}.json"
               )
 
               response = requests.get(
-                  submissions_url,
+                  url,
                   headers=headers,
                   timeout=30
               )
 
-              print("SEC Submissions HTTP:", response.status_code)
+              print(
+                  "SEC Submissions HTTP:",
+                  response.status_code
+              )
 
               if response.status_code != 200:
-                  print("Keine SEC-Daten verfügbar.")
-                  continue
+                  return []
 
               data = response.json()
-              recent = data.get("filings", {}).get("recent", {})
 
-              forms = recent.get("form", [])
-              accessions = recent.get("accessionNumber", [])
-              primary_docs = recent.get("primaryDocument", [])
-              filing_dates = recent.get("filingDate", [])
+              recent = (
+                  data
+                  .get("filings", {})
+                  .get("recent", {})
+              )
+
+              forms = recent.get(
+                  "form",
+                  []
+              )
+
+              accessions = recent.get(
+                  "accessionNumber",
+                  []
+              )
+
+              primary_docs = recent.get(
+                  "primaryDocument",
+                  []
+              )
+
+              filing_dates = recent.get(
+                  "filingDate",
+                  []
+              )
 
               candidates = []
 
-              for form, accession, doc, filing_date in zip(
+              for (
+                  form,
+                  accession,
+                  doc,
+                  filing_date
+              ) in zip(
                   forms,
                   accessions,
                   primary_docs,
                   filing_dates
               ):
-                  if form in ["10-Q", "10-K", "8-K"]:
-                      candidates.append(
-                          (form, accession, doc, filing_date)
-                      )
+
+                  if form in (
+                      "10-Q",
+                      "10-K",
+                      "8-K"
+                  ):
+
+                      candidates.append({
+                          "form":
+                              form,
+
+                          "accession":
+                              accession,
+
+                          "document":
+                              doc,
+
+                          "filing_date":
+                              filing_date
+                      })
 
                   if len(candidates) >= 6:
                       break
 
-              total_matches = []
+              return candidates
 
-              for form, accession, doc, filing_date in candidates:
+          # ============================================================
+          # FILING LADEN
+          # ============================================================
 
-                  accession_clean = accession.replace("-", "")
-                  cik_number = str(int(cik))
+          def load_filing(
+              cik,
+              filing
+          ):
 
-                  document_url = (
-                      "https://www.sec.gov/Archives/edgar/data/"
-                      f"{cik_number}/{accession_clean}/{doc}"
+              accession_clean = (
+                  filing[
+                      "accession"
+                  ].replace(
+                      "-",
+                      ""
+                  )
+              )
+
+              cik_number = str(
+                  int(cik)
+              )
+
+              document_url = (
+                  "https://www.sec.gov/"
+                  "Archives/edgar/data/"
+                  f"{cik_number}/"
+                  f"{accession_clean}/"
+                  f"{filing['document']}"
+              )
+
+              response = requests.get(
+                  document_url,
+                  headers=headers,
+                  timeout=30
+              )
+
+              print(
+                  filing[
+                      "filing_date"
+                  ],
+                  "|",
+                  filing[
+                      "form"
+                  ],
+                  "| HTTP",
+                  response.status_code
+              )
+
+              if response.status_code != 200:
+                  return None
+
+              text = clean_html(
+                  response.text
+              )
+
+              matches = find_matches(
+                  text
+              )
+
+              return {
+                  "filing_date":
+                      filing[
+                          "filing_date"
+                      ],
+
+                  "form":
+                      filing[
+                          "form"
+                      ],
+
+                  "matches":
+                      matches,
+
+                  "evaluation":
+                      evaluate_matches(
+                          matches
+                      )
+              }
+
+          # ============================================================
+          # HAUPTLAUF
+          # ============================================================
+
+          for ticker, cik in companies.items():
+
+              print("")
+              print("=" * 90)
+
+              print(
+                  f"BULLWERK ORDERS/BACKLOG V2: "
+                  f"{ticker}"
+              )
+
+              print("=" * 90)
+
+              try:
+
+                  filings = (
+                      get_recent_filings(
+                          cik
+                      )
                   )
 
-                  doc_response = requests.get(
-                      document_url,
-                      headers=headers,
-                      timeout=30
-                  )
+                  results = []
+
+                  for filing in filings:
+
+                      result = (
+                          load_filing(
+                              cik,
+                              filing
+                          )
+                      )
+
+                      if not result:
+                          continue
+
+                      if result[
+                          "matches"
+                      ]:
+
+                          results.append(
+                              result
+                          )
+
+                          print(
+                              "Gefundene Aussagen:",
+                              len(
+                                  result[
+                                      "matches"
+                                  ]
+                              )
+                          )
+
+                          for sentence in (
+                              result[
+                                  "matches"
+                              ][:3]
+                          ):
+
+                              print(
+                                  " -",
+                                  sentence[:700]
+                              )
+
+                          evaluation = (
+                              result[
+                                  "evaluation"
+                              ]
+                          )
+
+                          print(
+                              "Vorläufig:",
+                              evaluation[
+                                  "status"
+                              ],
+                              "|",
+                              evaluation[
+                                  "score"
+                              ]
+                          )
+
+                      else:
+
+                          print(
+                              "Keine passende Aussage gefunden."
+                          )
+
+                      time.sleep(0.2)
 
                   print("")
                   print(
-                      f"{filing_date} | {form} | "
-                      f"HTTP {doc_response.status_code}"
+                      "--- BULLWERK ERGEBNIS ---"
                   )
 
-                  if doc_response.status_code != 200:
-                      continue
+                  if not results:
 
-                  text = clean_html(doc_response.text)
-                  matches = find_matches(text)
-
-                  if matches:
                       print(
-                          f"Gefundene Orders/Backlog-Aussagen: "
-                          f"{len(matches)}"
+                          "ORDERS/BACKLOG SCORE: N/A"
                       )
 
-                      for match in matches[:5]:
-                          print(" -", match[:700])
+                      print(
+                          "STATUS: N/A"
+                      )
 
-                      total_matches.extend(matches)
+                      print(
+                          "Keine zuverlässig bewertbaren "
+                          "Orders-/Backlog-Daten."
+                      )
 
                   else:
-                      print("Keine passende Aussage gefunden.")
 
-                  time.sleep(0.15)
+                      # Das neueste Filing mit
+                      # brauchbaren Aussagen verwenden.
+                      latest = results[0]
+
+                      evaluation = (
+                          latest[
+                              "evaluation"
+                          ]
+                      )
+
+                      score = (
+                          evaluation[
+                              "score"
+                          ]
+                      )
+
+                      if score is None:
+
+                          score_text = "N/A"
+
+                      else:
+
+                          score_text = (
+                              f"{score}/3"
+                          )
+
+                      print(
+                          "VERWENDE FILING:",
+                          latest[
+                              "filing_date"
+                          ],
+                          latest[
+                              "form"
+                          ]
+                      )
+
+                      print(
+                          "ORDERS/BACKLOG SCORE:",
+                          score_text
+                      )
+
+                      print(
+                          "STATUS:",
+                          evaluation[
+                              "status"
+                          ]
+                      )
+
+                      print(
+                          "GRUND:",
+                          evaluation[
+                              "reason"
+                          ]
+                      )
+
+                      print(
+                          "ROHSCORE:",
+                          evaluation[
+                              "raw"
+                          ]
+                      )
+
+              except Exception as error:
+
+                  print(
+                      "FEHLER:",
+                      repr(error)
+                  )
 
               print("")
-              print("--- BULLWERK ERGEBNIS ---")
+              print(
+                  ticker,
+                  "abgeschlossen."
+              )
 
-              if total_matches:
-                  print(
-                      "STATUS: DATEN GEFUNDEN"
-                  )
-                  print(
-                      "Für dieses Unternehmen können wir "
-                      "Orders/Backlog grundsätzlich auswerten."
-                  )
-              else:
-                  print("STATUS: N/A")
-                  print(
-                      "Keine brauchbaren Orders/Backlog-Daten gefunden."
-                  )
-                  print(
-                      "WICHTIG: N/A wird später NICHT als 0 gewertet."
-                  )
-
-              time.sleep(0.25)
+              time.sleep(0.5)
 
           print("")
-          print("=" * 80)
-          print("Bullwerk Orders/Backlog Test V1 beendet.")
-          print("Noch KEINE automatische 0-3 Bewertung.")
-          print("=" * 80)
+          print("=" * 90)
+          print(
+              "Bullwerk Orders/Backlog Test V2 beendet."
+          )
+          print(
+              "Automatische 0-3 Bewertung aktiviert."
+          )
+          print(
+              "N/A wird NICHT als 0 gewertet."
+          )
+          print("=" * 90)
