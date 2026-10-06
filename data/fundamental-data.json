@@ -1,13 +1,8 @@
 {
-  "updated": "2026-10-06T13:35:00.884870+00:00",
+  "updated": "2026-10-06T14:16:03.288680Z",
   "version": "bullwerk-fundamental-data-v8",
   "scoreVersion": "bullwerk-fundamental-v2",
   "maxScore": 20,
-  "method": {
-    "missingValues": "N/A wird nicht als 0 gewertet.",
-    "ordersBacklog": "V6: neuester SEC-Wert gegen unmittelbar vorherigen Wert; extreme Sprünge werden CHECK_REQUIRED.",
-    "guidance": "Noch N/A; separate Integration folgt."
-  },
   "stocks": [
     {
       "symbol": "AAPL",
@@ -20,28 +15,10 @@
         "margin": 3,
         "fcf": 3,
         "guidance": null,
-        "ordersBacklog": null
-      },
-      "ordersBacklogDetails": {
-        "metric": null,
-        "status": "N/A",
-        "changePct": null,
-        "currentValueBn": null,
-        "previousValueBn": null,
-        "currentForm": null,
-        "previousForm": null,
-        "currentFilingDate": null,
-        "previousFilingDate": null,
-        "reason": "Keine zwei vergleichbaren RPO-, Backlog- oder Bookings-Werte gefunden."
-      },
-      "snapshot": {
-        "revenueYoY": 16.36,
-        "revenueAcceleration": -0.24,
-        "incomeYoY": 27.12,
-        "epsYoY": 28.66,
-        "operatingMargin": 32.62,
-        "marginChangePP": 2.63,
-        "fcfYoY": 30.77
+        "ordersBacklog": null,
+        "ordersBacklogStatus": "N/A",
+        "ordersBacklogMetric": null,
+        "ordersBacklogChangePct": null
       }
     },
     {
@@ -55,28 +32,10 @@
         "margin": 1,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": 3
-      },
-      "ordersBacklogDetails": {
-        "metric": "RPO",
-        "status": "POSITIVE",
-        "changePct": 8.1,
-        "currentValueBn": 684.0,
-        "previousValueBn": 633.0,
-        "currentForm": "10-K",
-        "previousForm": "10-Q",
-        "currentFilingDate": "2026-07-29",
-        "previousFilingDate": "2026-04-29",
-        "reason": "Klare positive Entwicklung."
-      },
-      "snapshot": {
-        "revenueYoY": 17.75,
-        "revenueAcceleration": -0.55,
-        "incomeYoY": 31.33,
-        "epsYoY": 31.78,
-        "operatingMargin": 45.11,
-        "marginChangePP": 0.21,
-        "fcfYoY": -23.19
+        "ordersBacklog": 3,
+        "ordersBacklogStatus": "POSITIVE",
+        "ordersBacklogMetric": "RPO",
+        "ordersBacklogChangePct": 8.1
       }
     },
     {
@@ -90,28 +49,10 @@
         "margin": null,
         "fcf": 3,
         "guidance": null,
-        "ordersBacklog": 3
-      },
-      "ordersBacklogDetails": {
-        "metric": "RPO",
-        "status": "STRONG_POSITIVE",
-        "changePct": 23.1,
-        "currentValueBn": 3.2,
-        "previousValueBn": 2.6,
-        "currentForm": "10-Q",
-        "previousForm": "10-Q",
-        "currentFilingDate": "2026-08-26",
-        "previousFilingDate": "2026-05-20",
-        "reason": "Starkes Wachstum."
-      },
-      "snapshot": {
-        "revenueYoY": null,
-        "revenueAcceleration": null,
-        "incomeYoY": 125.9,
-        "epsYoY": 127.78,
-        "operatingMargin": null,
-        "marginChangePP": null,
-        "fcfYoY": 27.36
+        "ordersBacklog": 3,
+        "ordersBacklogStatus": "STRONG_POSITIVE",
+        "ordersBacklogMetric": "RPO",
+        "ordersBacklogChangePct": 23.1
       }
     },
     {
@@ -125,28 +66,10 @@
         "margin": 3,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": 0
-      },
-      "ordersBacklogDetails": {
-        "metric": "RPO",
-        "status": "WEAKER",
-        "changePct": -15.9,
-        "currentValueBn": 0.222,
-        "previousValueBn": 0.264,
-        "currentForm": "10-Q",
-        "previousForm": "10-Q",
-        "currentFilingDate": "2026-08-05",
-        "previousFilingDate": "2026-05-06",
-        "reason": "Deutliche Verschlechterung."
-      },
-      "snapshot": {
-        "revenueYoY": 50.11,
-        "revenueAcceleration": 12.26,
-        "incomeYoY": 163.42,
-        "epsYoY": 155.56,
-        "operatingMargin": 17.25,
-        "marginChangePP": 18.99,
-        "fcfYoY": -9.89
+        "ordersBacklog": 0,
+        "ordersBacklogStatus": "WEAKER",
+        "ordersBacklogMetric": "RPO",
+        "ordersBacklogChangePct": -15.9
       }
     },
     {
@@ -160,28 +83,10 @@
         "margin": 3,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": null
-      },
-      "ordersBacklogDetails": {
-        "metric": null,
-        "status": "N/A",
-        "changePct": null,
-        "currentValueBn": null,
-        "previousValueBn": null,
-        "currentForm": null,
-        "previousForm": null,
-        "currentFilingDate": null,
-        "previousFilingDate": null,
-        "reason": "Keine zwei vergleichbaren RPO-, Backlog- oder Bookings-Werte gefunden."
-      },
-      "snapshot": {
-        "revenueYoY": 19.62,
-        "revenueAcceleration": 3.01,
-        "incomeYoY": 244.9,
-        "epsYoY": 242.26,
-        "operatingMargin": 13.69,
-        "marginChangePP": 2.26,
-        "fcfYoY": -11.11
+        "ordersBacklog": null,
+        "ordersBacklogStatus": "N/A",
+        "ordersBacklogMetric": null,
+        "ordersBacklogChangePct": null
       }
     },
     {
@@ -195,28 +100,10 @@
         "margin": 0,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": null
-      },
-      "ordersBacklogDetails": {
-        "metric": null,
-        "status": "N/A",
-        "changePct": null,
-        "currentValueBn": null,
-        "previousValueBn": null,
-        "currentForm": null,
-        "previousForm": null,
-        "currentFilingDate": null,
-        "previousFilingDate": null,
-        "reason": "Keine zwei vergleichbaren RPO-, Backlog- oder Bookings-Werte gefunden."
-      },
-      "snapshot": {
-        "revenueYoY": 27.96,
-        "revenueAcceleration": -5.12,
-        "incomeYoY": -13.57,
-        "epsYoY": -13.45,
-        "operatingMargin": 30.88,
-        "marginChangePP": -12.14,
-        "fcfYoY": -80.65
+        "ordersBacklog": null,
+        "ordersBacklogStatus": "N/A",
+        "ordersBacklogMetric": null,
+        "ordersBacklogChangePct": null
       }
     },
     {
@@ -230,28 +117,10 @@
         "margin": 3,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": 3
-      },
-      "ordersBacklogDetails": {
-        "metric": "BACKLOG",
-        "status": "POSITIVE",
-        "changePct": 11.1,
-        "currentValueBn": 519.5,
-        "previousValueBn": 467.6,
-        "currentForm": "10-Q",
-        "previousForm": "10-Q",
-        "currentFilingDate": "2026-07-23",
-        "previousFilingDate": "2026-04-30",
-        "reason": "Klare positive Entwicklung."
-      },
-      "snapshot": {
-        "revenueYoY": 12.04,
-        "revenueAcceleration": 0.27,
-        "incomeYoY": 297.9,
-        "epsYoY": 294.37,
-        "operatingMargin": 33.92,
-        "marginChangePP": 2.29,
-        "fcfYoY": -210.45
+        "ordersBacklog": 3,
+        "ordersBacklogStatus": "POSITIVE",
+        "ordersBacklogMetric": "BACKLOG",
+        "ordersBacklogChangePct": 11.1
       }
     },
     {
@@ -265,28 +134,10 @@
         "margin": 3,
         "fcf": 1,
         "guidance": null,
-        "ordersBacklog": 3
-      },
-      "ordersBacklogDetails": {
-        "metric": "RPO",
-        "status": "POSITIVE",
-        "changePct": 8.9,
-        "currentValueBn": 4.9,
-        "previousValueBn": 4.5,
-        "currentForm": "10-Q",
-        "previousForm": "10-Q",
-        "currentFilingDate": "2026-08-04",
-        "previousFilingDate": "2026-05-05",
-        "reason": "Klare positive Entwicklung."
-      },
-      "snapshot": {
-        "revenueYoY": 92.83,
-        "revenueAcceleration": 8.12,
-        "incomeYoY": 225.01,
-        "epsYoY": 215.38,
-        "operatingMargin": 47.12,
-        "marginChangePP": 20.29,
-        "fcfYoY": 126.03
+        "ordersBacklog": 3,
+        "ordersBacklogStatus": "POSITIVE",
+        "ordersBacklogMetric": "RPO",
+        "ordersBacklogChangePct": 8.9
       }
     }
   ]
