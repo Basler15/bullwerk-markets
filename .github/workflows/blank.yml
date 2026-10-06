@@ -1,4 +1,4 @@
-name: Bullwerk Orders Backlog Test V3
+name: Bullwerk Orders Backlog Test V4
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Orders and Backlog V3
+      - name: Test Orders and Backlog V4
         shell: python
         run: |
           import requests
@@ -18,19 +18,19 @@ jobs:
 
           # ============================================================
           # BULLWERK MARKETS
-          # ORDERS / BACKLOG TEST V3
+          # ORDERS / BACKLOG TEST V4
           #
-          # Ziel:
-          # Nur belastbare Orders-/Backlog-Signale aus SEC-Unterlagen.
+          # V4:
+          # - sucht spezifische Backlog-/RPO-Kennzahlen
+          # - extrahiert absolute Geldwerte
+          # - vergleicht neuere mit älteren SEC-Filings
+          # - keine Bewertung aus allgemeinen positiven Wörtern
           #
-          # 3/3 = deutlich positiv
+          # 3/3 = starke Verbesserung
           # 2/3 = stabil / moderat positiv
-          # 1/3 = leichter Gegenwind
-          # 0/3 = klar negativ
-          # N/A = nicht zuverlässig bewertbar
-          #
-          # WICHTIG:
-          # N/A wird NICHT als 0 gewertet.
+          # 1/3 = moderate Verschlechterung
+          # 0/3 = starke Verschlechterung
+          # N/A = keine belastbare Vergleichsbasis
           # ============================================================
 
           COMPANIES = {
@@ -49,20 +49,25 @@ jobs:
           }
 
           # ------------------------------------------------------------
-          # V3: NUR SPEZIFISCHE BEGRIFFE
-          #
-          # Das allgemeine Wort "orders" ist bewusst NICHT enthalten.
+          # Nur konkrete Kennzahlen
           # ------------------------------------------------------------
 
-          METRICS = [
-              "order backlog",
-              "backlog",
-              "bookings",
-              "book-to-bill",
-              "remaining performance obligations",
-              "remaining performance obligation",
-              "contracted backlog",
-          ]
+          METRICS = {
+              "RPO": [
+                  "remaining performance obligations",
+                  "remaining performance obligation",
+              ],
+
+              "BACKLOG": [
+                  "order backlog",
+                  "contracted backlog",
+                  "backlog",
+              ],
+
+              "BOOKINGS": [
+                  "bookings",
+              ],
+          }
 
           # ============================================================
           # HTML -> TEXT
@@ -89,7 +94,7 @@ jobs:
               )
 
               html = re.sub(
-                  r"(?i)</(?:p|div|tr|li|h1|h2|h3)>",
+                  r"(?i)</(?:p|div|tr|li|h1|h2|h3|td)>",
                   ". ",
                   html
               )
@@ -116,563 +121,368 @@ jobs:
               return text.strip()
 
           # ============================================================
-          # RELEVANTE PASSAGEN
+          # ZAHLEN NORMALISIEREN
           # ============================================================
 
-          def find_relevant_passages(text):
+          def money_to_billions(
+              number,
+              unit
+          ):
 
-              passages = []
+              try:
+                  value = float(
+                      number.replace(",", "")
+                  )
 
-              # Etwas größere Textstücke als nur einzelne Sätze.
-              chunks = re.split(
+              except:
+                  return None
+
+              unit = unit.lower()
+
+              if unit in (
+                  "billion",
+                  "billions"
+              ):
+                  return value
+
+              if unit in (
+                  "million",
+                  "millions"
+              ):
+                  return value / 1000.0
+
+              if unit in (
+                  "trillion",
+                  "trillions"
+              ):
+                  return value * 1000.0
+
+              return None
+
+          # ============================================================
+          # PASSAGEN FINDEN
+          # ============================================================
+
+          def find_metric_passages(text):
+
+              sentences = re.split(
                   r"(?<=[.!?])\s+",
                   text
               )
 
-              for i, sentence in enumerate(chunks):
+              results = []
+
+              for i, sentence in enumerate(sentences):
 
                   lower = sentence.lower()
 
-                  if not any(
-                      metric in lower
-                      for metric in METRICS
-                  ):
+                  found_metric = None
+
+                  for metric, terms in METRICS.items():
+
+                      if any(
+                          term in lower
+                          for term in terms
+                      ):
+                          found_metric = metric
+                          break
+
+                  if not found_metric:
                       continue
 
-                  # Vorheriger + aktueller + nächster Satz
                   start = max(
                       0,
                       i - 1
                   )
 
                   end = min(
-                      len(chunks),
+                      len(sentences),
                       i + 2
                   )
 
                   passage = " ".join(
-                      chunks[start:end]
+                      sentences[start:end]
                   ).strip()
 
                   if (
-                      40
-                      <= len(passage)
-                      <= 2500
+                      len(passage) >= 40
+                      and
+                      len(passage) <= 3000
                   ):
-                      passages.append(
-                          passage
-                      )
 
-              # Duplikate entfernen
-              unique = []
-              seen = set()
-
-              for passage in passages:
-
-                  key = passage.lower()
-
-                  if key not in seen:
-
-                      seen.add(key)
-                      unique.append(
-                          passage
-                      )
-
-              return unique[:15]
-
-          # ============================================================
-          # DIREKTE VERÄNDERUNGEN
-          # ============================================================
-
-          def extract_direction(passage):
-
-              lower = passage.lower()
-
-              signals = []
-
-              # --------------------------------------------------------
-              # Prozentuale Veränderungen
-              # --------------------------------------------------------
-
-              positive_patterns = [
-                  r"(?:backlog|bookings|remaining performance obligations)"
-                  r".{0,180}?"
-                  r"(?:increased|grew|rose|were up|was up)"
-                  r".{0,80}?"
-                  r"(\d+(?:\.\d+)?)\s*%",
-
-                  r"(?:increased|grew|rose)"
-                  r".{0,80}?"
-                  r"(\d+(?:\.\d+)?)\s*%"
-                  r".{0,180}?"
-                  r"(?:backlog|bookings|remaining performance obligations)"
-              ]
-
-              negative_patterns = [
-                  r"(?:backlog|bookings|remaining performance obligations)"
-                  r".{0,180}?"
-                  r"(?:decreased|declined|fell|were down|was down)"
-                  r".{0,80}?"
-                  r"(\d+(?:\.\d+)?)\s*%",
-
-                  r"(?:decreased|declined|fell)"
-                  r".{0,80}?"
-                  r"(\d+(?:\.\d+)?)\s*%"
-                  r".{0,180}?"
-                  r"(?:backlog|bookings|remaining performance obligations)"
-              ]
-
-              for pattern in positive_patterns:
-
-                  match = re.search(
-                      pattern,
-                      passage,
-                      flags=re.I
-                  )
-
-                  if match:
-
-                      value = float(
-                          match.group(1)
-                      )
-
-                      signals.append({
-                          "type":
-                              "PERCENT_CHANGE",
-                          "direction":
-                              "POSITIVE",
-                          "change":
-                              value,
-                          "strength":
-                              score_change(value)
-                      })
-
-              for pattern in negative_patterns:
-
-                  match = re.search(
-                      pattern,
-                      passage,
-                      flags=re.I
-                  )
-
-                  if match:
-
-                      value = float(
-                          match.group(1)
-                      )
-
-                      signals.append({
-                          "type":
-                              "PERCENT_CHANGE",
-                          "direction":
-                              "NEGATIVE",
-                          "change":
-                              -value,
-                          "strength":
-                              -score_change(value)
-                      })
-
-              # --------------------------------------------------------
-              # Explizite YoY / year-over-year Formulierungen
-              # --------------------------------------------------------
-
-              yoy_patterns = [
-                  (
-                      "POSITIVE",
-                      r"(?:backlog|bookings|remaining performance obligations)"
-                      r".{0,200}?"
-                      r"(?:year.over.year|year over year|yoy)"
-                      r".{0,100}?"
-                      r"(?:increased|grew|rose|up)"
-                      r".{0,60}?"
-                      r"(\d+(?:\.\d+)?)\s*%"
-                  ),
-
-                  (
-                      "NEGATIVE",
-                      r"(?:backlog|bookings|remaining performance obligations)"
-                      r".{0,200}?"
-                      r"(?:year.over.year|year over year|yoy)"
-                      r".{0,100}?"
-                      r"(?:decreased|declined|fell|down)"
-                      r".{0,60}?"
-                      r"(\d+(?:\.\d+)?)\s*%"
-                  )
-              ]
-
-              for direction, pattern in yoy_patterns:
-
-                  match = re.search(
-                      pattern,
-                      passage,
-                      flags=re.I
-                  )
-
-                  if match:
-
-                      value = float(
-                          match.group(1)
-                      )
-
-                      signed = (
-                          value
-                          if direction == "POSITIVE"
-                          else -value
-                      )
-
-                      strength = (
-                          score_change(value)
-                          if direction == "POSITIVE"
-                          else -score_change(value)
-                      )
-
-                      signals.append({
-                          "type":
-                              "YOY_CHANGE",
-                          "direction":
-                              direction,
-                          "change":
-                              signed,
-                          "strength":
-                              strength
-                      })
-
-              return signals
-
-          # ============================================================
-          # STÄRKE DER VERÄNDERUNG
-          # ============================================================
-
-          def score_change(value):
-
-              if value >= 15:
-                  return 3
-
-              if value >= 5:
-                  return 2
-
-              if value > 0:
-                  return 1
-
-              return 0
-
-          # ============================================================
-          # TEXTUELLE RICHTUNG
-          #
-          # Nur verwenden, wenn der relevante Begriff UND eine
-          # eindeutige Entwicklungsformulierung eng zusammenstehen.
-          # ============================================================
-
-          def textual_signal(passage):
-
-              lower = passage.lower()
-
-              positive_patterns = [
-                  r"(?:record|strong|growing|increased|higher|expanded)"
-                  r".{0,80}?"
-                  r"(?:backlog|bookings)",
-
-                  r"(?:backlog|bookings)"
-                  r".{0,80}?"
-                  r"(?:record|strong|growing|increased|higher|expanded)",
-
-                  r"(?:remaining performance obligations)"
-                  r".{0,80}?"
-                  r"(?:increased|grew|higher|expanded)"
-              ]
-
-              negative_patterns = [
-                  r"(?:declining|decreased|lower|weaker|reduced)"
-                  r".{0,80}?"
-                  r"(?:backlog|bookings)",
-
-                  r"(?:backlog|bookings)"
-                  r".{0,80}?"
-                  r"(?:declining|decreased|lower|weaker|reduced)",
-
-                  r"(?:remaining performance obligations)"
-                  r".{0,80}?"
-                  r"(?:declined|decreased|lower|reduced)"
-              ]
-
-              positive = any(
-                  re.search(
-                      pattern,
-                      lower
-                  )
-                  for pattern
-                  in positive_patterns
-              )
-
-              negative = any(
-                  re.search(
-                      pattern,
-                      lower
-                  )
-                  for pattern
-                  in negative_patterns
-              )
-
-              if positive and not negative:
-
-                  return {
-                      "type":
-                          "TEXT_DIRECTION",
-                      "direction":
-                          "POSITIVE",
-                      "change":
-                          None,
-                      "strength":
-                          1
-                  }
-
-              if negative and not positive:
-
-                  return {
-                      "type":
-                          "TEXT_DIRECTION",
-                      "direction":
-                          "NEGATIVE",
-                      "change":
-                          None,
-                      "strength":
-                          -1
-                  }
-
-              return None
-
-          # ============================================================
-          # FILING BEWERTEN
-          # ============================================================
-
-          def evaluate_passages(passages):
-
-              signals = []
-
-              for passage in passages:
-
-                  numeric = (
-                      extract_direction(
-                          passage
-                      )
-                  )
-
-                  signals.extend(
-                      numeric
-                  )
-
-                  # Textsignal nur ergänzen, wenn
-                  # keine numerische Aussage erkannt wurde.
-                  if not numeric:
-
-                      text_signal = (
-                          textual_signal(
+                      results.append({
+                          "metric":
+                              found_metric,
+                          "text":
                               passage
-                          )
+                      })
+
+              return results
+
+          # ============================================================
+          # GELDWERTE EXTRAHIEREN
+          # ============================================================
+
+          def extract_money_values(passage):
+
+              text = passage["text"]
+
+              values = []
+
+              patterns = [
+
+                  # $12.3 billion
+                  r"\$\s*([0-9]+(?:\.[0-9]+)?)\s*"
+                  r"(billion|billions|million|millions|"
+                  r"trillion|trillions)",
+
+                  # 12.3 billion dollars
+                  r"([0-9]+(?:\.[0-9]+)?)\s*"
+                  r"(billion|billions|million|millions|"
+                  r"trillion|trillions)\s+"
+                  r"(?:U\.S\.\s*)?dollars",
+              ]
+
+              for pattern in patterns:
+
+                  for match in re.finditer(
+                      pattern,
+                      text,
+                      flags=re.I
+                  ):
+
+                      number = match.group(1)
+                      unit = match.group(2)
+
+                      value = money_to_billions(
+                          number,
+                          unit
                       )
 
-                      if text_signal:
+                      if value is None:
+                          continue
 
-                          signals.append(
-                              text_signal
-                          )
+                      values.append({
+                          "value_bn":
+                              value,
+                          "raw":
+                              match.group(0)
+                      })
 
-              if not signals:
+              return values
 
-                  return {
-                      "score":
-                          None,
-                      "status":
-                          "N/A",
-                      "reason":
-                          "Keine belastbare Veränderung von "
-                          "Orders/Backlog/RPO gefunden.",
-                      "signals":
-                          []
-                  }
+          # ============================================================
+          # BESTEN METRIK-WERT AUS PASSAGE WÄHLEN
+          # ============================================================
 
-              positive = [
-                  s
-                  for s in signals
-                  if s["strength"] > 0
-              ]
+          def choose_metric_value(
+              metric,
+              passage_text,
+              values
+          ):
 
-              negative = [
-                  s
-                  for s in signals
-                  if s["strength"] < 0
-              ]
+              if not values:
+                  return None
 
-              strongest_positive = max(
-                  [
-                      s["strength"]
-                      for s in positive
-                  ],
-                  default=0
-              )
-
-              strongest_negative = min(
-                  [
-                      s["strength"]
-                      for s in negative
-                  ],
-                  default=0
-              )
+              lower = passage_text.lower()
 
               # --------------------------------------------------------
-              # Konfliktprüfung
+              # Schutz vor häufigen RPO-Fehlern:
+              #
+              # SEC-Texte nennen oft:
+              # - gesamten RPO
+              # - davon erwartete Recognition in 12 Monaten
+              #
+              # Wir wollen möglichst den GESAMTWERT.
               # --------------------------------------------------------
 
-              if positive and negative:
+              filtered = []
 
-                  raw = (
-                      strongest_positive
-                      + strongest_negative
+              for item in values:
+
+                  raw_lower = item[
+                      "raw"
+                  ].lower()
+
+                  pos = lower.find(
+                      raw_lower
                   )
 
-                  if raw >= 2:
+                  if pos == -1:
+                      filtered.append(
+                          item
+                      )
+                      continue
 
-                      return {
-                          "score":
-                              3,
-                          "status":
-                              "STRONG_POSITIVE",
-                          "reason":
-                              "Positive Orders-/Backlog-Signale "
-                              "überwiegen deutlich.",
-                          "signals":
-                              signals
-                      }
+                  context_start = max(
+                      0,
+                      pos - 180
+                  )
 
-                  if raw >= 0:
+                  context_end = min(
+                      len(lower),
+                      pos + 180
+                  )
 
-                      return {
-                          "score":
-                              2,
-                          "status":
-                              "MIXED_TO_POSITIVE",
-                          "reason":
-                              "Gemischte Signale, insgesamt "
-                              "stabil bis positiv.",
-                          "signals":
-                              signals
-                      }
+                  context = lower[
+                      context_start:
+                      context_end
+                  ]
 
-                  if raw >= -2:
+                  recognition_words = [
+                      "recognized",
+                      "recognize",
+                      "recognition",
+                      "next twelve months",
+                      "next 12 months",
+                      "over the next",
+                  ]
 
-                      return {
-                          "score":
-                              1,
-                          "status":
-                              "CAUTIOUS",
-                          "reason":
-                              "Gemischte Signale mit "
-                              "überwiegendem Gegenwind.",
-                          "signals":
-                              signals
-                      }
+                  if any(
+                      word in context
+                      for word in recognition_words
+                  ):
+                      # Nicht sofort löschen:
+                      # nur schwächer priorisieren.
+                      item = dict(item)
+                      item[
+                          "recognition_context"
+                      ] = True
 
-                  return {
-                      "score":
-                          0,
-                      "status":
-                          "WEAKER",
-                      "reason":
-                          "Negative Orders-/Backlog-Signale "
-                          "überwiegen deutlich.",
-                      "signals":
-                          signals
-                  }
+                  else:
+                      item = dict(item)
+                      item[
+                          "recognition_context"
+                      ] = False
+
+                  filtered.append(
+                      item
+                  )
+
+              preferred = [
+                  item
+                  for item in filtered
+                  if not item.get(
+                      "recognition_context",
+                      False
+                  )
+              ]
+
+              if preferred:
+                  candidates = preferred
+
+              else:
+                  candidates = filtered
+
+              if not candidates:
+                  return None
+
+              # Bei mehreren Werten nehmen wir zunächst
+              # den größten plausiblen Gesamtwert.
+              # Das verhindert häufig, dass ein Teilbetrag
+              # statt Gesamt-RPO gewählt wird.
+              best = max(
+                  candidates,
+                  key=lambda x:
+                      x["value_bn"]
+              )
+
+              return best
+
+          # ============================================================
+          # FILING ANALYSIEREN
+          # ============================================================
+
+          def analyse_text(text):
+
+              passages = (
+                  find_metric_passages(
+                      text
+                  )
+              )
+
+              candidates = []
+
+              for passage in passages:
+
+                  values = (
+                      extract_money_values(
+                          passage
+                      )
+                  )
+
+                  chosen = (
+                      choose_metric_value(
+                          passage[
+                              "metric"
+                          ],
+                          passage[
+                              "text"
+                          ],
+                          values
+                      )
+                  )
+
+                  if chosen:
+
+                      candidates.append({
+                          "metric":
+                              passage[
+                                  "metric"
+                              ],
+                          "value_bn":
+                              chosen[
+                                  "value_bn"
+                              ],
+                          "raw":
+                              chosen[
+                                  "raw"
+                              ],
+                          "passage":
+                              passage[
+                                  "text"
+                              ]
+                      })
 
               # --------------------------------------------------------
-              # Nur positive Signale
+              # Pro Metrik nur einen Wert verwenden.
               # --------------------------------------------------------
 
-              if positive:
+              best_by_metric = {}
 
-                  if strongest_positive >= 3:
+              for candidate in candidates:
 
-                      score = 3
-                      status = "STRONG_POSITIVE"
-                      reason = (
-                          "Orders/Backlog zeigen "
-                          "deutliches Wachstum."
-                      )
+                  metric = candidate[
+                      "metric"
+                  ]
 
-                  elif strongest_positive >= 2:
+                  if metric not in best_by_metric:
 
-                      score = 3
-                      status = "POSITIVE"
-                      reason = (
-                          "Orders/Backlog entwickeln "
-                          "sich klar positiv."
-                      )
+                      best_by_metric[
+                          metric
+                      ] = candidate
 
                   else:
 
-                      score = 2
-                      status = "STABLE_TO_POSITIVE"
-                      reason = (
-                          "Orders/Backlog zeigen "
-                          "eine moderate positive Entwicklung."
-                      )
+                      # Größeren Wert bevorzugen,
+                      # weil Gesamt-RPO/Backlog oft größer
+                      # als Teilbeträge ist.
+                      if (
+                          candidate[
+                              "value_bn"
+                          ]
+                          >
+                          best_by_metric[
+                              metric
+                          ][
+                              "value_bn"
+                          ]
+                      ):
+                          best_by_metric[
+                              metric
+                          ] = candidate
 
-                  return {
-                      "score":
-                          score,
-                      "status":
-                          status,
-                      "reason":
-                          reason,
-                      "signals":
-                          signals
-                  }
-
-              # --------------------------------------------------------
-              # Nur negative Signale
-              # --------------------------------------------------------
-
-              if negative:
-
-                  if strongest_negative <= -3:
-
-                      score = 0
-                      status = "WEAKER"
-                      reason = (
-                          "Orders/Backlog haben sich "
-                          "deutlich verschlechtert."
-                      )
-
-                  else:
-
-                      score = 1
-                      status = "CAUTIOUS"
-                      reason = (
-                          "Orders/Backlog zeigen "
-                          "leichten bis moderaten Gegenwind."
-                      )
-
-                  return {
-                      "score":
-                          score,
-                      "status":
-                          status,
-                      "reason":
-                          reason,
-                      "signals":
-                          signals
-                  }
-
-              return {
-                  "score":
-                      None,
-                  "status":
-                      "N/A",
-                  "reason":
-                      "Keine zuverlässige Bewertung möglich.",
-                  "signals":
-                      signals
-              }
+              return best_by_metric
 
           # ============================================================
           # SEC SUBMISSIONS
@@ -717,7 +527,7 @@ jobs:
                   []
               )
 
-              docs = recent.get(
+              documents = recent.get(
                   "primaryDocument",
                   []
               )
@@ -729,8 +539,13 @@ jobs:
 
               filings = []
 
-              # V3 bevorzugt 10-Q und 10-K.
-              # 8-K wird nur ergänzend geprüft.
+              # --------------------------------------------------------
+              # V4 konzentriert sich auf 10-Q / 10-K.
+              #
+              # 8-K lassen wir bewusst weg.
+              # Dort hatten V2/V3 zu viel Rauschen.
+              # --------------------------------------------------------
+
               for (
                   form,
                   accession,
@@ -739,14 +554,13 @@ jobs:
               ) in zip(
                   forms,
                   accessions,
-                  docs,
+                  documents,
                   dates
               ):
 
                   if form not in (
                       "10-Q",
-                      "10-K",
-                      "8-K"
+                      "10-K"
                   ):
                       continue
 
@@ -761,7 +575,9 @@ jobs:
                           filing_date
                   })
 
-                  if len(filings) >= 10:
+                  # Mehrere Quartale nötig,
+                  # damit ein Vergleich möglich ist.
+                  if len(filings) >= 8:
                       break
 
               return filings
@@ -803,9 +619,13 @@ jobs:
               )
 
               print(
-                  filing["filing_date"],
+                  filing[
+                      "filing_date"
+                  ],
                   "|",
-                  filing["form"],
+                  filing[
+                      "form"
+                  ],
                   "| HTTP",
                   response.status_code
               )
@@ -817,27 +637,110 @@ jobs:
                   response.text
               )
 
-              passages = (
-                  find_relevant_passages(
-                      text
-                  )
-              )
-
-              evaluation = (
-                  evaluate_passages(
-                      passages
-                  )
+              metrics = analyse_text(
+                  text
               )
 
               return {
                   "filing_date":
-                      filing["filing_date"],
+                      filing[
+                          "filing_date"
+                      ],
                   "form":
-                      filing["form"],
-                  "passages":
-                      passages,
-                  "evaluation":
-                      evaluation
+                      filing[
+                          "form"
+                      ],
+                  "metrics":
+                      metrics
+              }
+
+          # ============================================================
+          # VERGLEICH ZWEIER WERTE
+          # ============================================================
+
+          def compare_values(
+              current,
+              previous
+          ):
+
+              if (
+                  current is None
+                  or previous is None
+                  or previous <= 0
+              ):
+                  return None
+
+              change = (
+                  (
+                      current
+                      / previous
+                  )
+                  - 1
+              ) * 100
+
+              return change
+
+          # ============================================================
+          # BULLWERK SCORE
+          # ============================================================
+
+          def bullwerk_score(change):
+
+              if change is None:
+
+                  return {
+                      "score":
+                          None,
+                      "status":
+                          "N/A"
+                  }
+
+              # Starkes Wachstum
+              if change >= 15:
+
+                  return {
+                      "score":
+                          3,
+                      "status":
+                          "STRONG_POSITIVE"
+                  }
+
+              # Moderates Wachstum
+              if change >= 5:
+
+                  return {
+                      "score":
+                          3,
+                      "status":
+                          "POSITIVE"
+                  }
+
+              # Stabil / leicht positiv
+              if change >= -5:
+
+                  return {
+                      "score":
+                          2,
+                      "status":
+                          "STABLE"
+                  }
+
+              # Moderate Verschlechterung
+              if change >= -15:
+
+                  return {
+                      "score":
+                          1,
+                      "status":
+                          "CAUTIOUS"
+                  }
+
+              # Deutliche Verschlechterung
+              return {
+                  "score":
+                      0,
+                  "status":
+                      "WEAKER"
               }
 
           # ============================================================
@@ -850,7 +753,7 @@ jobs:
               print("=" * 90)
 
               print(
-                  "BULLWERK ORDERS/BACKLOG V3:",
+                  "BULLWERK ORDERS/BACKLOG V4:",
                   ticker
               )
 
@@ -864,7 +767,7 @@ jobs:
                       )
                   )
 
-                  usable = []
+                  results = []
 
                   for filing in filings:
 
@@ -878,56 +781,44 @@ jobs:
                       if result is None:
                           continue
 
-                      passages = (
-                          result[
-                              "passages"
-                          ]
-                      )
-
-                      evaluation = (
-                          result[
-                              "evaluation"
-                          ]
+                      results.append(
+                          result
                       )
 
                       print(
-                          "Relevante Passagen:",
-                          len(passages)
+                          "Gefundene Kennzahlen:"
                       )
 
-                      if passages:
+                      if not result[
+                          "metrics"
+                      ]:
 
-                          for passage in (
-                              passages[:2]
-                          ):
+                          print(
+                              "  keine"
+                          )
 
-                              print(
-                                  " -",
-                                  passage[:900]
-                              )
+                      for (
+                          metric,
+                          data
+                      ) in result[
+                          "metrics"
+                      ].items():
 
-                      print(
-                          "Bewertung:",
-                          evaluation[
-                              "status"
-                          ],
-                          "| Score:",
-                          evaluation[
-                              "score"
-                          ]
-                      )
-
-                      # Nur wirklich bewertbare
-                      # Filings aufnehmen.
-                      if (
-                          evaluation[
-                              "score"
-                          ]
-                          is not None
-                      ):
-
-                          usable.append(
-                              result
+                          print(
+                              " ",
+                              metric,
+                              "=",
+                              round(
+                                  data[
+                                      "value_bn"
+                                  ],
+                                  3
+                              ),
+                              "Mrd. USD",
+                              "|",
+                              data[
+                                  "raw"
+                              ]
                           )
 
                       time.sleep(0.2)
@@ -937,7 +828,101 @@ jobs:
                       "--- BULLWERK ERGEBNIS ---"
                   )
 
-                  if not usable:
+                  # ----------------------------------------------------
+                  # Für jede Metrik chronologisch nach zwei
+                  # vergleichbaren Werten suchen.
+                  # ----------------------------------------------------
+
+                  comparisons = []
+
+                  for metric in (
+                      "RPO",
+                      "BACKLOG",
+                      "BOOKINGS"
+                  ):
+
+                      observations = []
+
+                      for result in results:
+
+                          if (
+                              metric
+                              in result[
+                                  "metrics"
+                              ]
+                          ):
+
+                              observations.append({
+                                  "date":
+                                      result[
+                                          "filing_date"
+                                      ],
+                                  "form":
+                                      result[
+                                          "form"
+                                      ],
+                                  "value":
+                                      result[
+                                          "metrics"
+                                      ][
+                                          metric
+                                      ][
+                                          "value_bn"
+                                      ]
+                              })
+
+                      # Results kommen neu -> alt.
+                      if len(
+                          observations
+                      ) >= 2:
+
+                          current = (
+                              observations[0]
+                          )
+
+                          previous = (
+                              observations[1]
+                          )
+
+                          change = (
+                              compare_values(
+                                  current[
+                                      "value"
+                                  ],
+                                  previous[
+                                      "value"
+                                  ]
+                              )
+                          )
+
+                          if change is not None:
+
+                              score_data = (
+                                  bullwerk_score(
+                                      change
+                                  )
+                              )
+
+                              comparisons.append({
+                                  "metric":
+                                      metric,
+                                  "current":
+                                      current,
+                                  "previous":
+                                      previous,
+                                  "change":
+                                      change,
+                                  "score":
+                                      score_data[
+                                          "score"
+                                      ],
+                                  "status":
+                                      score_data[
+                                          "status"
+                                      ]
+                              })
+
+                  if not comparisons:
 
                       print(
                           "ORDERS/BACKLOG SCORE: N/A"
@@ -948,70 +933,123 @@ jobs:
                       )
 
                       print(
-                          "GRUND: Keine belastbare "
-                          "Orders-/Backlog-Entwicklung "
-                          "aus SEC-Unterlagen ableitbar."
+                          "GRUND: Keine zwei "
+                          "vergleichbaren Backlog-, "
+                          "RPO- oder Bookings-Werte "
+                          "gefunden."
                       )
 
                   else:
 
-                      # Neueste belastbare
-                      # Information verwenden.
-                      latest = usable[0]
+                      # ------------------------------------------------
+                      # Priorität:
+                      # BACKLOG > BOOKINGS > RPO
+                      #
+                      # Backlog/Bookings sind für unsere
+                      # Fundamental-Momentum-Idee meist direkter.
+                      # RPO bleibt wertvoll, aber ist bei Software-
+                      # Unternehmen etwas anders zu interpretieren.
+                      # ------------------------------------------------
 
-                      evaluation = (
-                          latest[
-                              "evaluation"
+                      priority = {
+                          "BACKLOG": 3,
+                          "BOOKINGS": 2,
+                          "RPO": 1,
+                      }
+
+                      comparisons.sort(
+                          key=lambda x:
+                              priority[
+                                  x[
+                                      "metric"
+                                  ]
+                              ],
+                          reverse=True
+                      )
+
+                      best = comparisons[0]
+
+                      print(
+                          "METRIK:",
+                          best[
+                              "metric"
                           ]
                       )
 
                       print(
-                          "VERWENDE FILING:",
-                          latest[
-                              "filing_date"
-                          ],
-                          latest[
-                              "form"
+                          "AKTUELL:",
+                          round(
+                              best[
+                                  "current"
+                              ][
+                                  "value"
+                              ],
+                              3
+                          ),
+                          "Mrd. USD",
+                          "| Filing:",
+                          best[
+                              "current"
+                          ][
+                              "date"
                           ]
+                      )
+
+                      print(
+                          "VORHER:",
+                          round(
+                              best[
+                                  "previous"
+                              ][
+                                  "value"
+                              ],
+                              3
+                          ),
+                          "Mrd. USD",
+                          "| Filing:",
+                          best[
+                              "previous"
+                          ][
+                              "date"
+                          ]
+                      )
+
+                      print(
+                          "VERÄNDERUNG:",
+                          f"{best['change']:+.1f}%"
                       )
 
                       print(
                           "ORDERS/BACKLOG SCORE:",
-                          f"{evaluation['score']}/3"
+                          f"{best['score']}/3"
                       )
 
                       print(
                           "STATUS:",
-                          evaluation[
+                          best[
                               "status"
                           ]
                       )
 
+                      print("")
                       print(
-                          "GRUND:",
-                          evaluation[
-                              "reason"
-                          ]
+                          "ALLE VERGLEICHE:"
                       )
 
-                      print(
-                          "SIGNALANZAHL:",
-                          len(
-                              evaluation[
-                                  "signals"
-                              ]
-                          )
-                      )
-
-                      for signal in (
-                          evaluation[
-                              "signals"
-                          ][:5]
-                      ):
+                      for comp in comparisons:
 
                           print(
-                              "SIGNAL:",
-                              signal
+                              comp[
+                                  "metric"
+                              ],
+                              "|",
+                              f"{comp['change']:+.1f}%",
+                              "|",
+                              f"{comp['score']}/3",
+                              "|",
+                              comp[
+                                  "status"
+                              ]
                           )
 
               except Exception as error:
@@ -1032,12 +1070,13 @@ jobs:
           print("")
           print("=" * 90)
           print(
-              "Bullwerk Orders/Backlog Test V3 beendet."
+              "Bullwerk Orders/Backlog Test V4 beendet."
           )
           print(
-              "Nur spezifische Orders-/Backlog-/RPO-Signale."
+              "V4 vergleicht konkrete Kennzahlen "
+              "zwischen SEC-Filings."
           )
           print(
-              "N/A wird NICHT als 0 gewertet."
+              "Keine belastbare Vergleichsbasis = N/A."
           )
           print("=" * 90)
