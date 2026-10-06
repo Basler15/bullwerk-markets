@@ -1,4 +1,4 @@
-name: Bullwerk Fundamental Momentum Score V8
+name: Bullwerk Fundamental Momentum Score V7
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Fundamental Momentum V8 berechnen und speichern
+      - name: Fundamental Momentum V7 berechnen und speichern
         run: |
           python3 <<'PY'
 
@@ -22,9 +22,6 @@ jobs:
           import os
           import time
           import urllib.request
-          import requests
-          import re
-          from html import unescape
           from datetime import datetime
 
 
@@ -1329,244 +1326,6 @@ jobs:
                   )
 
 
-
-
-          # ============================================================
-          # ORDERS / BACKLOG V6
-          # ============================================================
-
-          ORDERS_METRICS = {
-              "RPO": ["remaining performance obligations", "remaining performance obligation"],
-              "BACKLOG": ["order backlog", "contracted backlog", "backlog"],
-              "BOOKINGS": ["bookings"],
-          }
-
-          MAX_POSITIVE_JUMP = 75.0
-          MAX_NEGATIVE_JUMP = -50.0
-
-          def clean_html(html):
-              html = re.sub(r"(?is)<script.*?>.*?</script>", " ", html)
-              html = re.sub(r"(?is)<style.*?>.*?</style>", " ", html)
-              html = re.sub(r"(?i)<br\s*/?>", ". ", html)
-              html = re.sub(r"(?i)</(?:p|div|tr|li|h1|h2|h3|td)>", ". ", html)
-              html = re.sub(r"(?is)<[^>]+>", " ", html)
-              text = unescape(html).replace("\xa0", " ")
-              return re.sub(r"\s+", " ", text).strip()
-
-          def money_to_billions(number, unit):
-              try:
-                  value = float(number.replace(",", ""))
-              except Exception:
-                  return None
-              unit = unit.lower()
-              if unit in ("billion", "billions"):
-                  return value
-              if unit in ("million", "millions"):
-                  return value / 1000.0
-              if unit in ("trillion", "trillions"):
-                  return value * 1000.0
-              return None
-
-          def find_metric_passages(text):
-              sentences = re.split(r"(?<=[.!?])\s+", text)
-              results = []
-              for i, sentence in enumerate(sentences):
-                  lower = sentence.lower()
-                  found_metric = None
-                  for metric, terms in ORDERS_METRICS.items():
-                      if any(term in lower for term in terms):
-                          found_metric = metric
-                          break
-                  if not found_metric:
-                      continue
-                  passage = " ".join(sentences[max(0, i - 1):min(len(sentences), i + 2)]).strip()
-                  if 40 <= len(passage) <= 3000:
-                      results.append({"metric": found_metric, "text": passage})
-              return results
-
-          def extract_money_values(passage):
-              text = passage["text"]
-              values = []
-              patterns = [
-                  r"\$\s*([0-9]+(?:\.[0-9]+)?)\s*(billion|billions|million|millions|trillion|trillions)",
-                  r"([0-9]+(?:\.[0-9]+)?)\s*(billion|billions|million|millions|trillion|trillions)\s+(?:U\.S\.\s*)?dollars",
-              ]
-              for pattern in patterns:
-                  for match in re.finditer(pattern, text, flags=re.I):
-                      value = money_to_billions(match.group(1), match.group(2))
-                      if value is not None:
-                          values.append({"value_bn": value, "raw": match.group(0)})
-              return values
-
-          def choose_metric_value(metric, passage_text, values):
-              if not values:
-                  return None
-              lower = passage_text.lower()
-              candidates = []
-              for item in values:
-                  raw_lower = item["raw"].lower()
-                  pos = lower.find(raw_lower)
-                  context = lower[max(0, pos - 180):min(len(lower), pos + 180)] if pos != -1 else ""
-                  recognition_words = [
-                      "recognized", "recognize", "recognition",
-                      "next twelve months", "next 12 months", "over the next"
-                  ]
-                  candidate = dict(item)
-                  candidate["recognition_context"] = any(word in context for word in recognition_words)
-                  candidates.append(candidate)
-              preferred = [item for item in candidates if not item["recognition_context"]]
-              pool = preferred if preferred else candidates
-              return max(pool, key=lambda x: x["value_bn"]) if pool else None
-
-          def analyse_orders_text(text):
-              candidates = []
-              for passage in find_metric_passages(text):
-                  chosen = choose_metric_value(
-                      passage["metric"], passage["text"], extract_money_values(passage)
-                  )
-                  if chosen:
-                      candidates.append({
-                          "metric": passage["metric"],
-                          "value_bn": chosen["value_bn"],
-                          "raw": chosen["raw"],
-                          "passage": passage["text"],
-                      })
-              best_by_metric = {}
-              for candidate in candidates:
-                  metric = candidate["metric"]
-                  if metric not in best_by_metric or candidate["value_bn"] > best_by_metric[metric]["value_bn"]:
-                      best_by_metric[metric] = candidate
-              return best_by_metric
-
-          def load_orders_filings(cik):
-              url = f"https://data.sec.gov/submissions/CIK{cik}.json"
-              response = requests.get(url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "gzip, deflate"}, timeout=30)
-              if response.status_code != 200:
-                  return []
-              recent = response.json().get("filings", {}).get("recent", {})
-              filings = []
-              for form, accession, document, filing_date in zip(
-                  recent.get("form", []),
-                  recent.get("accessionNumber", []),
-                  recent.get("primaryDocument", []),
-                  recent.get("filingDate", []),
-              ):
-                  if form not in ("10-Q", "10-K"):
-                      continue
-                  filings.append({
-                      "form": form,
-                      "accession": accession,
-                      "document": document,
-                      "filing_date": filing_date,
-                  })
-                  if len(filings) >= 12:
-                      break
-              return filings
-
-          def load_orders_document(cik, filing):
-              accession = filing["accession"].replace("-", "")
-              cik_number = str(int(cik))
-              url = (
-                  "https://www.sec.gov/Archives/edgar/data/"
-                  f"{cik_number}/{accession}/{filing['document']}"
-              )
-              response = requests.get(url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "gzip, deflate"}, timeout=30)
-              if response.status_code != 200:
-                  return None
-              return {
-                  "filing_date": filing["filing_date"],
-                  "form": filing["form"],
-                  "metrics": analyse_orders_text(clean_html(response.text)),
-              }
-
-          def orders_change(current, previous):
-              if current is None or previous is None or previous <= 0:
-                  return None
-              return ((current / previous) - 1) * 100
-
-          def orders_score_from_change(change):
-              if change is None:
-                  return {"score": None, "status": "N/A", "reason": "Keine Veränderung berechenbar."}
-              if change > MAX_POSITIVE_JUMP or change < MAX_NEGATIVE_JUMP:
-                  return {
-                      "score": None,
-                      "status": "CHECK_REQUIRED",
-                      "reason": "Ungewöhnlich großer Sprung. Vergleichbarkeit prüfen.",
-                  }
-              if change >= 15:
-                  return {"score": 3, "status": "STRONG_POSITIVE", "reason": "Starkes Wachstum."}
-              if change >= 5:
-                  return {"score": 3, "status": "POSITIVE", "reason": "Klare positive Entwicklung."}
-              if change >= -5:
-                  return {"score": 2, "status": "STABLE", "reason": "Stabile bis leicht positive Entwicklung."}
-              if change >= -15:
-                  return {"score": 1, "status": "CAUTIOUS", "reason": "Moderate Verschlechterung."}
-              return {"score": 0, "status": "WEAKER", "reason": "Deutliche Verschlechterung."}
-
-          def build_orders_comparison(results, metric):
-              observations = []
-              for result in results:
-                  if metric in result["metrics"]:
-                      observations.append({
-                          "date": result["filing_date"],
-                          "form": result["form"],
-                          "value": result["metrics"][metric]["value_bn"],
-                      })
-              if len(observations) < 2:
-                  return None
-              current = observations[0]
-              previous = observations[1]
-              change = orders_change(current["value"], previous["value"])
-              if change is None:
-                  return None
-              score_data = orders_score_from_change(change)
-              return {
-                  "metric": metric,
-                  "current": current,
-                  "previous": previous,
-                  "change": change,
-                  "score": score_data["score"],
-                  "status": score_data["status"],
-                  "reason": score_data["reason"],
-              }
-
-          def get_orders_backlog_result(cik):
-              results = []
-              try:
-                  for filing in load_orders_filings(cik):
-                      result = load_orders_document(cik, filing)
-                      if result is not None:
-                          results.append(result)
-                      time.sleep(0.15)
-              except Exception as error:
-                  return {
-                      "score": None,
-                      "status": "N/A",
-                      "reason": f"SEC Orders/Backlog Fehler: {error}",
-                      "metric": None,
-                      "change": None,
-                  }
-
-              comparisons = []
-              for metric in ("RPO", "BACKLOG", "BOOKINGS"):
-                  comparison = build_orders_comparison(results, metric)
-                  if comparison:
-                      comparisons.append(comparison)
-
-              if not comparisons:
-                  return {
-                      "score": None,
-                      "status": "N/A",
-                      "reason": "Keine zwei vergleichbaren Backlog-, RPO- oder Bookings-Werte gefunden.",
-                      "metric": None,
-                      "change": None,
-                  }
-
-              priority = {"BACKLOG": 3, "BOOKINGS": 2, "RPO": 1}
-              comparisons.sort(key=lambda x: priority[x["metric"]], reverse=True)
-              return comparisons[0]
-
-
           # ============================================================
           # CONCEPTS
           # ============================================================
@@ -2087,22 +1846,10 @@ jobs:
               margin_score = score_margin(current_margin)
               fcf_score = score_fcf(current_fcf)
 
-              # Guidance bleibt vorerst separat / N/A.
+              # Guidance und Orders/Backlog bleiben bewusst einfach.
+              # Bis eine eindeutige aktuelle Bewertung vorliegt: N/A.
               guidance_score = None
-
-              # Orders/Backlog V6: neuester Wert gegen unmittelbar vorherigen Wert.
-              # N/A und CHECK_REQUIRED werden NICHT als 0 gewertet.
-              orders_backlog_result = get_orders_backlog_result(cik)
-              orders_backlog_score = orders_backlog_result.get("score")
-
-              print("")
-              print("--- ORDERS / BACKLOG V6 ---")
-              print("Metrik:", orders_backlog_result.get("metric") or "N/A")
-              change = orders_backlog_result.get("change")
-              print("Veränderung:", f"{change:+.1f}%" if change is not None else "N/A")
-              print("Score:", f"{orders_backlog_score}/3" if orders_backlog_score is not None else "N/A")
-              print("Status:", orders_backlog_result.get("status"))
-              print("Grund:", orders_backlog_result.get("reason"))
+              orders_backlog_score = None
 
               components = [
                   ("Umsatz", revenue_score, 4),
@@ -2166,14 +1913,7 @@ jobs:
                       "margin": margin_score,
                       "fcf": fcf_score,
                       "guidance": guidance_score,
-                      "ordersBacklog": orders_backlog_score,
-                      "ordersBacklogStatus": orders_backlog_result.get("status"),
-                      "ordersBacklogMetric": orders_backlog_result.get("metric"),
-                      "ordersBacklogChangePct": (
-                          round(orders_backlog_result.get("change"), 1)
-                          if orders_backlog_result.get("change") is not None
-                          else None
-                      )
+                      "ordersBacklog": orders_backlog_score
                   }
               })
 
@@ -2194,8 +1934,8 @@ jobs:
 
           output = {
               "updated": datetime.utcnow().isoformat() + "Z",
-              "version": "bullwerk-fundamental-data-v8",
-              "scoreVersion": "bullwerk-fundamental-v2",
+              "version": "bullwerk-fundamental-data-v7",
+              "scoreVersion": "bullwerk-fundamental-v1",
               "maxScore": 20,
               "stocks": fundamental_results
           }
@@ -2221,7 +1961,7 @@ jobs:
 
           print(
               "Bullwerk Fundamental "
-              "Momentum Score V8 beendet."
+              "Momentum Score V7 beendet."
           )
 
           print("=" * 90)
@@ -2238,6 +1978,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Keine neuen Fundamentaldaten."
           else
-            git commit -m "Update Bullwerk fundamental data v8"
+            git commit -m "Update Bullwerk fundamental data v7"
             git push
           fi
