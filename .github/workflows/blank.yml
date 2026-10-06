@@ -1,4 +1,4 @@
-name: Bullwerk Orders Backlog Test V5
+name: Bullwerk Orders Backlog Test V6
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Orders and Backlog V5
+      - name: Test Orders and Backlog V6
         shell: python
         run: |
           import requests
@@ -18,20 +18,21 @@ jobs:
 
           # ============================================================
           # BULLWERK MARKETS
-          # ORDERS / BACKLOG TEST V5
+          # ORDERS / BACKLOG TEST V6
           #
-          # V5:
+          # V6:
           # - konkrete RPO-/Backlog-/Bookings-Werte
-          # - Vergleich über SEC-Filings
-          # - bevorzugt vergleichbare Filing-Typen
-          # - Plausibilitätsprüfung bei großen Sprüngen
+          # - neuester Wert gegen unmittelbar vorherigen Wert
+          # - 10-Q und 10-K dürfen aufeinanderfolgen
+          # - Filing-Typ bleibt als Kontrollinformation sichtbar
+          # - Plausibilitätsprüfung bei außergewöhnlichen Sprüngen
           #
           # 3/3 = klar positiv
           # 2/3 = stabil / leicht positiv
           # 1/3 = moderat schwächer
           # 0/3 = klar schwächer
           # N/A = nicht bewertbar
-          # CHECK_REQUIRED = ungewöhnlicher Sprung -> keine Punkte
+          # CHECK_REQUIRED = außergewöhnlicher Sprung -> keine Punkte
           # ============================================================
 
           COMPANIES = {
@@ -64,15 +65,9 @@ jobs:
               ],
           }
 
-          # ------------------------------------------------------------
-          # PLAUSIBILITÄTSREGEL
-          #
-          # > +75 % oder < -50 % zwischen zwei aufeinanderfolgenden
-          # vergleichbaren Filings wird NICHT automatisch bewertet.
-          #
-          # Solche Sprünge können real sein, müssen aber vor Verwendung
-          # im Bullwerk-Score geprüft werden.
-          # ------------------------------------------------------------
+          # ============================================================
+          # PLAUSIBILITÄT
+          # ============================================================
 
           MAX_POSITIVE_JUMP = 75.0
           MAX_NEGATIVE_JUMP = -50.0
@@ -164,7 +159,7 @@ jobs:
               return None
 
           # ============================================================
-          # METRIK-PASSAGEN FINDEN
+          # RELEVANTE PASSAGEN
           # ============================================================
 
           def find_metric_passages(text):
@@ -262,7 +257,7 @@ jobs:
               return values
 
           # ============================================================
-          # BESTEN WERT WÄHLEN
+          # BESTEN WERT AUS EINER PASSAGE WÄHLEN
           # ============================================================
 
           def choose_metric_value(
@@ -281,7 +276,6 @@ jobs:
               for item in values:
 
                   raw_lower = item["raw"].lower()
-
                   pos = lower.find(raw_lower)
 
                   if pos == -1:
@@ -348,7 +342,7 @@ jobs:
               )
 
           # ============================================================
-          # TEXT ANALYSIEREN
+          # DOKUMENT ANALYSIEREN
           # ============================================================
 
           def analyse_text(text):
@@ -477,8 +471,6 @@ jobs:
                       "filing_date": filing_date
                   })
 
-                  # Etwas mehr Historie als V4
-                  # für Plausibilitätsprüfung.
                   if len(filings) >= 12:
                       break
 
@@ -562,7 +554,7 @@ jobs:
               ) * 100
 
           # ============================================================
-          # PLAUSIBILITÄT
+          # PLAUSIBILITÄTSPRÜFUNG
           # ============================================================
 
           def plausibility_check(change):
@@ -596,8 +588,7 @@ jobs:
               return {
                   "valid": True,
                   "reason":
-                      "Veränderung innerhalb "
-                      "des Plausibilitätsbereichs."
+                      "Veränderung plausibel."
               }
 
           # ============================================================
@@ -647,8 +638,8 @@ jobs:
                       "status":
                           "STABLE",
                       "reason":
-                          "Stabile bis leicht "
-                          "positive Entwicklung."
+                          "Stabile bis leicht positive "
+                          "Entwicklung."
                   }
 
               if change >= -15:
@@ -670,10 +661,19 @@ jobs:
               }
 
           # ============================================================
-          # VERGLEICHBARE BEOBACHTUNGEN FINDEN
+          # V6: DIREKTER VERGLEICH
+          #
+          # WICHTIG:
+          # Nicht mehr gleicher Filing-Typ bevorzugen.
+          #
+          # Wir verwenden:
+          # 1. neuesten gefundenen Wert
+          # 2. unmittelbar vorherigen gefundenen Wert
+          #
+          # Dadurch misst Bullwerk die jüngste Veränderung.
           # ============================================================
 
-          def build_comparisons(
+          def build_comparison(
               results,
               metric
           ):
@@ -699,40 +699,12 @@ jobs:
                               ]
                       })
 
-              comparisons = []
-
               if len(observations) < 2:
-                  return comparisons
+                  return None
 
-              # --------------------------------------------------------
-              # Neueste Beobachtung als Ausgangspunkt.
-              # Zuerst möglichst denselben Filing-Typ suchen.
-              # --------------------------------------------------------
-
+              # SEC-Liste kommt neu -> alt.
               current = observations[0]
-
-              same_form_previous = None
-
-              for observation in observations[1:]:
-
-                  if (
-                      observation["form"]
-                      ==
-                      current["form"]
-                  ):
-
-                      same_form_previous = (
-                          observation
-                      )
-                      break
-
-              # Falls kein gleicher Typ vorhanden:
-              # nächste verfügbare Beobachtung.
-              previous = (
-                  same_form_previous
-                  if same_form_previous
-                  else observations[1]
-              )
+              previous = observations[1]
 
               change = compare_values(
                   current["value"],
@@ -740,13 +712,13 @@ jobs:
               )
 
               if change is None:
-                  return comparisons
+                  return None
 
               score_data = bullwerk_score(
                   change
               )
 
-              comparisons.append({
+              return {
                   "metric":
                       metric,
                   "current":
@@ -767,9 +739,7 @@ jobs:
                           ==
                           previous["form"]
                       )
-              })
-
-              return comparisons
+              }
 
           # ============================================================
           # HAUPTLAUF
@@ -781,7 +751,7 @@ jobs:
               print("=" * 90)
 
               print(
-                  "BULLWERK ORDERS/BACKLOG V5:",
+                  "BULLWERK ORDERS/BACKLOG V6:",
                   ticker
               )
 
@@ -856,12 +826,17 @@ jobs:
                       "BOOKINGS"
                   ):
 
-                      comparisons.extend(
-                          build_comparisons(
+                      comparison = (
+                          build_comparison(
                               results,
                               metric
                           )
                       )
+
+                      if comparison:
+                          comparisons.append(
+                              comparison
+                          )
 
                   if not comparisons:
 
@@ -929,7 +904,7 @@ jobs:
                       )
 
                       print(
-                          "VERGLEICH:",
+                          "VORHER:",
                           round(
                               best[
                                   "previous"
@@ -1026,8 +1001,14 @@ jobs:
                               score_text,
                               "|",
                               comp["status"],
-                              "| gleicher Filing-Typ:",
-                              comp["same_form"]
+                              "| Filing-Typen:",
+                              comp[
+                                  "current"
+                              ]["form"],
+                              "->",
+                              comp[
+                                  "previous"
+                              ]["form"]
                           )
 
               except Exception as error:
@@ -1049,18 +1030,21 @@ jobs:
           print("=" * 90)
 
           print(
-              "Bullwerk Orders/Backlog Test V5 beendet."
+              "Bullwerk Orders/Backlog Test V6 beendet."
           )
 
           print(
-              "V5 nutzt konkrete SEC-Kennzahlen "
-              "plus Plausibilitätsprüfung."
+              "V6 vergleicht den neuesten Wert mit "
+              "dem unmittelbar vorherigen Wert."
           )
 
           print(
-              "Ungewöhnliche Sprünge werden als "
-              "CHECK_REQUIRED behandelt und "
-              "nicht automatisch bewertet."
+              "10-Q und 10-K dürfen aufeinanderfolgen."
+          )
+
+          print(
+              "Ungewöhnliche Sprünge werden weiterhin "
+              "als CHECK_REQUIRED behandelt."
           )
 
           print(
