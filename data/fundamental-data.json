@@ -1,7 +1,7 @@
 {
-  "updated": "2026-10-06T14:16:03.288680Z",
-  "version": "bullwerk-fundamental-data-v8",
-  "scoreVersion": "bullwerk-fundamental-v2",
+  "updated": "2026-10-06T14:36:33.763661Z",
+  "version": "bullwerk-fundamental-data-v7",
+  "scoreVersion": "bullwerk-fundamental-v1",
   "maxScore": 20,
   "stocks": [
     {
@@ -15,61 +15,49 @@
         "margin": 3,
         "fcf": 3,
         "guidance": null,
-        "ordersBacklog": null,
-        "ordersBacklogStatus": "N/A",
-        "ordersBacklogMetric": null,
-        "ordersBacklogChangePct": null
+        "ordersBacklog": null
       }
     },
     {
       "symbol": "MSFT",
-      "fundamentalScore": 12.9,
-      "rawPoints": 11,
-      "availableMax": 17,
+      "fundamentalScore": 11.4,
+      "rawPoints": 8,
+      "availableMax": 14,
       "breakdown": {
         "revenue": 3,
         "profitEps": 4,
         "margin": 1,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": 3,
-        "ordersBacklogStatus": "POSITIVE",
-        "ordersBacklogMetric": "RPO",
-        "ordersBacklogChangePct": 8.1
+        "ordersBacklog": null
       }
     },
     {
       "symbol": "NVDA",
-      "fundamentalScore": 16.0,
-      "rawPoints": 8,
-      "availableMax": 10,
+      "fundamentalScore": 14.3,
+      "rawPoints": 5,
+      "availableMax": 7,
       "breakdown": {
         "revenue": null,
         "profitEps": 2,
         "margin": null,
         "fcf": 3,
         "guidance": null,
-        "ordersBacklog": 3,
-        "ordersBacklogStatus": "STRONG_POSITIVE",
-        "ordersBacklogMetric": "RPO",
-        "ordersBacklogChangePct": 23.1
+        "ordersBacklog": null
       }
     },
     {
       "symbol": "AMD",
-      "fundamentalScore": 12.9,
+      "fundamentalScore": 15.7,
       "rawPoints": 11,
-      "availableMax": 17,
+      "availableMax": 14,
       "breakdown": {
         "revenue": 4,
         "profitEps": 4,
         "margin": 3,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": 0,
-        "ordersBacklogStatus": "WEAKER",
-        "ordersBacklogMetric": "RPO",
-        "ordersBacklogChangePct": -15.9
+        "ordersBacklog": null
       }
     },
     {
@@ -83,10 +71,7 @@
         "margin": 3,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": null,
-        "ordersBacklogStatus": "N/A",
-        "ordersBacklogMetric": null,
-        "ordersBacklogChangePct": null
+        "ordersBacklog": null
       }
     },
     {
@@ -100,44 +85,35 @@
         "margin": 0,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": null,
-        "ordersBacklogStatus": "N/A",
-        "ordersBacklogMetric": null,
-        "ordersBacklogChangePct": null
+        "ordersBacklog": null
       }
     },
     {
       "symbol": "GOOGL",
-      "fundamentalScore": 15.3,
-      "rawPoints": 13,
-      "availableMax": 17,
+      "fundamentalScore": 14.3,
+      "rawPoints": 10,
+      "availableMax": 14,
       "breakdown": {
         "revenue": 3,
         "profitEps": 4,
         "margin": 3,
         "fcf": 0,
         "guidance": null,
-        "ordersBacklog": 3,
-        "ordersBacklogStatus": "POSITIVE",
-        "ordersBacklogMetric": "BACKLOG",
-        "ordersBacklogChangePct": 11.1
+        "ordersBacklog": null
       }
     },
     {
       "symbol": "PLTR",
-      "fundamentalScore": 15.3,
-      "rawPoints": 13,
-      "availableMax": 17,
+      "fundamentalScore": 14.3,
+      "rawPoints": 10,
+      "availableMax": 14,
       "breakdown": {
         "revenue": 4,
         "profitEps": 2,
         "margin": 3,
         "fcf": 1,
         "guidance": null,
-        "ordersBacklog": 3,
-        "ordersBacklogStatus": "POSITIVE",
-        "ordersBacklogMetric": "RPO",
-        "ordersBacklogChangePct": 8.9
+        "ordersBacklog": null
       }
     }
   ]
