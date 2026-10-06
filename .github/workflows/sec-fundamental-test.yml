@@ -1,4 +1,4 @@
-name: Bullwerk Fundamental Momentum Score V7
+name: Bullwerk Fundamental Momentum Score V8
 
 on:
   workflow_dispatch:
@@ -14,42 +14,45 @@ jobs:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Fundamental Momentum V7 berechnen und speichern
+      - name: Bullwerk Fundamental Momentum V8 berechnen
+        shell: python
         run: |
-          python3 <<'PY'
-
           import json
           import os
+          import re
           import time
           import urllib.request
-          from datetime import datetime
+          from html import unescape
+          from datetime import datetime, timezone
 
 
           # ============================================================
           # BULLWERK MARKETS
-          # FUNDAMENTAL MOMENTUM SCORE V5
+          # FUNDAMENTAL MOMENTUM SCORE V8
           #
-          # WICHTIGE ÄNDERUNG:
+          # V8 kombiniert:
           #
-          # SEC FY/FP wird NICHT mehr für die zeitliche Reihenfolge
-          # der Quartale verwendet.
+          # 1. Umsatz-Momentum
+          # 2. Gewinn-/EPS-Momentum
+          # 3. operative Marge
+          # 4. Free Cashflow
+          # 5. Guidance -> vorerst N/A
+          # 6. Orders/Backlog V6
           #
-          # Die Reihenfolge entsteht aus dem tatsächlichen Enddatum.
+          # Orders/Backlog V6:
+          # - RPO / Backlog / Bookings
+          # - konkrete Werte aus SEC 10-Q / 10-K
+          # - neuester Wert gegen unmittelbar vorherigen Wert
+          # - 10-Q und 10-K dürfen aufeinanderfolgen
+          # - ungewöhnliche Sprünge -> CHECK_REQUIRED
           #
-          # Bullwerk erzeugt daraus:
-          # BQ1, BQ2, BQ3 ... = chronologische Quartalsfolge.
+          # N/A und CHECK_REQUIRED werden NICHT als 0 gewertet.
           #
-          # YoY:
-          # aktuelles Quartal gegen Quartal 4 Positionen davor.
-          #
-          # Beschleunigung:
-          # aktuelles YoY minus YoY des direkt vorherigen Quartals.
-          #
-          # V5 ergänzt den Bullwerk Fundamental Score 0-20.
+          # Ergebnis wird auf 20 Punkte normalisiert.
           # ============================================================
 
 
-          companies = {
+          COMPANIES = {
               "AAPL": "0000320193",
               "MSFT": "0000789019",
               "NVDA": "0001045810",
@@ -57,7 +60,7 @@ jobs:
               "AMZN": "0001018724",
               "META": "0001326801",
               "GOOGL": "0001652044",
-              "PLTR": "0001321655"
+              "PLTR": "0001321655",
           }
 
 
@@ -67,12 +70,17 @@ jobs:
           )
 
 
+          HEADERS = {
+              "User-Agent": USER_AGENT,
+              "Accept-Encoding": "identity",
+          }
+
+
           # ============================================================
-          # DATUM
+          # HILFSFUNKTIONEN
           # ============================================================
 
           def parse_date(value):
-
               if not value:
                   return None
 
@@ -82,12 +90,11 @@ jobs:
                       "%Y-%m-%d"
                   ).date()
 
-              except ValueError:
+              except Exception:
                   return None
 
 
           def duration_days(row):
-
               start = parse_date(
                   row.get("start")
               )
@@ -104,11 +111,7 @@ jobs:
               ).days + 1
 
 
-          def date_gap_days(
-              newer,
-              older
-          ):
-
+          def date_gap_days(newer, older):
               a = parse_date(newer)
               b = parse_date(older)
 
@@ -120,12 +123,7 @@ jobs:
               ).days
 
 
-          def starts_match(
-              a,
-              b,
-              tolerance=7
-          ):
-
+          def starts_match(a, b, tolerance=7):
               if not a or not b:
                   return False
 
@@ -146,22 +144,16 @@ jobs:
 
 
           # ============================================================
-          # SEC
+          # SEC JSON
           # ============================================================
 
           def get_json(url):
-
               request = urllib.request.Request(
                   url,
                   headers={
-                      "User-Agent":
-                          USER_AGENT,
-
-                      "Accept":
-                          "application/json",
-
-                      "Accept-Encoding":
-                          "identity"
+                      "User-Agent": USER_AGENT,
+                      "Accept": "application/json",
+                      "Accept-Encoding": "identity",
                   }
               )
 
@@ -170,16 +162,66 @@ jobs:
                   timeout=30
               ) as response:
 
-                  print(
-                      "HTTP Status:",
-                      response.status
-                  )
-
                   return json.loads(
                       response.read().decode(
                           "utf-8"
                       )
                   )
+
+
+          # ============================================================
+          # XBRL CONCEPTS
+          # ============================================================
+
+          CONCEPTS = {
+
+              "Revenue": (
+                  [
+                      "RevenueFromContractWithCustomerExcludingAssessedTax",
+                      "SalesRevenueNet",
+                      "Revenues",
+                  ],
+                  ["USD"]
+              ),
+
+              "Net Income": (
+                  [
+                      "NetIncomeLoss",
+                  ],
+                  ["USD"]
+              ),
+
+              "Operating Income": (
+                  [
+                      "OperatingIncomeLoss",
+                  ],
+                  ["USD"]
+              ),
+
+              "Diluted EPS": (
+                  [
+                      "EarningsPerShareDiluted",
+                  ],
+                  [
+                      "USD/shares",
+                      "USD / shares"
+                  ]
+              ),
+
+              "Operating Cash Flow": (
+                  [
+                      "NetCashProvidedByUsedInOperatingActivities",
+                  ],
+                  ["USD"]
+              ),
+
+              "Capital Expenditure": (
+                  [
+                      "PaymentsToAcquirePropertyPlantAndEquipment",
+                  ],
+                  ["USD"]
+              ),
+          }
 
 
           # ============================================================
@@ -192,38 +234,42 @@ jobs:
               units
           ):
 
+              us_gaap = (
+                  facts.get(
+                      "facts",
+                      {}
+                  ).get(
+                      "us-gaap",
+                      {}
+                  )
+              )
+
               for concept in concepts:
 
-                  try:
-
-                      available = (
-                          facts["facts"]
-                          ["us-gaap"]
-                          [concept]
-                          ["units"]
+                  concept_data = (
+                      us_gaap.get(
+                          concept
                       )
+                  )
 
-                  except KeyError:
-
+                  if not concept_data:
                       continue
 
+                  available = (
+                      concept_data.get(
+                          "units",
+                          {}
+                      )
+                  )
 
                   selected = None
 
-
                   for unit in units:
-
                       if unit in available:
-
-                          selected = (
-                              available[unit]
-                          )
-
+                          selected = available[unit]
                           break
 
-
                   if selected is None:
-
                       if not available:
                           continue
 
@@ -233,9 +279,7 @@ jobs:
                           )
                       )
 
-
                   rows = []
-
 
                   for row in selected:
 
@@ -262,7 +306,6 @@ jobs:
                       ):
                           continue
 
-
                       item = dict(row)
 
                       item[
@@ -275,29 +318,18 @@ jobs:
                           item
                       )
 
-
                   if rows:
+                      return concept, rows
 
-                      return (
-                          concept,
-                          rows
-                      )
-
-
-              return (
-                  None,
-                  []
-              )
+              return None, []
 
 
           # ============================================================
-          # DUPLIKATE
+          # DUPLIKATE ENTFERNEN
           # ============================================================
 
           def dedupe_rows(rows):
-
               best = {}
-
 
               for row in rows:
 
@@ -307,19 +339,14 @@ jobs:
                       row.get("val"),
                       row.get("fy"),
                       row.get("fp"),
-                      row.get("form")
+                      row.get("form"),
                   )
-
 
                   old = best.get(key)
 
-
                   if old is None:
-
                       best[key] = row
-
                       continue
-
 
                   if (
                       row.get("filed")
@@ -328,9 +355,7 @@ jobs:
                       old.get("filed")
                       or ""
                   ):
-
                       best[key] = row
-
 
               return list(
                   best.values()
@@ -342,9 +367,7 @@ jobs:
           # ============================================================
 
           def direct_quarters(rows):
-
               result = []
-
 
               for row in rows:
 
@@ -352,19 +375,15 @@ jobs:
                       "duration_days"
                   )
 
-
                   if days is None:
                       continue
-
 
                   if not (
                       70 <= days <= 110
                   ):
                       continue
 
-
                   fp = row.get("fp")
-
 
                   if fp not in (
                       "Q1",
@@ -374,9 +393,7 @@ jobs:
                   ):
                       continue
 
-
                   result.append({
-
                       "end":
                           row.get("end"),
 
@@ -393,9 +410,8 @@ jobs:
                           row.get("filed"),
 
                       "source":
-                          "DIRECT"
+                          "DIRECT",
                   })
-
 
               return result
 
@@ -403,6 +419,20 @@ jobs:
           # ============================================================
           # KUMULATIVE PERIODEN
           # ============================================================
+
+          def newest(items):
+              if not items:
+                  return None
+
+              return sorted(
+                  items,
+                  key=lambda x: (
+                      x.get("filed") or "",
+                      x.get("end") or "",
+                  ),
+                  reverse=True
+              )[0]
+
 
           def find_periods_for_fy(
               rows,
@@ -414,83 +444,45 @@ jobs:
               nine = []
               full = []
 
-
               for row in rows:
 
                   if row.get("fy") != fy:
                       continue
 
-
                   days = row.get(
                       "duration_days"
                   )
 
-
                   if days is None:
                       continue
 
-
                   if (
                       70 <= days <= 110
-                      and row.get("fp")
-                      == "Q1"
+                      and row.get("fp") == "Q1"
                   ):
-
                       q1.append(row)
-
 
                   elif (
                       150 <= days <= 220
                   ):
-
                       h1.append(row)
-
 
                   elif (
                       230 <= days <= 310
                   ):
-
                       nine.append(row)
-
 
                   elif (
                       330 <= days <= 380
-                      and row.get("form")
-                      == "10-K"
+                      and row.get("form") == "10-K"
                   ):
-
                       full.append(row)
 
-
-              def newest(items):
-
-                  if not items:
-                      return None
-
-                  return sorted(
-                      items,
-                      key=lambda x: (
-                          x.get("filed")
-                          or "",
-                          x.get("end")
-                          or ""
-                      ),
-                      reverse=True
-                  )[0]
-
-
               return {
-                  "q1":
-                      newest(q1),
-
-                  "h1":
-                      newest(h1),
-
-                  "nine":
-                      newest(nine),
-
-                  "full":
-                      newest(full)
+                  "q1": newest(q1),
+                  "h1": newest(h1),
+                  "nine": newest(nine),
+                  "full": newest(full),
               }
 
 
@@ -499,36 +491,27 @@ jobs:
           # ============================================================
 
           def derived_quarters(rows):
-
               result = []
 
-
               fiscal_years = {
-
                   row.get("fy")
-
                   for row in rows
-
-                  if row.get("fy")
-                  is not None
+                  if row.get("fy") is not None
               }
-
 
               for fy in fiscal_years:
 
-                  p = find_periods_for_fy(
+                  periods = find_periods_for_fy(
                       rows,
                       fy
                   )
 
+                  q1 = periods["q1"]
+                  h1 = periods["h1"]
+                  nine = periods["nine"]
+                  full = periods["full"]
 
-                  q1 = p["q1"]
-                  h1 = p["h1"]
-                  nine = p["nine"]
-                  full = p["full"]
-
-
-                  # Q2
+                  # Q2 = H1 - Q1
                   if (
                       q1
                       and h1
@@ -537,9 +520,7 @@ jobs:
                           h1
                       )
                   ):
-
                       result.append({
-
                           "end":
                               h1.get("end"),
 
@@ -557,11 +538,10 @@ jobs:
                               h1.get("filed"),
 
                           "source":
-                              "DERIVED_H1_MINUS_Q1"
+                              "DERIVED_H1_MINUS_Q1",
                       })
 
-
-                  # Q3
+                  # Q3 = 9M - H1
                   if (
                       h1
                       and nine
@@ -570,9 +550,7 @@ jobs:
                           nine
                       )
                   ):
-
                       result.append({
-
                           "end":
                               nine.get("end"),
 
@@ -590,11 +568,10 @@ jobs:
                               nine.get("filed"),
 
                           "source":
-                              "DERIVED_9M_MINUS_H1"
+                              "DERIVED_9M_MINUS_H1",
                       })
 
-
-                  # Q4
+                  # Q4 = FY - 9M
                   if (
                       nine
                       and full
@@ -603,9 +580,7 @@ jobs:
                           full
                       )
                   ):
-
                       result.append({
-
                           "end":
                               full.get("end"),
 
@@ -623,24 +598,18 @@ jobs:
                               full.get("filed"),
 
                           "source":
-                              "DERIVED_FY_MINUS_9M"
+                              "DERIVED_FY_MINUS_9M",
                       })
-
 
               return result
 
 
           # ============================================================
-          # QUARTALE NACH ECHTEM ENDDATUM
-          #
-          # Hier liegt die wichtigste V4-Änderung.
-          # Ein Enddatum = eine wirtschaftliche Periode.
+          # QUARTALSREIHE
           # ============================================================
 
           def build_quarters(rows):
-
               rows = dedupe_rows(rows)
-
 
               candidates = (
                   derived_quarters(rows)
@@ -648,49 +617,32 @@ jobs:
                   direct_quarters(rows)
               )
 
-
               best_by_end = {}
-
 
               for row in candidates:
 
                   end = row.get("end")
 
-
                   if not end:
                       continue
 
-
-                  old = best_by_end.get(
-                      end
-                  )
-
+                  old = best_by_end.get(end)
 
                   if old is None:
-
                       best_by_end[end] = row
-
                       continue
 
-
-                  # Direktes Einzelquartal
-                  # bevorzugen.
                   if (
-                      row.get("source")
-                      == "DIRECT"
-                      and old.get("source")
-                      != "DIRECT"
+                      row.get("source") == "DIRECT"
+                      and old.get("source") != "DIRECT"
                   ):
-
                       best_by_end[end] = row
-
                       continue
 
-
-                  # Neueste Einreichung
                   if (
                       row.get("source")
-                      == old.get("source")
+                      ==
+                      old.get("source")
                       and (
                           row.get("filed")
                           or ""
@@ -699,89 +651,57 @@ jobs:
                           or ""
                       )
                   ):
-
                       best_by_end[end] = row
-
 
               quarters = list(
                   best_by_end.values()
               )
 
-
               quarters.sort(
                   key=lambda x:
-                      x.get("end")
-                      or ""
+                      x.get("end") or ""
               )
 
-
-              # --------------------------------------------------------
-              # Quartalsfolge prüfen.
-              #
-              # Nur Perioden behalten, deren Abstand
-              # zu benachbarten Quartalen plausibel ist.
-              # --------------------------------------------------------
-
               clean = []
-
 
               for row in quarters:
 
                   if not clean:
-
                       clean.append(row)
-
                       continue
-
 
                   gap = date_gap_days(
                       row.get("end"),
                       clean[-1].get("end")
                   )
 
-
                   if gap is None:
                       continue
 
-
-                  # Gleiche/fast gleiche Periode
                   if gap < 45:
-
-                      # neueren Kandidaten verwenden
                       clean[-1] = row
-
                       continue
-
 
                   clean.append(row)
 
-
-              # Bullwerk Sequence
               for index, row in enumerate(
                   clean
               ):
-
                   row[
                       "sequence"
                   ] = index + 1
 
-
               clean.sort(
                   key=lambda x:
-                      x.get("end")
-                      or "",
+                      x.get("end") or "",
                   reverse=True
               )
-
 
               return clean
 
 
           # ============================================================
-          # YOY NACH ECHTEM DATUM
-          #
-          # Wir suchen ein Quartal ca. 1 Jahr zurück.
-          # SEC FY spielt hier KEINE Rolle.
+          # YOY
           # ============================================================
 
           def find_prior_year(
@@ -793,39 +713,31 @@ jobs:
                   current.get("end")
               )
 
-
               if not current_end:
                   return None
 
-
               candidates = []
-
 
               for row in quarters:
 
                   if row is current:
                       continue
 
-
                   older_end = parse_date(
                       row.get("end")
                   )
 
-
                   if not older_end:
                       continue
-
 
                   gap = (
                       current_end
                       - older_end
                   ).days
 
-
                   if (
                       330 <= gap <= 400
                   ):
-
                       candidates.append(
                           (
                               abs(
@@ -835,23 +747,16 @@ jobs:
                           )
                       )
 
-
               if not candidates:
                   return None
-
 
               candidates.sort(
                   key=lambda x:
                       x[0]
               )
 
-
               return candidates[0][1]
 
-
-          # ============================================================
-          # YOY
-          # ============================================================
 
           def yoy_growth(
               current,
@@ -867,14 +772,15 @@ jobs:
               if previous == 0:
                   return None
 
-
               return (
                   (
                       current
                       - previous
                   )
-                  / abs(previous)
-                  * 100
+                  /
+                  abs(previous)
+                  *
+                  100
               )
 
 
@@ -884,498 +790,1520 @@ jobs:
 
               result = []
 
-
               for current in quarters:
 
-                  previous = (
-                      find_prior_year(
-                          current,
-                          quarters
-                      )
+                  previous = find_prior_year(
+                      current,
+                      quarters
                   )
-
 
                   if not previous:
                       continue
 
-
-                  growth = yoy_growth(
+                  yoy = yoy_growth(
                       current.get("value"),
                       previous.get("value")
                   )
 
-
-                  if growth is None:
+                  if yoy is None:
                       continue
 
+                  item = dict(current)
 
-                  result.append({
+                  item["yoy"] = yoy
 
-                      "end":
-                          current.get("end"),
+                  item[
+                      "prior_year_value"
+                  ] = previous.get(
+                      "value"
+                  )
 
-                      "sequence":
-                          current.get(
-                              "sequence"
-                          ),
+                  item[
+                      "prior_year_end"
+                  ] = previous.get(
+                      "end"
+                  )
 
-                      "value":
-                          current.get(
-                              "value"
-                          ),
-
-                      "previous_end":
-                          previous.get(
-                              "end"
-                          ),
-
-                      "previous_value":
-                          previous.get(
-                              "value"
-                          ),
-
-                      "yoy":
-                          growth,
-
-                      "sec_fy":
-                          current.get(
-                              "sec_fy"
-                          ),
-
-                      "sec_fp":
-                          current.get(
-                              "sec_fp"
-                          )
-                  })
-
+                  result.append(
+                      item
+                  )
 
               result.sort(
                   key=lambda x:
-                      x.get("end")
-                      or "",
+                      x.get("end") or "",
                   reverse=True
               )
-
 
               return result
 
 
           # ============================================================
           # BESCHLEUNIGUNG
-          #
-          # Nur das unmittelbar vorherige echte Quartal.
           # ============================================================
 
-          def add_acceleration(
-              series
-          ):
+          def add_acceleration(series):
+              if not series:
+                  return []
 
               result = []
 
-
-              for i, row in enumerate(
+              for index, row in enumerate(
                   series
               ):
 
-                  new_row = dict(row)
+                  item = dict(row)
 
-                  new_row[
-                      "acceleration"
-                  ] = None
+                  if (
+                      index + 1
+                      < len(series)
+                  ):
 
-
-                  if i + 1 < len(series):
-
-                      older = series[
-                          i + 1
-                      ]
-
-
-                      gap = date_gap_days(
-                          row.get("end"),
-                          older.get("end")
+                      older = (
+                          series[
+                              index + 1
+                          ]
                       )
 
+                      item[
+                          "acceleration"
+                      ] = (
+                          row["yoy"]
+                          -
+                          older["yoy"]
+                      )
 
-                      if (
-                          gap is not None
-                          and 60 <= gap <= 120
-                      ):
-
-                          new_row[
-                              "acceleration"
-                          ] = (
-                              row["yoy"]
-                              - older["yoy"]
-                          )
-
+                  else:
+                      item[
+                          "acceleration"
+                      ] = None
 
                   result.append(
-                      new_row
+                      item
                   )
-
 
               return result
 
 
           # ============================================================
-          # OPERATIVE MARGE
+          # MARGE
           # ============================================================
 
-          def build_margin_series(
-              revenue,
-              operating_income
-          ):
-
-              op_lookup = {
-
+          def map_by_end(rows):
+              return {
                   row.get("end"): row
-
-                  for row in operating_income
-
+                  for row in rows
                   if row.get("end")
               }
 
 
-              result = []
+          def build_margin_series(
+              revenue_rows,
+              operating_rows
+          ):
 
+              revenue_map = map_by_end(
+                  revenue_rows
+              )
 
-              for rev in revenue:
+              operating_map = map_by_end(
+                  operating_rows
+              )
 
-                  end = rev.get("end")
+              common = sorted(
+                  set(revenue_map)
+                  &
+                  set(operating_map),
+                  reverse=True
+              )
 
-                  op = op_lookup.get(end)
+              margins = []
 
+              for end in common:
 
-                  if not op:
-                      continue
-
-
-                  revenue_value = (
-                      rev.get("value")
+                  revenue = (
+                      revenue_map[end]
+                      .get("value")
                   )
 
-                  operating_value = (
-                      op.get("value")
+                  operating = (
+                      operating_map[end]
+                      .get("value")
                   )
-
 
                   if (
-                      revenue_value is None
-                      or revenue_value == 0
-                      or operating_value
-                      is None
+                      revenue is None
+                      or operating is None
+                      or revenue == 0
                   ):
                       continue
 
+                  margin = (
+                      operating
+                      /
+                      revenue
+                      *
+                      100
+                  )
 
-                  result.append({
+                  base = revenue_map[end]
 
+                  margins.append({
                       "end":
                           end,
 
                       "sequence":
-                          rev.get(
+                          base.get(
                               "sequence"
                           ),
 
                       "margin":
-                          (
-                              operating_value
-                              / revenue_value
-                              * 100
-                          )
+                          margin,
+
+                      "margin_change_pp":
+                          None,
                   })
 
+              for row in margins:
 
-              result.sort(
-                  key=lambda x:
-                      x.get("end")
-                      or "",
-                  reverse=True
-              )
-
-
-              for row in result:
-
-                  previous = (
-                      find_prior_year(
-                          row,
-                          result
-                      )
+                  current_end = parse_date(
+                      row["end"]
                   )
 
+                  if not current_end:
+                      continue
 
-                  if previous:
+                  candidates = []
+
+                  for older in margins:
+
+                      if older is row:
+                          continue
+
+                      older_end = parse_date(
+                          older["end"]
+                      )
+
+                      if not older_end:
+                          continue
+
+                      gap = (
+                          current_end
+                          -
+                          older_end
+                      ).days
+
+                      if (
+                          330 <= gap <= 400
+                      ):
+                          candidates.append(
+                              (
+                                  abs(
+                                      gap - 365
+                                  ),
+                                  older
+                              )
+                          )
+
+                  if candidates:
+
+                      candidates.sort(
+                          key=lambda x:
+                              x[0]
+                      )
+
+                      prior = (
+                          candidates[0][1]
+                      )
 
                       row[
                           "margin_change_pp"
                       ] = (
                           row["margin"]
-                          - previous[
-                              "margin"
-                          ]
+                          -
+                          prior["margin"]
                       )
 
-                  else:
-
-                      row[
-                          "margin_change_pp"
-                      ] = None
-
-
-              return result
+              return margins
 
 
           # ============================================================
-          # FREE CASH FLOW
+          # FREE CASHFLOW
           # ============================================================
 
           def build_fcf_series(
-              ocf,
-              capex
+              ocf_rows,
+              capex_rows
           ):
 
-              capex_lookup = {
+              ocf_map = map_by_end(
+                  ocf_rows
+              )
 
-                  row.get("end"): row
+              capex_map = map_by_end(
+                  capex_rows
+              )
 
-                  for row in capex
-
-                  if row.get("end")
-              }
-
+              common = sorted(
+                  set(ocf_map)
+                  &
+                  set(capex_map),
+                  reverse=True
+              )
 
               result = []
 
+              for end in common:
 
-              for ocf_row in ocf:
-
-                  end = ocf_row.get("end")
-
-                  capex_row = (
-                      capex_lookup.get(end)
+                  ocf = (
+                      ocf_map[end]
+                      .get("value")
                   )
 
-
-                  if not capex_row:
-                      continue
-
-
-                  ocf_value = (
-                      ocf_row.get("value")
+                  capex = (
+                      capex_map[end]
+                      .get("value")
                   )
-
-                  capex_value = (
-                      capex_row.get("value")
-                  )
-
 
                   if (
-                      ocf_value is None
-                      or capex_value is None
+                      ocf is None
+                      or capex is None
                   ):
                       continue
 
+                  base = ocf_map[end]
 
                   result.append({
-
                       "end":
                           end,
 
                       "sequence":
-                          ocf_row.get(
+                          base.get(
                               "sequence"
                           ),
 
-                      "value":
-                          (
-                              ocf_value
-                              - capex_value
+                      "sec_fy":
+                          base.get(
+                              "sec_fy"
                           ),
 
-                      "ocf":
-                          ocf_value,
+                      "sec_fp":
+                          base.get(
+                              "sec_fp"
+                          ),
 
-                      "capex":
-                          capex_value,
+                      "filed":
+                          base.get(
+                              "filed"
+                          ),
 
                       "source":
-                          (
-                              ocf_row.get(
-                                  "source"
-                              )
-                              + " / "
-                              + capex_row.get(
-                                  "source"
-                              )
-                          )
+                          "FCF",
+
+                      "ocf":
+                          ocf,
+
+                      "capex":
+                          capex,
+
+                      "value":
+                          ocf - capex,
                   })
-
-
-              result.sort(
-                  key=lambda x:
-                      x.get("end")
-                      or ""
-              )
-
-
-              # eigene lückenlose Reihenfolge
-              for index, row in enumerate(
-                  result
-              ):
-
-                  row[
-                      "sequence"
-                  ] = index + 1
-
-
-              result.sort(
-                  key=lambda x:
-                      x.get("end")
-                      or "",
-                  reverse=True
-              )
-
 
               return result
 
 
           # ============================================================
-          # FORMAT
+          # ORDERS / BACKLOG V6
           # ============================================================
 
-          def format_acceleration(
-              value
-          ):
+          ORDER_METRICS = {
 
-              if value is None:
-                  return "n/a"
+              "RPO": [
+                  "remaining performance obligations",
+                  "remaining performance obligation",
+              ],
 
-              return (
-                  f"{value:+.2f} PP"
+              "BACKLOG": [
+                  "order backlog",
+                  "contracted backlog",
+                  "backlog",
+              ],
+
+              "BOOKINGS": [
+                  "bookings",
+              ],
+          }
+
+
+          MAX_POSITIVE_JUMP = 75.0
+          MAX_NEGATIVE_JUMP = -50.0
+
+
+          def clean_html(html):
+
+              html = re.sub(
+                  r"(?is)<script.*?>.*?</script>",
+                  " ",
+                  html
               )
 
-
-          def print_growth(
-              title,
-              series,
-              billions=True
-          ):
-
-              print("")
-              print(
-                  f"--- {title} ---"
+              html = re.sub(
+                  r"(?is)<style.*?>.*?</style>",
+                  " ",
+                  html
               )
 
+              html = re.sub(
+                  r"(?i)<br\s*/?>",
+                  ". ",
+                  html
+              )
 
-              if not series:
+              html = re.sub(
+                  r"(?i)</(?:p|div|tr|li|h1|h2|h3|td)>",
+                  ". ",
+                  html
+              )
 
-                  print(
-                      "Keine ausreichenden Daten."
+              html = re.sub(
+                  r"(?is)<[^>]+>",
+                  " ",
+                  html
+              )
+
+              text = unescape(
+                  html
+              )
+
+              text = text.replace(
+                  "\xa0",
+                  " "
+              )
+
+              text = re.sub(
+                  r"\s+",
+                  " ",
+                  text
+              )
+
+              return text.strip()
+
+
+          def money_to_billions(
+              number,
+              unit
+          ):
+
+              try:
+                  value = float(
+                      number.replace(
+                          ",",
+                          ""
+                      )
                   )
 
-                  return
+              except Exception:
+                  return None
 
+              unit = unit.lower()
 
-              for row in series[:8]:
+              if unit in (
+                  "billion",
+                  "billions"
+              ):
+                  return value
 
-                  value = row.get(
-                      "value"
+              if unit in (
+                  "million",
+                  "millions"
+              ):
+                  return (
+                      value
+                      /
+                      1000.0
                   )
 
+              if unit in (
+                  "trillion",
+                  "trillions"
+              ):
+                  return (
+                      value
+                      *
+                      1000.0
+                  )
 
-                  if billions:
-
-                      value_text = (
-                          f"{value / 1_000_000_000:.3f} Mrd."
-                      )
-
-                  else:
-
-                      value_text = (
-                          f"{value:.2f}"
-                      )
+              return None
 
 
-                  print(
-                      row.get("end"),
-                      "| BQ",
-                      row.get(
-                          "sequence"
-                      ),
-                      "| SEC:",
-                      row.get(
-                          "sec_fy",
-                          "-"
-                      ),
-                      row.get(
-                          "sec_fp",
-                          "-"
-                      ),
-                      "| Wert:",
-                      value_text,
-                      "| YoY:",
-                      f"{row['yoy']:+.2f} %",
-                      "| Beschleunigung:",
-                      format_acceleration(
-                          row.get(
-                              "acceleration"
+          def find_metric_passages(
+              text
+          ):
+
+              sentences = re.split(
+                  r"(?<=[.!?])\s+",
+                  text
+              )
+
+              results = []
+
+              for index, sentence in enumerate(
+                  sentences
+              ):
+
+                  lower = sentence.lower()
+
+                  found_metric = None
+
+                  for metric, terms in (
+                      ORDER_METRICS.items()
+                  ):
+
+                      if any(
+                          term in lower
+                          for term in terms
+                      ):
+                          found_metric = metric
+                          break
+
+                  if not found_metric:
+                      continue
+
+                  start = max(
+                      0,
+                      index - 1
+                  )
+
+                  end = min(
+                      len(sentences),
+                      index + 2
+                  )
+
+                  passage = " ".join(
+                      sentences[
+                          start:end
+                      ]
+                  ).strip()
+
+                  if (
+                      40
+                      <=
+                      len(passage)
+                      <=
+                      3000
+                  ):
+                      results.append({
+                          "metric":
+                              found_metric,
+
+                          "text":
+                              passage,
+                      })
+
+              return results
+
+
+          def extract_money_values(
+              passage
+          ):
+
+              text = passage["text"]
+
+              values = []
+
+              patterns = [
+
+                  (
+                      r"\$\s*"
+                      r"([0-9]+(?:\.[0-9]+)?)"
+                      r"\s*"
+                      r"(billion|billions|million|millions|"
+                      r"trillion|trillions)"
+                  ),
+
+                  (
+                      r"([0-9]+(?:\.[0-9]+)?)"
+                      r"\s*"
+                      r"(billion|billions|million|millions|"
+                      r"trillion|trillions)"
+                      r"\s+"
+                      r"(?:U\.S\.\s*)?dollars"
+                  ),
+              ]
+
+              for pattern in patterns:
+
+                  for match in re.finditer(
+                      pattern,
+                      text,
+                      flags=re.I
+                  ):
+
+                      value = (
+                          money_to_billions(
+                              match.group(1),
+                              match.group(2)
                           )
                       )
+
+                      if value is None:
+                          continue
+
+                      values.append({
+                          "value_bn":
+                              value,
+
+                          "raw":
+                              match.group(0),
+                      })
+
+              return values
+
+
+          def choose_metric_value(
+              passage_text,
+              values
+          ):
+
+              if not values:
+                  return None
+
+              lower = (
+                  passage_text.lower()
+              )
+
+              candidates = []
+
+              for item in values:
+
+                  raw_lower = (
+                      item["raw"].lower()
                   )
 
+                  position = (
+                      lower.find(
+                          raw_lower
+                      )
+                  )
 
-          # ============================================================
-          # CONCEPTS
-          # ============================================================
+                  context = lower[
+                      max(
+                          0,
+                          position - 180
+                      ):
+                      min(
+                          len(lower),
+                          position + 180
+                      )
+                  ]
 
-          concepts = {
+                  recognition_words = [
+                      "recognized",
+                      "recognize",
+                      "recognition",
+                      "next twelve months",
+                      "next 12 months",
+                      "over the next",
+                  ]
 
-              "Revenue": (
-                  [
-                      "RevenueFromContractWithCustomerExcludingAssessedTax",
-                      "SalesRevenueNet",
-                      "Revenues"
-                  ],
-                  ["USD"]
-              ),
+                  candidate = dict(
+                      item
+                  )
 
-              "Net Income": (
-                  [
-                      "NetIncomeLoss"
-                  ],
-                  ["USD"]
-              ),
+                  candidate[
+                      "recognition_context"
+                  ] = any(
+                      word in context
+                      for word in recognition_words
+                  )
 
-              "Operating Income": (
-                  [
-                      "OperatingIncomeLoss"
-                  ],
-                  ["USD"]
-              ),
+                  candidates.append(
+                      candidate
+                  )
 
-              "Diluted EPS": (
-                  [
-                      "EarningsPerShareDiluted"
-                  ],
-                  ["USD/shares"]
-              ),
+              preferred = [
+                  item
+                  for item in candidates
+                  if not item[
+                      "recognition_context"
+                  ]
+              ]
 
-              "Operating Cash Flow": (
-                  [
-                      "NetCashProvidedByUsedInOperatingActivities"
-                  ],
-                  ["USD"]
-              ),
-
-              "Capital Expenditure": (
-                  [
-                      "PaymentsToAcquirePropertyPlantAndEquipment"
-                  ],
-                  ["USD"]
+              pool = (
+                  preferred
+                  if preferred
+                  else candidates
               )
-          }
+
+              if not pool:
+                  return None
+
+              return max(
+                  pool,
+                  key=lambda x:
+                      x["value_bn"]
+              )
+
+
+          def analyse_order_text(
+              text
+          ):
+
+              passages = (
+                  find_metric_passages(
+                      text
+                  )
+              )
+
+              candidates = []
+
+              for passage in passages:
+
+                  values = (
+                      extract_money_values(
+                          passage
+                      )
+                  )
+
+                  chosen = (
+                      choose_metric_value(
+                          passage["text"],
+                          values
+                      )
+                  )
+
+                  if chosen:
+
+                      candidates.append({
+                          "metric":
+                              passage["metric"],
+
+                          "value_bn":
+                              chosen["value_bn"],
+
+                          "raw":
+                              chosen["raw"],
+                      })
+
+              best_by_metric = {}
+
+              for candidate in candidates:
+
+                  metric = (
+                      candidate["metric"]
+                  )
+
+                  if (
+                      metric
+                      not in best_by_metric
+                  ):
+                      best_by_metric[
+                          metric
+                      ] = candidate
+
+                  elif (
+                      candidate["value_bn"]
+                      >
+                      best_by_metric[
+                          metric
+                      ]["value_bn"]
+                  ):
+                      best_by_metric[
+                          metric
+                      ] = candidate
+
+              return best_by_metric
+
+
+          def load_sec_filings(
+              cik
+          ):
+
+              url = (
+                  "https://data.sec.gov/"
+                  f"submissions/CIK{cik}.json"
+              )
+
+              request = urllib.request.Request(
+                  url,
+                  headers=HEADERS
+              )
+
+              try:
+
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=30
+                  ) as response:
+
+                      data = json.loads(
+                          response.read().decode(
+                              "utf-8"
+                          )
+                      )
+
+              except Exception as error:
+
+                  print(
+                      "SEC Submissions Fehler:",
+                      error
+                  )
+
+                  return []
+
+              recent = (
+                  data.get(
+                      "filings",
+                      {}
+                  ).get(
+                      "recent",
+                      {}
+                  )
+              )
+
+              filings = []
+
+              forms = recent.get(
+                  "form",
+                  []
+              )
+
+              accessions = recent.get(
+                  "accessionNumber",
+                  []
+              )
+
+              documents = recent.get(
+                  "primaryDocument",
+                  []
+              )
+
+              dates = recent.get(
+                  "filingDate",
+                  []
+              )
+
+              for (
+                  form,
+                  accession,
+                  document,
+                  filing_date
+              ) in zip(
+                  forms,
+                  accessions,
+                  documents,
+                  dates
+              ):
+
+                  if form not in (
+                      "10-Q",
+                      "10-K"
+                  ):
+                      continue
+
+                  filings.append({
+                      "form":
+                          form,
+
+                      "accession":
+                          accession,
+
+                      "document":
+                          document,
+
+                      "filing_date":
+                          filing_date,
+                  })
+
+                  if len(filings) >= 12:
+                      break
+
+              return filings
+
+
+          def load_filing_document(
+              cik,
+              filing
+          ):
+
+              accession = (
+                  filing[
+                      "accession"
+                  ].replace(
+                      "-",
+                      ""
+                  )
+              )
+
+              cik_number = str(
+                  int(cik)
+              )
+
+              url = (
+                  "https://www.sec.gov/"
+                  "Archives/edgar/data/"
+                  f"{cik_number}/"
+                  f"{accession}/"
+                  f"{filing['document']}"
+              )
+
+              request = urllib.request.Request(
+                  url,
+                  headers=HEADERS
+              )
+
+              try:
+
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=30
+                  ) as response:
+
+                      html = (
+                          response.read()
+                          .decode(
+                              "utf-8",
+                              errors="ignore"
+                          )
+                      )
+
+              except Exception as error:
+
+                  print(
+                      "Filing Fehler:",
+                      filing[
+                          "filing_date"
+                      ],
+                      error
+                  )
+
+                  return None
+
+              metrics = (
+                  analyse_order_text(
+                      clean_html(
+                          html
+                      )
+                  )
+              )
+
+              return {
+                  "filing_date":
+                      filing[
+                          "filing_date"
+                      ],
+
+                  "form":
+                      filing["form"],
+
+                  "metrics":
+                      metrics,
+              }
+
+
+          def order_change(
+              current,
+              previous
+          ):
+
+              if (
+                  current is None
+                  or previous is None
+                  or previous <= 0
+              ):
+                  return None
+
+              return (
+                  (
+                      current
+                      /
+                      previous
+                  )
+                  -
+                  1
+              ) * 100
+
+
+          def score_orders_change(
+              change
+          ):
+
+              if change is None:
+
+                  return {
+                      "score":
+                          None,
+
+                      "status":
+                          "N/A",
+
+                      "reason":
+                          "Keine Veränderung berechenbar.",
+                  }
+
+              if (
+                  change
+                  >
+                  MAX_POSITIVE_JUMP
+              ):
+
+                  return {
+                      "score":
+                          None,
+
+                      "status":
+                          "CHECK_REQUIRED",
+
+                      "reason":
+                          "Ungewöhnlich großer positiver Sprung.",
+                  }
+
+              if (
+                  change
+                  <
+                  MAX_NEGATIVE_JUMP
+              ):
+
+                  return {
+                      "score":
+                          None,
+
+                      "status":
+                          "CHECK_REQUIRED",
+
+                      "reason":
+                          "Ungewöhnlich großer negativer Sprung.",
+                  }
+
+              if change >= 15:
+
+                  return {
+                      "score":
+                          3,
+
+                      "status":
+                          "STRONG_POSITIVE",
+
+                      "reason":
+                          "Starkes Wachstum.",
+                  }
+
+              if change >= 5:
+
+                  return {
+                      "score":
+                          3,
+
+                      "status":
+                          "POSITIVE",
+
+                      "reason":
+                          "Klare positive Entwicklung.",
+                  }
+
+              if change >= -5:
+
+                  return {
+                      "score":
+                          2,
+
+                      "status":
+                          "STABLE",
+
+                      "reason":
+                          "Stabile bis leicht positive Entwicklung.",
+                  }
+
+              if change >= -15:
+
+                  return {
+                      "score":
+                          1,
+
+                      "status":
+                          "CAUTIOUS",
+
+                      "reason":
+                          "Moderate Verschlechterung.",
+                  }
+
+              return {
+                  "score":
+                      0,
+
+                  "status":
+                      "WEAKER",
+
+                  "reason":
+                      "Deutliche Verschlechterung.",
+              }
+
+
+          def build_order_comparison(
+              filing_results,
+              metric
+          ):
+
+              observations = []
+
+              for result in filing_results:
+
+                  if (
+                      metric
+                      in result["metrics"]
+                  ):
+
+                      observations.append({
+                          "date":
+                              result[
+                                  "filing_date"
+                              ],
+
+                          "form":
+                              result["form"],
+
+                          "value":
+                              result[
+                                  "metrics"
+                              ][
+                                  metric
+                              ][
+                                  "value_bn"
+                              ],
+                      })
+
+              if len(
+                  observations
+              ) < 2:
+                  return None
+
+              # SEC submissions sind neu -> alt.
+              current = observations[0]
+              previous = observations[1]
+
+              change = order_change(
+                  current["value"],
+                  previous["value"]
+              )
+
+              scoring = (
+                  score_orders_change(
+                      change
+                  )
+              )
+
+              return {
+                  "metric":
+                      metric,
+
+                  "current":
+                      current,
+
+                  "previous":
+                      previous,
+
+                  "change":
+                      change,
+
+                  "score":
+                      scoring["score"],
+
+                  "status":
+                      scoring["status"],
+
+                  "reason":
+                      scoring["reason"],
+              }
+
+
+          def get_orders_backlog(
+              cik
+          ):
+
+              filings = (
+                  load_sec_filings(
+                      cik
+                  )
+              )
+
+              results = []
+
+              for filing in filings:
+
+                  result = (
+                      load_filing_document(
+                          cik,
+                          filing
+                      )
+                  )
+
+                  if result:
+                      results.append(
+                          result
+                      )
+
+                  time.sleep(
+                      0.12
+                  )
+
+              comparisons = []
+
+              for metric in (
+                  "RPO",
+                  "BACKLOG",
+                  "BOOKINGS"
+              ):
+
+                  comparison = (
+                      build_order_comparison(
+                          results,
+                          metric
+                      )
+                  )
+
+                  if comparison:
+                      comparisons.append(
+                          comparison
+                      )
+
+              if not comparisons:
+
+                  return {
+                      "score":
+                          None,
+
+                      "status":
+                          "N/A",
+
+                      "metric":
+                          None,
+
+                      "changePct":
+                          None,
+
+                      "currentValueBn":
+                          None,
+
+                      "previousValueBn":
+                          None,
+
+                      "currentForm":
+                          None,
+
+                      "previousForm":
+                          None,
+
+                      "currentFilingDate":
+                          None,
+
+                      "previousFilingDate":
+                          None,
+
+                      "reason":
+                          (
+                              "Keine zwei vergleichbaren "
+                              "RPO-, Backlog- oder "
+                              "Bookings-Werte gefunden."
+                          ),
+                  }
+
+              # Priorität:
+              # echter Backlog vor Bookings vor RPO.
+              priority = {
+                  "BACKLOG": 3,
+                  "BOOKINGS": 2,
+                  "RPO": 1,
+              }
+
+              comparisons.sort(
+                  key=lambda x:
+                      priority[
+                          x["metric"]
+                      ],
+                  reverse=True
+              )
+
+              best = comparisons[0]
+
+              return {
+                  "score":
+                      best["score"],
+
+                  "status":
+                      best["status"],
+
+                  "metric":
+                      best["metric"],
+
+                  "changePct":
+                      (
+                          round(
+                              best["change"],
+                              1
+                          )
+                          if best[
+                              "change"
+                          ] is not None
+                          else None
+                      ),
+
+                  "currentValueBn":
+                      round(
+                          best[
+                              "current"
+                          ][
+                              "value"
+                          ],
+                          3
+                      ),
+
+                  "previousValueBn":
+                      round(
+                          best[
+                              "previous"
+                          ][
+                              "value"
+                          ],
+                          3
+                      ),
+
+                  "currentForm":
+                      best[
+                          "current"
+                      ][
+                          "form"
+                      ],
+
+                  "previousForm":
+                      best[
+                          "previous"
+                      ][
+                          "form"
+                      ],
+
+                  "currentFilingDate":
+                      best[
+                          "current"
+                      ][
+                          "date"
+                      ],
+
+                  "previousFilingDate":
+                      best[
+                          "previous"
+                      ][
+                          "date"
+                      ],
+
+                  "reason":
+                      best["reason"],
+              }
+
+
+          # ============================================================
+          # FUNDAMENTAL SCORE
+          # ============================================================
+
+          def score_revenue(row):
+
+              if (
+                  not row
+                  or row.get("yoy")
+                  is None
+              ):
+                  return None
+
+              yoy = row["yoy"]
+
+              acc = row.get(
+                  "acceleration"
+              )
+
+              acc = (
+                  0
+                  if acc is None
+                  else acc
+              )
+
+              if (
+                  (
+                      yoy >= 15
+                      and acc > 0
+                  )
+                  or
+                  (
+                      yoy >= 25
+                      and acc >= -3
+                  )
+              ):
+                  return 4
+
+              if (
+                  (
+                      yoy >= 8
+                      and acc >= 0
+                  )
+                  or
+                  (
+                      yoy >= 15
+                      and acc >= -8
+                  )
+              ):
+                  return 3
+
+              if yoy >= 3:
+                  return 2
+
+              if yoy >= 0:
+                  return 1
+
+              return 0
+
+
+          def score_profit_eps(
+              income_row,
+              eps_row
+          ):
+
+              values = []
+
+              for row in (
+                  income_row,
+                  eps_row
+              ):
+
+                  if (
+                      row
+                      and row.get("yoy")
+                      is not None
+                  ):
+
+                      acc = row.get(
+                          "acceleration"
+                      )
+
+                      acc = (
+                          0
+                          if acc is None
+                          else acc
+                      )
+
+                      values.append(
+                          (
+                              row["yoy"],
+                              acc
+                          )
+                      )
+
+              if not values:
+                  return None
+
+              growth = max(
+                  value[0]
+                  for value in values
+              )
+
+              acceleration = max(
+                  value[1]
+                  for value in values
+              )
+
+              if (
+                  growth >= 20
+                  and acceleration > 0
+              ):
+                  return 4
+
+              if (
+                  (
+                      growth >= 10
+                      and acceleration >= 0
+                  )
+                  or
+                  (
+                      growth >= 20
+                      and acceleration >= -8
+                  )
+              ):
+                  return 3
+
+              if growth >= 3:
+                  return 2
+
+              if growth >= 0:
+                  return 1
+
+              return 0
+
+
+          def score_margin(row):
+
+              if not row:
+                  return None
+
+              change = row.get(
+                  "margin_change_pp"
+              )
+
+              if change is None:
+                  return None
+
+              if change >= 1.0:
+                  return 3
+
+              if change >= 0.25:
+                  return 2
+
+              if change >= -0.25:
+                  return 1
+
+              return 0
+
+
+          def score_fcf(row):
+
+              if (
+                  not row
+                  or row.get("yoy")
+                  is None
+              ):
+                  return None
+
+              yoy = row["yoy"]
+
+              acc = row.get(
+                  "acceleration"
+              )
+
+              acc = (
+                  0
+                  if acc is None
+                  else acc
+              )
+
+              if (
+                  yoy >= 15
+                  and acc >= 0
+              ):
+                  return 3
+
+              if (
+                  (
+                      yoy >= 5
+                      and acc >= 0
+                  )
+                  or
+                  (
+                      yoy >= 15
+                      and acc >= -8
+                  )
+              ):
+                  return 2
+
+              if yoy >= 0:
+                  return 1
+
+              return 0
 
 
           # ============================================================
@@ -1384,8 +2312,9 @@ jobs:
 
           fundamental_results = []
 
+
           for symbol, cik in (
-              companies.items()
+              COMPANIES.items()
           ):
 
               print("")
@@ -1393,11 +2322,15 @@ jobs:
 
               print(
                   "BULLWERK FUNDAMENTAL "
-                  f"MOMENTUM V5: {symbol}"
+                  f"MOMENTUM V8: {symbol}"
               )
 
               print("=" * 90)
 
+
+              # --------------------------------------------------------
+              # COMPANYFACTS
+              # --------------------------------------------------------
 
               url = (
                   "https://data.sec.gov/"
@@ -1415,7 +2348,7 @@ jobs:
               except Exception as error:
 
                   print(
-                      "SEC FEHLER:",
+                      "SEC COMPANYFACTS FEHLER:",
                       error
                   )
 
@@ -1436,7 +2369,7 @@ jobs:
               for label, (
                   concept_names,
                   units
-              ) in concepts.items():
+              ) in CONCEPTS.items():
 
                   concept, rows = (
                       get_concept_rows(
@@ -1446,18 +2379,17 @@ jobs:
                       )
                   )
 
-
                   quarters = (
-                      build_quarters(rows)
+                      build_quarters(
+                          rows
+                      )
                       if rows
                       else []
                   )
 
-
                   company_data[
                       label
                   ] = quarters
-
 
                   print(
                       label,
@@ -1469,9 +2401,9 @@ jobs:
                   )
 
 
-              # ========================================================
+              # --------------------------------------------------------
               # UMSATZ
-              # ========================================================
+              # --------------------------------------------------------
 
               revenue = (
                   add_acceleration(
@@ -1484,15 +2416,9 @@ jobs:
               )
 
 
-              print_growth(
-                  "UMSATZ MOMENTUM",
-                  revenue
-              )
-
-
-              # ========================================================
+              # --------------------------------------------------------
               # GEWINN
-              # ========================================================
+              # --------------------------------------------------------
 
               income = (
                   add_acceleration(
@@ -1505,15 +2431,9 @@ jobs:
               )
 
 
-              print_growth(
-                  "GEWINN MOMENTUM",
-                  income
-              )
-
-
-              # ========================================================
+              # --------------------------------------------------------
               # EPS
-              # ========================================================
+              # --------------------------------------------------------
 
               eps = (
                   add_acceleration(
@@ -1526,16 +2446,9 @@ jobs:
               )
 
 
-              print_growth(
-                  "EPS MOMENTUM",
-                  eps,
-                  billions=False
-              )
-
-
-              # ========================================================
+              # --------------------------------------------------------
               # MARGE
-              # ========================================================
+              # --------------------------------------------------------
 
               margins = (
                   build_margin_series(
@@ -1549,40 +2462,9 @@ jobs:
               )
 
 
-              print("")
-              print(
-                  "--- OPERATIVE MARGE ---"
-              )
-
-
-              for row in margins[:8]:
-
-                  change = row.get(
-                      "margin_change_pp"
-                  )
-
-
-                  print(
-                      row.get("end"),
-                      "| BQ",
-                      row.get(
-                          "sequence"
-                      ),
-                      "| Marge:",
-                      f"{row['margin']:.2f} %",
-                      "| YoY:",
-                      (
-                          f"{change:+.2f} PP"
-                          if change
-                          is not None
-                          else "n/a"
-                      )
-                  )
-
-
-              # ========================================================
+              # --------------------------------------------------------
               # FCF
-              # ========================================================
+              # --------------------------------------------------------
 
               fcf_quarters = (
                   build_fcf_series(
@@ -1596,33 +2478,6 @@ jobs:
               )
 
 
-              print("")
-              print(
-                  "--- FCF EINZELQUARTALE ---"
-              )
-
-
-              for row in (
-                  fcf_quarters[:12]
-              ):
-
-                  print(
-                      row.get("end"),
-                      "| BQ",
-                      row.get(
-                          "sequence"
-                      ),
-                      "| FCF:",
-                      f"{row['value'] / 1_000_000_000:.3f} Mrd.",
-                      "| OCF:",
-                      f"{row['ocf'] / 1_000_000_000:.3f}",
-                      "| CapEx:",
-                      f"{row['capex'] / 1_000_000_000:.3f}",
-                      "|",
-                      row.get("source")
-                  )
-
-
               fcf = (
                   add_acceleration(
                       build_yoy_series(
@@ -1632,22 +2487,9 @@ jobs:
               )
 
 
-              print_growth(
-                  "FREE CASH FLOW MOMENTUM",
-                  fcf
-              )
-
-
-              # ========================================================
-              # SNAPSHOT
-              # ========================================================
-
-              print("")
-              print(
-                  "--- AKTUELLER "
-                  "FUNDAMENTAL SNAPSHOT ---"
-              )
-
+              # --------------------------------------------------------
+              # AKTUELLSTER WERT
+              # --------------------------------------------------------
 
               def latest(series):
 
@@ -1657,208 +2499,195 @@ jobs:
                   return series[0]
 
 
-              current_revenue = (
-                  latest(revenue)
+              current_revenue = latest(
+                  revenue
               )
 
-              current_income = (
-                  latest(income)
+              current_income = latest(
+                  income
               )
 
-              current_eps = (
-                  latest(eps)
+              current_eps = latest(
+                  eps
               )
 
-              current_margin = (
-                  latest(margins)
+              current_margin = latest(
+                  margins
               )
 
-              current_fcf = (
-                  latest(fcf)
+              current_fcf = latest(
+                  fcf
               )
 
 
-              if current_revenue:
+              # --------------------------------------------------------
+              # ORDERS / BACKLOG V6
+              # --------------------------------------------------------
+
+              print("")
+              print(
+                  "--- ORDERS / BACKLOG V6 ---"
+              )
+
+
+              try:
+
+                  orders_result = (
+                      get_orders_backlog(
+                          cik
+                      )
+                  )
+
+              except Exception as error:
 
                   print(
-                      "Umsatz YoY:",
-                      f"{current_revenue['yoy']:+.2f} %",
-                      "| Beschleunigung:",
-                      format_acceleration(
-                          current_revenue.get(
-                              "acceleration"
-                          )
-                      )
+                      "Orders/Backlog Fehler:",
+                      repr(error)
                   )
 
+                  orders_result = {
+                      "score": None,
+                      "status": "N/A",
+                      "metric": None,
+                      "changePct": None,
+                      "currentValueBn": None,
+                      "previousValueBn": None,
+                      "currentForm": None,
+                      "previousForm": None,
+                      "currentFilingDate": None,
+                      "previousFilingDate": None,
+                      "reason":
+                          "Technischer Fehler bei Orders/Backlog.",
+                  }
 
-              if current_income:
 
-                  print(
-                      "Gewinn YoY:",
-                      f"{current_income['yoy']:+.2f} %",
-                      "| Beschleunigung:",
-                      format_acceleration(
-                          current_income.get(
-                              "acceleration"
-                          )
-                      )
+              print(
+                  "METRIK:",
+                  orders_result[
+                      "metric"
+                  ]
+              )
+
+              print(
+                  "VERÄNDERUNG:",
+                  (
+                      f"{orders_result['changePct']:+.1f}%"
+                      if orders_result[
+                          "changePct"
+                      ] is not None
+                      else "N/A"
                   )
+              )
 
+              print(
+                  "STATUS:",
+                  orders_result[
+                      "status"
+                  ]
+              )
 
-              if current_eps:
-
-                  print(
-                      "EPS YoY:",
-                      f"{current_eps['yoy']:+.2f} %",
-                      "| Beschleunigung:",
-                      format_acceleration(
-                          current_eps.get(
-                              "acceleration"
-                          )
-                      )
+              print(
+                  "SCORE:",
+                  (
+                      f"{orders_result['score']}/3"
+                      if orders_result[
+                          "score"
+                      ] is not None
+                      else "N/A"
                   )
+              )
 
-
-              if current_margin:
-
-                  change = (
-                      current_margin.get(
-                          "margin_change_pp"
-                      )
-                  )
-
-
-                  print(
-                      "Operative Marge:",
-                      f"{current_margin['margin']:.2f} %",
-                      "| YoY:",
-                      (
-                          f"{change:+.2f} PP"
-                          if change
-                          is not None
-                          else "n/a"
-                      )
-                  )
-
-
-              if current_fcf:
-
-                  print(
-                      "FCF YoY:",
-                      f"{current_fcf['yoy']:+.2f} %",
-                      "| Beschleunigung:",
-                      format_acceleration(
-                          current_fcf.get(
-                              "acceleration"
-                          )
-                      )
-                  )
+              print(
+                  "GRUND:",
+                  orders_result[
+                      "reason"
+                  ]
+              )
 
 
               # ========================================================
-              # BULLWERK FUNDAMENTAL SCORE V5
-              # Umsatz 0-4 | Gewinn/EPS 0-4 | Marge 0-3 | FCF 0-3
-              # Guidance 0-3/N/A | Orders/Backlog 0-3/N/A
-              # N/A wird nicht als 0 gewertet.
+              # SCORES
               # ========================================================
 
-              def score_revenue(row):
-                  if not row or row.get("yoy") is None:
-                      return None
-                  yoy = row["yoy"]
-                  acc = row.get("acceleration")
-                  acc = 0 if acc is None else acc
+              revenue_score = (
+                  score_revenue(
+                      current_revenue
+                  )
+              )
 
-                  if (yoy >= 15 and acc > 0) or (yoy >= 25 and acc >= -3):
-                      return 4
-                  if (yoy >= 8 and acc >= 0) or (yoy >= 15 and acc >= -8):
-                      return 3
-                  if yoy >= 3:
-                      return 2
-                  if yoy >= 0:
-                      return 1
-                  return 0
+              profit_eps_score = (
+                  score_profit_eps(
+                      current_income,
+                      current_eps
+                  )
+              )
 
+              margin_score = (
+                  score_margin(
+                      current_margin
+                  )
+              )
 
-              def score_profit_eps(income_row, eps_row):
-                  values = []
-
-                  for row in (income_row, eps_row):
-                      if row and row.get("yoy") is not None:
-                          acc = row.get("acceleration")
-                          acc = 0 if acc is None else acc
-                          values.append((row["yoy"], acc))
-
-                  if not values:
-                      return None
-
-                  growth = max(v[0] for v in values)
-                  acc = max(v[1] for v in values)
-
-                  if growth >= 20 and acc > 0:
-                      return 4
-                  if (growth >= 10 and acc >= 0) or (growth >= 20 and acc >= -8):
-                      return 3
-                  if growth >= 3:
-                      return 2
-                  if growth >= 0:
-                      return 1
-                  return 0
+              fcf_score = (
+                  score_fcf(
+                      current_fcf
+                  )
+              )
 
 
-              def score_margin(row):
-                  if not row:
-                      return None
-
-                  change = row.get("margin_change_pp")
-
-                  if change is None:
-                      return None
-                  if change >= 1.0:
-                      return 3
-                  if change >= 0.25:
-                      return 2
-                  if change >= -0.25:
-                      return 1
-                  return 0
-
-
-              def score_fcf(row):
-                  if not row or row.get("yoy") is None:
-                      return None
-
-                  yoy = row["yoy"]
-                  acc = row.get("acceleration")
-                  acc = 0 if acc is None else acc
-
-                  if yoy >= 15 and acc >= 0:
-                      return 3
-                  if (yoy >= 5 and acc >= 0) or (yoy >= 15 and acc >= -8):
-                      return 2
-                  if yoy >= 0:
-                      return 1
-                  return 0
-
-
-              revenue_score = score_revenue(current_revenue)
-              profit_eps_score = score_profit_eps(current_income, current_eps)
-              margin_score = score_margin(current_margin)
-              fcf_score = score_fcf(current_fcf)
-
-              # Guidance und Orders/Backlog bleiben bewusst einfach.
-              # Bis eine eindeutige aktuelle Bewertung vorliegt: N/A.
+              # Guidance bleibt bis zur separaten
+              # Integration des getesteten Guidance-Moduls N/A.
               guidance_score = None
-              orders_backlog_score = None
+
+
+              # V6-Ergebnis.
+              # CHECK_REQUIRED liefert bereits score=None
+              # und fließt deshalb nicht in den Score ein.
+              orders_backlog_score = (
+                  orders_result[
+                      "score"
+                  ]
+              )
+
 
               components = [
-                  ("Umsatz", revenue_score, 4),
-                  ("Gewinn/EPS", profit_eps_score, 4),
-                  ("Marge", margin_score, 3),
-                  ("FCF", fcf_score, 3),
-                  ("Guidance", guidance_score, 3),
-                  ("Orders/Backlog", orders_backlog_score, 3)
+                  (
+                      "Umsatz",
+                      revenue_score,
+                      4
+                  ),
+
+                  (
+                      "Gewinn/EPS",
+                      profit_eps_score,
+                      4
+                  ),
+
+                  (
+                      "Marge",
+                      margin_score,
+                      3
+                  ),
+
+                  (
+                      "FCF",
+                      fcf_score,
+                      3
+                  ),
+
+                  (
+                      "Guidance",
+                      guidance_score,
+                      3
+                  ),
+
+                  (
+                      "Orders/Backlog",
+                      orders_backlog_score,
+                      3
+                  ),
               ]
+
 
               earned = sum(
                   value
@@ -1866,30 +2695,66 @@ jobs:
                   if value is not None
               )
 
+
               available_max = sum(
                   maximum
-                  for _, value, maximum in components
+                  for _, value, maximum
+                  in components
                   if value is not None
               )
 
+
               fundamental_score = (
-                  earned / available_max * 20
+                  (
+                      earned
+                      /
+                      available_max
+                      *
+                      20
+                  )
                   if available_max > 0
                   else None
               )
 
-              print("")
-              print("--- BULLWERK FUNDAMENTAL SCORE V5 ---")
 
-              for label, value, maximum in components:
+              # ========================================================
+              # AUSGABE
+              # ========================================================
+
+              print("")
+              print(
+                  "--- BULLWERK FUNDAMENTAL SCORE V8 ---"
+              )
+
+
+              for (
+                  label,
+                  value,
+                  maximum
+              ) in components:
+
                   if value is None:
-                      print(f"{label}: N/A")
+
+                      print(
+                          f"{label}: N/A"
+                      )
+
                   else:
-                      print(f"{label}: {value}/{maximum}")
+
+                      print(
+                          f"{label}: "
+                          f"{value}/{maximum}"
+                      )
+
 
               if fundamental_score is None:
-                  print("FUNDAMENTAL SCORE: N/A")
+
+                  print(
+                      "FUNDAMENTAL SCORE: N/A"
+                  )
+
               else:
+
                   print(
                       "FUNDAMENTAL SCORE:",
                       f"{fundamental_score:.1f}/20",
@@ -1898,24 +2763,206 @@ jobs:
                   )
 
 
+              # ========================================================
+              # JSON
+              # ========================================================
+
               fundamental_results.append({
-                  "symbol": symbol,
-                  "fundamentalScore": (
-                      round(fundamental_score, 1)
-                      if fundamental_score is not None
-                      else None
-                  ),
-                  "rawPoints": earned,
-                  "availableMax": available_max,
+
+                  "symbol":
+                      symbol,
+
+                  "fundamentalScore":
+                      (
+                          round(
+                              fundamental_score,
+                              1
+                          )
+                          if fundamental_score
+                          is not None
+                          else None
+                      ),
+
+                  "rawPoints":
+                      earned,
+
+                  "availableMax":
+                      available_max,
+
                   "breakdown": {
-                      "revenue": revenue_score,
-                      "profitEps": profit_eps_score,
-                      "margin": margin_score,
-                      "fcf": fcf_score,
-                      "guidance": guidance_score,
-                      "ordersBacklog": orders_backlog_score
-                  }
+
+                      "revenue":
+                          revenue_score,
+
+                      "profitEps":
+                          profit_eps_score,
+
+                      "margin":
+                          margin_score,
+
+                      "fcf":
+                          fcf_score,
+
+                      "guidance":
+                          guidance_score,
+
+                      "ordersBacklog":
+                          orders_backlog_score,
+                  },
+
+                  "ordersBacklogDetails": {
+
+                      "metric":
+                          orders_result[
+                              "metric"
+                          ],
+
+                      "status":
+                          orders_result[
+                              "status"
+                          ],
+
+                      "changePct":
+                          orders_result[
+                              "changePct"
+                          ],
+
+                      "currentValueBn":
+                          orders_result[
+                              "currentValueBn"
+                          ],
+
+                      "previousValueBn":
+                          orders_result[
+                              "previousValueBn"
+                          ],
+
+                      "currentForm":
+                          orders_result[
+                              "currentForm"
+                          ],
+
+                      "previousForm":
+                          orders_result[
+                              "previousForm"
+                          ],
+
+                      "currentFilingDate":
+                          orders_result[
+                              "currentFilingDate"
+                          ],
+
+                      "previousFilingDate":
+                          orders_result[
+                              "previousFilingDate"
+                          ],
+
+                      "reason":
+                          orders_result[
+                              "reason"
+                          ],
+                  },
+
+                  "snapshot": {
+
+                      "revenueYoY":
+                          (
+                              round(
+                                  current_revenue[
+                                      "yoy"
+                                  ],
+                                  2
+                              )
+                              if current_revenue
+                              else None
+                          ),
+
+                      "revenueAcceleration":
+                          (
+                              round(
+                                  current_revenue.get(
+                                      "acceleration"
+                                  ),
+                                  2
+                              )
+                              if (
+                                  current_revenue
+                                  and current_revenue.get(
+                                      "acceleration"
+                                  )
+                                  is not None
+                              )
+                              else None
+                          ),
+
+                      "incomeYoY":
+                          (
+                              round(
+                                  current_income[
+                                      "yoy"
+                                  ],
+                                  2
+                              )
+                              if current_income
+                              else None
+                          ),
+
+                      "epsYoY":
+                          (
+                              round(
+                                  current_eps[
+                                      "yoy"
+                                  ],
+                                  2
+                              )
+                              if current_eps
+                              else None
+                          ),
+
+                      "operatingMargin":
+                          (
+                              round(
+                                  current_margin[
+                                      "margin"
+                                  ],
+                                  2
+                              )
+                              if current_margin
+                              else None
+                          ),
+
+                      "marginChangePP":
+                          (
+                              round(
+                                  current_margin.get(
+                                      "margin_change_pp"
+                                  ),
+                                  2
+                              )
+                              if (
+                                  current_margin
+                                  and current_margin.get(
+                                      "margin_change_pp"
+                                  )
+                                  is not None
+                              )
+                              else None
+                          ),
+
+                      "fcfYoY":
+                          (
+                              round(
+                                  current_fcf[
+                                      "yoy"
+                                  ],
+                                  2
+                              )
+                              if current_fcf
+                              else None
+                          ),
+                  },
               })
+
 
               print("")
               print(
@@ -1923,28 +2970,64 @@ jobs:
                   "abgeschlossen."
               )
 
+              time.sleep(
+                  0.5
+              )
 
-              time.sleep(1)
 
+          # ============================================================
+          # JSON SPEICHERN
+          # ============================================================
 
           os.makedirs(
               "data",
               exist_ok=True
           )
 
+
           output = {
-              "updated": datetime.utcnow().isoformat() + "Z",
-              "version": "bullwerk-fundamental-data-v7",
-              "scoreVersion": "bullwerk-fundamental-v1",
-              "maxScore": 20,
-              "stocks": fundamental_results
+
+              "updated":
+                  datetime.now(
+                      timezone.utc
+                  ).isoformat(),
+
+              "version":
+                  "bullwerk-fundamental-data-v8",
+
+              "scoreVersion":
+                  "bullwerk-fundamental-v2",
+
+              "maxScore":
+                  20,
+
+              "method": {
+                  "missingValues":
+                      "N/A wird nicht als 0 gewertet.",
+
+                  "ordersBacklog":
+                      (
+                          "V6: neuester SEC-Wert gegen "
+                          "unmittelbar vorherigen Wert; "
+                          "extreme Sprünge werden "
+                          "CHECK_REQUIRED."
+                      ),
+
+                  "guidance":
+                      "Noch N/A; separate Integration folgt."
+              },
+
+              "stocks":
+                  fundamental_results,
           }
+
 
           with open(
               "data/fundamental-data.json",
               "w",
               encoding="utf-8"
           ) as file:
+
               json.dump(
                   output,
                   file,
@@ -1952,21 +3035,29 @@ jobs:
                   indent=2
               )
 
-          print("")
-          print("data/fundamental-data.json gespeichert.")
-          print(f"{len(fundamental_results)} Aktien gespeichert.")
 
           print("")
           print("=" * 90)
 
           print(
+              "data/fundamental-data.json "
+              "gespeichert."
+          )
+
+          print(
+              len(
+                  fundamental_results
+              ),
+              "Aktien gespeichert."
+          )
+
+          print(
               "Bullwerk Fundamental "
-              "Momentum Score V7 beendet."
+              "Momentum Score V8 beendet."
           )
 
           print("=" * 90)
 
-          PY
 
       - name: Fundamentaldaten im Repository speichern
         run: |
@@ -1978,6 +3069,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Keine neuen Fundamentaldaten."
           else
-            git commit -m "Update Bullwerk fundamental data v7"
+            git commit -m "Update Bullwerk fundamental data v8"
             git push
           fi
