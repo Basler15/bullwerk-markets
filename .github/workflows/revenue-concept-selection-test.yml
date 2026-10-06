@@ -1,0 +1,551 @@
+name: Bullwerk Revenue Concept Selection Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  revenue-concept-selection-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Revenue Concept Auswahl testen
+        run: |
+          python3 <<'PY'
+
+          import json
+          import urllib.request
+          from datetime import datetime
+
+
+          # ============================================================
+          # BULLWERK MARKETS
+          # REVENUE CONCEPT SELECTION TEST
+          #
+          # Ziel:
+          # Nicht mehr einfach das erste vorhandene SEC-Concept nehmen.
+          #
+          # Stattdessen:
+          # 1. Alle erlaubten Revenue-Concepts prüfen
+          # 2. Brauchbare 10-Q/10-K-Daten ermitteln
+          # 3. Aktualität der Daten vergleichen
+          # 4. Concept mit den aktuellsten Quartalsdaten auswählen
+          #
+          # Der bestehende V7-Scanner wird NICHT verändert.
+          # ============================================================
+
+
+          companies = {
+              "AAPL": "0000320193",
+              "MSFT": "0000789019",
+              "NVDA": "0001045810",
+              "AMD": "0000002488",
+              "AMZN": "0001018724",
+              "META": "0001326801",
+              "GOOGL": "0001652044",
+              "PLTR": "0001321655"
+          }
+
+
+          USER_AGENT = (
+              "Bullwerk Markets "
+              "contact: bullwerkmarkets@gmail.com"
+          )
+
+
+          REVENUE_CONCEPTS = [
+              "RevenueFromContractWithCustomerExcludingAssessedTax",
+              "SalesRevenueNet",
+              "Revenues"
+          ]
+
+
+          # ============================================================
+          # HILFSFUNKTIONEN
+          # ============================================================
+
+          def parse_date(value):
+
+              if not value:
+                  return None
+
+              try:
+                  return datetime.strptime(
+                      value,
+                      "%Y-%m-%d"
+                  ).date()
+
+              except ValueError:
+                  return None
+
+
+          def duration_days(row):
+
+              start = parse_date(
+                  row.get("start")
+              )
+
+              end = parse_date(
+                  row.get("end")
+              )
+
+              if not start or not end:
+                  return None
+
+              return (
+                  end - start
+              ).days + 1
+
+
+          def get_json(url):
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent": USER_AGENT,
+                      "Accept": "application/json",
+                      "Accept-Encoding": "identity"
+                  }
+              )
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+
+                  print(
+                      "HTTP Status:",
+                      response.status
+                  )
+
+                  return json.loads(
+                      response.read().decode(
+                          "utf-8"
+                      )
+                  )
+
+
+          # ============================================================
+          # BRAUCHBARE REVENUE-DATEN
+          # ============================================================
+
+          def get_valid_rows(
+              facts,
+              concept_name
+          ):
+
+              try:
+
+                  units = (
+                      facts["facts"]
+                      ["us-gaap"]
+                      [concept_name]
+                      ["units"]
+                  )
+
+              except KeyError:
+
+                  return []
+
+
+              rows = units.get(
+                  "USD",
+                  []
+              )
+
+
+              valid = []
+
+
+              for row in rows:
+
+                  if row.get("form") not in (
+                      "10-Q",
+                      "10-K"
+                  ):
+                      continue
+
+                  if row.get("val") is None:
+                      continue
+
+                  if not row.get("start"):
+                      continue
+
+                  if not row.get("end"):
+                      continue
+
+
+                  days = duration_days(row)
+
+
+                  if days is None:
+                      continue
+
+
+                  # Einzelquartal
+                  # oder kumulative Periode,
+                  # aus der V7 Quartale ableiten kann.
+
+                  if not (
+                      70 <= days <= 110
+                      or 150 <= days <= 220
+                      or 230 <= days <= 310
+                      or 330 <= days <= 380
+                  ):
+                      continue
+
+
+                  item = dict(row)
+
+                  item[
+                      "duration_days"
+                  ] = days
+
+                  valid.append(
+                      item
+                  )
+
+
+              return valid
+
+
+          # ============================================================
+          # CONCEPT BEWERTEN
+          # ============================================================
+
+          def evaluate_concept(
+              facts,
+              concept_name
+          ):
+
+              rows = get_valid_rows(
+                  facts,
+                  concept_name
+              )
+
+
+              if not rows:
+
+                  return {
+                      "concept": concept_name,
+                      "rows": [],
+                      "latest_end": None,
+                      "latest_filed": None,
+                      "recent_quarter_rows": 0
+                  }
+
+
+              latest_end = max(
+                  row.get("end") or ""
+                  for row in rows
+              )
+
+
+              latest_filed = max(
+                  row.get("filed") or ""
+                  for row in rows
+              )
+
+
+              # --------------------------------------------------------
+              # Wie viele echte Einzelquartals-Zeilen liegen
+              # ungefähr in den letzten zwei Jahren vor?
+              # --------------------------------------------------------
+
+              latest_date = parse_date(
+                  latest_end
+              )
+
+
+              recent_quarter_rows = 0
+
+
+              if latest_date:
+
+                  for row in rows:
+
+                      end_date = parse_date(
+                          row.get("end")
+                      )
+
+                      days = row.get(
+                          "duration_days"
+                      )
+
+
+                      if not end_date:
+                          continue
+
+
+                      age = (
+                          latest_date
+                          - end_date
+                      ).days
+
+
+                      if (
+                          age <= 800
+                          and 70 <= days <= 110
+                      ):
+
+                          recent_quarter_rows += 1
+
+
+              return {
+                  "concept": concept_name,
+                  "rows": rows,
+                  "latest_end": latest_end,
+                  "latest_filed": latest_filed,
+                  "recent_quarter_rows":
+                      recent_quarter_rows
+              }
+
+
+          # ============================================================
+          # BESTES CONCEPT AUSWÄHLEN
+          # ============================================================
+
+          def select_best_revenue_concept(
+              facts
+          ):
+
+              evaluations = []
+
+
+              for concept_name in (
+                  REVENUE_CONCEPTS
+              ):
+
+                  result = evaluate_concept(
+                      facts,
+                      concept_name
+                  )
+
+                  evaluations.append(
+                      result
+                  )
+
+
+              usable = [
+                  item
+                  for item in evaluations
+                  if item["latest_end"]
+              ]
+
+
+              if not usable:
+
+                  return (
+                      None,
+                      evaluations
+                  )
+
+
+              # --------------------------------------------------------
+              # WICHTIG:
+              #
+              # Primär gewinnt das Concept mit dem aktuellsten
+              # wirtschaftlichen Enddatum.
+              #
+              # Bei gleichem Enddatum bevorzugen wir das Concept
+              # mit mehr aktuellen Einzelquartalsdaten.
+              #
+              # Danach dient das Filing-Datum als Tie-Breaker.
+              # --------------------------------------------------------
+
+              usable.sort(
+                  key=lambda x: (
+                      x["latest_end"],
+                      x["recent_quarter_rows"],
+                      x["latest_filed"] or ""
+                  ),
+                  reverse=True
+              )
+
+
+              return (
+                  usable[0],
+                  evaluations
+              )
+
+
+          # ============================================================
+          # TESTLAUF
+          # ============================================================
+
+          for symbol, cik in (
+              companies.items()
+          ):
+
+              print("")
+              print("=" * 90)
+
+              print(
+                  "BULLWERK REVENUE CONCEPT TEST:",
+                  symbol
+              )
+
+              print("=" * 90)
+
+
+              url = (
+                  "https://data.sec.gov/"
+                  "api/xbrl/companyfacts/"
+                  f"CIK{cik}.json"
+              )
+
+
+              try:
+
+                  facts = get_json(
+                      url
+                  )
+
+              except Exception as error:
+
+                  print(
+                      "SEC FEHLER:",
+                      error
+                  )
+
+                  continue
+
+
+              print(
+                  "Unternehmen:",
+                  facts.get(
+                      "entityName"
+                  )
+              )
+
+
+              selected, evaluations = (
+                  select_best_revenue_concept(
+                      facts
+                  )
+              )
+
+
+              print("")
+              print(
+                  "--- VERFÜGBARE REVENUE CONCEPTS ---"
+              )
+
+
+              for item in evaluations:
+
+                  print("")
+
+                  print(
+                      "Concept:",
+                      item["concept"]
+                  )
+
+                  print(
+                      "Brauchbare Datensätze:",
+                      len(item["rows"])
+                  )
+
+                  print(
+                      "Neuestes Enddatum:",
+                      item["latest_end"]
+                  )
+
+                  print(
+                      "Neuestes Filing:",
+                      item["latest_filed"]
+                  )
+
+                  print(
+                      "Aktuelle Einzelquartals-Zeilen:",
+                      item["recent_quarter_rows"]
+                  )
+
+
+              print("")
+              print(
+                  "--- AUSWAHL ---"
+              )
+
+
+              if selected is None:
+
+                  print(
+                      "KEIN BRAUCHBARES "
+                      "REVENUE CONCEPT"
+                  )
+
+              else:
+
+                  print(
+                      "GEWÄHLTES CONCEPT:",
+                      selected["concept"]
+                  )
+
+                  print(
+                      "NEUESTES ENDDATUM:",
+                      selected["latest_end"]
+                  )
+
+                  print(
+                      "BRAUCHBARE DATENSÄTZE:",
+                      len(
+                          selected["rows"]
+                      )
+                  )
+
+
+                  rows = sorted(
+                      selected["rows"],
+                      key=lambda x: (
+                          x.get("end") or "",
+                          x.get("filed") or ""
+                      ),
+                      reverse=True
+                  )
+
+
+                  print("")
+                  print(
+                      "--- NEUESTE AUSGEWÄHLTE DATEN ---"
+                  )
+
+
+                  for row in rows[:12]:
+
+                      print(
+                          row.get("end"),
+                          "| start:",
+                          row.get("start"),
+                          "| duration:",
+                          row.get(
+                              "duration_days"
+                          ),
+                          "| form:",
+                          row.get("form"),
+                          "| FY:",
+                          row.get("fy"),
+                          "| FP:",
+                          row.get("fp"),
+                          "| filed:",
+                          row.get("filed"),
+                          "| value:",
+                          row.get("val")
+                      )
+
+
+              print("")
+              print(
+                  symbol,
+                  "abgeschlossen."
+              )
+
+
+          print("")
+          print("=" * 90)
+          print(
+              "Bullwerk Revenue Concept "
+              "Selection Test beendet."
+          )
+          print("=" * 90)
+
+          PY
