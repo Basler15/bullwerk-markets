@@ -1,0 +1,53 @@
+name: Bullwerk Revenue Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-revenue:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Revenue Modul testen
+        run: |
+          python - <<'PY'
+          from scanner.sec_data import get_company_facts
+          from scanner.revenue import get_revenue_data
+
+          companies = {
+              "AAPL": "0000320193",
+              "MSFT": "0000789019",
+              "NVDA": "0001045810",
+              "AMD":  "0000002488",
+          }
+
+          print("=== BULLWERK REVENUE MODULE TEST ===")
+
+          for symbol, cik in companies.items():
+              print()
+              print("=" * 70)
+              print("Unternehmen:", symbol)
+
+              facts = get_company_facts(cik)
+              revenue = get_revenue_data(facts)
+
+              print("GEWÄHLTES CONCEPT:", revenue["concept"])
+              print("NEUESTES ENDDATUM:", revenue["latest_end"])
+              print("BRAUCHBARE DATENSÄTZE:", len(revenue["rows"]))
+
+              if not revenue["concept"]:
+                  raise RuntimeError(
+                      f"{symbol}: Kein Revenue Concept gefunden."
+                  )
+
+          print()
+          print("=== TEST ERFOLGREICH ===")
+          PY
