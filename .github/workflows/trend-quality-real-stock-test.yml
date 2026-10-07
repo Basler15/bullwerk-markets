@@ -1,0 +1,545 @@
+name: Bullwerk Trend Quality Real Stock Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trend-quality-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependency
+        run: |
+          pip install yfinance pandas
+
+      - name: Test Trend Quality
+        run: |
+          python - <<'PY'
+          import yfinance as yf
+          import pandas as pd
+
+
+          STOCKS = ["AMD", "NVDA", "MSFT", "NKE"]
+
+
+          # ==================================================
+          # Hilfsfunktionen
+          # ==================================================
+
+          def download_prices(ticker):
+              data = yf.download(
+                  ticker,
+                  period="18mo",
+                  interval="1d",
+                  auto_adjust=True,
+                  progress=False,
+              )
+
+              if data.empty:
+                  raise RuntimeError(
+                      f"Keine Kursdaten für {ticker}"
+                  )
+
+              close = data["Close"]
+              high = data["High"]
+              low = data["Low"]
+
+              if isinstance(close, pd.DataFrame):
+                  close = close.iloc[:, 0]
+                  high = high.iloc[:, 0]
+                  low = low.iloc[:, 0]
+
+              df = pd.DataFrame({
+                  "close": close,
+                  "high": high,
+                  "low": low,
+              }).dropna()
+
+              if len(df) < 252:
+                  raise RuntimeError(
+                      f"Zu wenig Daten für {ticker}: {len(df)}"
+                  )
+
+              return df
+
+
+          def pct_change(current, previous):
+              if previous == 0:
+                  return 0.0
+
+              return ((current / previous) - 1) * 100.0
+
+
+          # ==================================================
+          # 1. KURS VS EMA50
+          # ==================================================
+
+          def score_price_vs_ema50(close, ema50):
+
+              distance = pct_change(close, ema50)
+
+              if 2 <= distance <= 10:
+                  score = 4
+
+              elif 0 <= distance < 2:
+                  score = 3
+
+              elif 10 < distance <= 20:
+                  score = 3
+
+              elif -3 <= distance < 0:
+                  score = 2
+
+              elif -8 <= distance < -3:
+                  score = 1
+
+              else:
+                  score = 0
+
+              return score, distance
+
+
+          # ==================================================
+          # 2. EMA50 VS EMA200
+          # ==================================================
+
+          def score_ema50_vs_ema200(ema50, ema200):
+
+              distance = pct_change(ema50, ema200)
+
+              if distance >= 5:
+                  score = 4
+
+              elif distance >= 2:
+                  score = 3
+
+              elif distance >= 0:
+                  score = 2
+
+              elif distance >= -3:
+                  score = 1
+
+              else:
+                  score = 0
+
+              return score, distance
+
+
+          # ==================================================
+          # 3. EMA-STEIGUNG
+          # Vergleich mit 20 Handelstagen zuvor
+          # ==================================================
+
+          def direction(change):
+
+              if change > 1:
+                  return "RISING"
+
+              if change < -1:
+                  return "FALLING"
+
+              return "FLAT"
+
+
+          def score_ema_slope(
+              ema50_now,
+              ema50_old,
+              ema200_now,
+              ema200_old,
+          ):
+
+              change50 = pct_change(
+                  ema50_now,
+                  ema50_old,
+              )
+
+              change200 = pct_change(
+                  ema200_now,
+                  ema200_old,
+              )
+
+              dir50 = direction(change50)
+              dir200 = direction(change200)
+
+              if dir50 == "RISING" and dir200 == "RISING":
+                  score = 4
+
+              elif dir50 == "RISING" and dir200 == "FLAT":
+                  score = 3
+
+              elif dir50 == "RISING" and dir200 == "FALLING":
+                  score = 2
+
+              elif dir50 in ("FLAT", "FALLING") and dir200 == "RISING":
+                  score = 1
+
+              else:
+                  score = 0
+
+              return (
+                  score,
+                  change50,
+                  change200,
+                  dir50,
+                  dir200,
+              )
+
+
+          # ==================================================
+          # 4. HIGHER HIGHS / HIGHER LOWS
+          #
+          # 63 Handelstage:
+          # erste 21 Tage gegen letzte 21 Tage
+          # mittlere 21 Tage = Puffer
+          #
+          # +/- 2 % Toleranz
+          # ==================================================
+
+          def structural_direction(
+              new_value,
+              old_value,
+          ):
+
+              change = pct_change(
+                  new_value,
+                  old_value,
+              )
+
+              if change > 2:
+                  return "HIGHER"
+
+              if change < -2:
+                  return "LOWER"
+
+              return "EQUAL"
+
+
+          def score_market_structure(df):
+
+              window = df.iloc[-63:]
+
+              first = window.iloc[:21]
+              last = window.iloc[-21:]
+
+              first_high = first["high"].max()
+              first_low = first["low"].min()
+
+              last_high = last["high"].max()
+              last_low = last["low"].min()
+
+              high_direction = structural_direction(
+                  last_high,
+                  first_high,
+              )
+
+              low_direction = structural_direction(
+                  last_low,
+                  first_low,
+              )
+
+              if (
+                  high_direction == "HIGHER"
+                  and low_direction == "HIGHER"
+              ):
+                  score = 4
+
+              elif (
+                  low_direction == "HIGHER"
+                  and high_direction == "EQUAL"
+              ):
+                  score = 3
+
+              elif (
+                  high_direction == "EQUAL"
+                  and low_direction == "EQUAL"
+              ):
+                  score = 2
+
+              elif (
+                  high_direction == "LOWER"
+                  and low_direction in ("EQUAL", "HIGHER")
+              ):
+                  score = 1
+
+              else:
+                  score = 0
+
+              return (
+                  score,
+                  high_direction,
+                  low_direction,
+                  pct_change(last_high, first_high),
+                  pct_change(last_low, first_low),
+              )
+
+
+          # ==================================================
+          # 5. 20T / 60T TREND-AUSRICHTUNG
+          #
+          # +/- 2 % = seitwärts
+          # ==================================================
+
+          def trend_direction(value):
+
+              if value > 2:
+                  return "UP"
+
+              if value < -2:
+                  return "DOWN"
+
+              return "SIDEWAYS"
+
+
+          def score_trend_alignment(
+              return20,
+              return60,
+          ):
+
+              dir20 = trend_direction(return20)
+              dir60 = trend_direction(return60)
+
+              if dir20 == "UP" and dir60 == "UP":
+                  score = 4
+
+              elif dir20 == "UP" and dir60 == "DOWN":
+                  score = 3
+
+              elif dir20 == "SIDEWAYS" and dir60 == "UP":
+                  score = 2
+
+              elif dir20 == "DOWN" and dir60 == "UP":
+                  score = 1
+
+              else:
+                  score = 0
+
+              return score, dir20, dir60
+
+
+          # ==================================================
+          # REAL-STOCK TEST
+          # ==================================================
+
+          print()
+          print("=" * 70)
+          print("BULLWERK TREND QUALITY")
+          print("REAL-STOCK CALIBRATION")
+          print("=" * 70)
+
+
+          for ticker in STOCKS:
+
+              df = download_prices(ticker)
+
+              close = df["close"]
+
+              ema50 = close.ewm(
+                  span=50,
+                  adjust=False,
+              ).mean()
+
+              ema200 = close.ewm(
+                  span=200,
+                  adjust=False,
+              ).mean()
+
+              current_close = close.iloc[-1]
+
+              current_ema50 = ema50.iloc[-1]
+              current_ema200 = ema200.iloc[-1]
+
+              old_ema50 = ema50.iloc[-21]
+              old_ema200 = ema200.iloc[-21]
+
+
+              score1, distance50 = score_price_vs_ema50(
+                  current_close,
+                  current_ema50,
+              )
+
+
+              score2, distance200 = score_ema50_vs_ema200(
+                  current_ema50,
+                  current_ema200,
+              )
+
+
+              (
+                  score3,
+                  ema50_change,
+                  ema200_change,
+                  ema50_direction,
+                  ema200_direction,
+              ) = score_ema_slope(
+                  current_ema50,
+                  old_ema50,
+                  current_ema200,
+                  old_ema200,
+              )
+
+
+              (
+                  score4,
+                  high_direction,
+                  low_direction,
+                  high_change,
+                  low_change,
+              ) = score_market_structure(df)
+
+
+              return20 = pct_change(
+                  close.iloc[-1],
+                  close.iloc[-21],
+              )
+
+              return60 = pct_change(
+                  close.iloc[-1],
+                  close.iloc[-61],
+              )
+
+              (
+                  score5,
+                  trend20,
+                  trend60,
+              ) = score_trend_alignment(
+                  return20,
+                  return60,
+              )
+
+
+              total = (
+                  score1
+                  + score2
+                  + score3
+                  + score4
+                  + score5
+              )
+
+
+              print()
+              print("-" * 70)
+              print(ticker)
+              print("-" * 70)
+
+              print("TOTAL:", total, "/ 20")
+
+              print()
+              print("COMPONENTS")
+
+              print(
+                  "Price vs EMA50:",
+                  score1,
+                  "/ 4"
+              )
+
+              print(
+                  "EMA50 vs EMA200:",
+                  score2,
+                  "/ 4"
+              )
+
+              print(
+                  "EMA slopes:",
+                  score3,
+                  "/ 4"
+              )
+
+              print(
+                  "Higher High / Higher Low:",
+                  score4,
+                  "/ 4"
+              )
+
+              print(
+                  "20T / 60T alignment:",
+                  score5,
+                  "/ 4"
+              )
+
+              print()
+              print("METRICS")
+
+              print(
+                  "Close:",
+                  round(current_close, 2)
+              )
+
+              print(
+                  "EMA50:",
+                  round(current_ema50, 2)
+              )
+
+              print(
+                  "EMA200:",
+                  round(current_ema200, 2)
+              )
+
+              print(
+                  "Price distance EMA50:",
+                  round(distance50, 2),
+                  "%"
+              )
+
+              print(
+                  "EMA50 distance EMA200:",
+                  round(distance200, 2),
+                  "%"
+              )
+
+              print(
+                  "EMA50 20T change:",
+                  round(ema50_change, 2),
+                  "%",
+                  ema50_direction,
+              )
+
+              print(
+                  "EMA200 20T change:",
+                  round(ema200_change, 2),
+                  "%",
+                  ema200_direction,
+              )
+
+              print(
+                  "High structure:",
+                  high_direction,
+                  round(high_change, 2),
+                  "%"
+              )
+
+              print(
+                  "Low structure:",
+                  low_direction,
+                  round(low_change, 2),
+                  "%"
+              )
+
+              print(
+                  "20T return:",
+                  round(return20, 2),
+                  "%",
+                  trend20,
+              )
+
+              print(
+                  "60T return:",
+                  round(return60, 2),
+                  "%",
+                  trend60,
+              )
+
+
+          print()
+          print("=" * 70)
+          print("TREND QUALITY CALIBRATION COMPLETE")
+          print("=" * 70)
+
+          PY
