@@ -1,0 +1,238 @@
+name: Price Momentum Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-price-momentum:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Test Price Momentum Module
+        run: |
+          python - <<'PY'
+          from scanner.price_momentum import calculate_price_momentum
+
+
+          def make_prices(
+              start,
+              segments,
+          ):
+              """
+              Erstellt eine kontrollierte Kursreihe.
+
+              segments:
+              Liste aus:
+              (Anzahl Handelstage, Gesamtveraenderung in %)
+              """
+
+              prices = [float(start)]
+
+              for days, total_change in segments:
+
+                  start_price = prices[-1]
+
+                  end_price = (
+                      start_price
+                      * (1 + total_change / 100)
+                  )
+
+                  for i in range(1, days + 1):
+
+                      fraction = i / days
+
+                      price = (
+                          start_price
+                          + (
+                              end_price
+                              - start_price
+                          )
+                          * fraction
+                      )
+
+                      prices.append(price)
+
+              return prices
+
+
+          def show_result(
+              name,
+              stock,
+              benchmark,
+          ):
+
+              result = calculate_price_momentum(
+                  stock,
+                  benchmark,
+              )
+
+              print()
+              print("=" * 70)
+              print(name)
+              print("=" * 70)
+
+              print(
+                  "SCORE:",
+                  result["score"],
+                  "/",
+                  result["max_score"],
+              )
+
+              print()
+              print("COMPONENTS")
+
+              for key, value in (
+                  result["components"].items()
+              ):
+                  print(
+                      key,
+                      "=",
+                      value,
+                  )
+
+              print()
+              print("METRICS")
+
+              for key, value in (
+                  result["metrics"].items()
+              ):
+
+                  if value is None:
+                      print(
+                          key,
+                          "=",
+                          None,
+                      )
+
+                  else:
+                      print(
+                          key,
+                          "=",
+                          round(value, 2),
+                      )
+
+
+          # ==================================================
+          # Benchmark QQQ
+          #
+          # 6 Monate insgesamt positiv,
+          # aber nicht extrem stark.
+          # ==================================================
+
+          qqq = make_prices(
+              100,
+              [
+                  (63, 5),
+                  (42, 4),
+                  (21, 3),
+                  (126, 8),
+              ],
+          )
+
+
+          # ==================================================
+          # TEST 1
+          # Starker Leader
+          #
+          # Deutlich stärker als QQQ,
+          # starkes Momentum,
+          # nahe 52W-Hoch.
+          # ==================================================
+
+          leader = make_prices(
+              100,
+              [
+                  (63, 12),
+                  (42, 15),
+                  (21, 15),
+                  (126, 35),
+              ],
+          )
+
+
+          # ==================================================
+          # TEST 2
+          # Solider Aufwärtstrend
+          # ==================================================
+
+          normal_uptrend = make_prices(
+              100,
+              [
+                  (63, 5),
+                  (42, 6),
+                  (21, 5),
+                  (126, 15),
+              ],
+          )
+
+
+          # ==================================================
+          # TEST 3
+          # Schwache Aktie
+          # ==================================================
+
+          weak_stock = make_prices(
+              100,
+              [
+                  (63, -10),
+                  (42, -8),
+                  (21, -5),
+                  (126, -15),
+              ],
+          )
+
+
+          # ==================================================
+          # TEST 4
+          # Aktie steigt,
+          # aber deutlich langsamer als QQQ.
+          #
+          # Wichtig für Bullwerk:
+          # positiver Kurs allein darf nicht
+          # automatisch hohe RS-Punkte erzeugen.
+          # ==================================================
+
+          laggard = make_prices(
+              100,
+              [
+                  (63, 2),
+                  (42, 1),
+                  (21, 1),
+                  (126, 5),
+              ],
+          )
+
+
+          show_result(
+              "TEST 1 - STRONG LEADER",
+              leader,
+              qqq,
+          )
+
+          show_result(
+              "TEST 2 - NORMAL UPTREND",
+              normal_uptrend,
+              qqq,
+          )
+
+          show_result(
+              "TEST 3 - WEAK STOCK",
+              weak_stock,
+              qqq,
+          )
+
+          show_result(
+              "TEST 4 - POSITIVE BUT LAGGING QQQ",
+              laggard,
+              qqq,
+          )
+
+          PY
