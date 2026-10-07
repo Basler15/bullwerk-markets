@@ -1,0 +1,86 @@
+name: Bullwerk Margin FCF Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-margin-fcf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Margin FCF Modul testen
+        run: |
+          python - <<'PY'
+          from scanner.sec_data import get_company_facts
+          from scanner.margin_fcf import get_margin_fcf_data
+
+          companies = {
+              "AAPL": "0000320193",
+              "MSFT": "0000789019",
+              "NVDA": "0001045810",
+              "AMD":  "0000002488",
+          }
+
+          print("=== BULLWERK MARGIN & FCF MODULE TEST ===")
+
+          for symbol, cik in companies.items():
+              print()
+              print("=" * 70)
+              print("Unternehmen:", symbol)
+
+              facts = get_company_facts(cik)
+              result = get_margin_fcf_data(facts)
+
+              print(
+                  "OPERATING INCOME CONCEPT:",
+                  result["operating_income_concept"]
+              )
+              print(
+                  "OPERATING INCOME DATENSÄTZE:",
+                  len(result["operating_income_rows"])
+              )
+
+              print(
+                  "OPERATING CASHFLOW CONCEPT:",
+                  result["operating_cashflow_concept"]
+              )
+              print(
+                  "OPERATING CASHFLOW DATENSÄTZE:",
+                  len(result["operating_cashflow_rows"])
+              )
+
+              print(
+                  "CAPEX CONCEPT:",
+                  result["capex_concept"]
+              )
+              print(
+                  "CAPEX DATENSÄTZE:",
+                  len(result["capex_rows"])
+              )
+
+              if not result["operating_income_rows"]:
+                  raise RuntimeError(
+                      f"{symbol}: Keine Operating-Income-Daten gefunden."
+                  )
+
+              if not result["operating_cashflow_rows"]:
+                  raise RuntimeError(
+                      f"{symbol}: Keine Operating-Cashflow-Daten gefunden."
+                  )
+
+              if not result["capex_rows"]:
+                  raise RuntimeError(
+                      f"{symbol}: Keine CapEx-Daten gefunden."
+                  )
+
+          print()
+          print("=== TEST ERFOLGREICH ===")
+          PY
