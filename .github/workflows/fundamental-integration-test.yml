@@ -1,0 +1,413 @@
+name: Bullwerk Fundamental Integration Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-fundamental:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fundamental Scanner komplett testen
+        run: |
+          python - <<'PY'
+          from scanner.fundamental import get_fundamental_data
+
+
+          companies = {
+              "NVDA": "0001045810",
+              "MSFT": "0000789019",
+              "AVGO": "0001730168",
+              "MU":   "0000723125",
+          }
+
+
+          print(
+              "=== BULLWERK FUNDAMENTAL "
+              "INTEGRATION TEST ==="
+          )
+
+
+          for symbol, cik in companies.items():
+
+              print()
+              print("=" * 80)
+              print("UNTERNEHMEN:", symbol)
+              print("=" * 80)
+
+              result = get_fundamental_data(
+                  cik=cik,
+                  symbol=symbol,
+              )
+
+
+              # ----------------------------------------------
+              # GESAMTSCORE
+              # ----------------------------------------------
+
+              score = result.get(
+                  "fundamental_score"
+              )
+
+              print()
+              print(
+                  "FUNDAMENTAL SCORE:",
+                  score,
+                  "/ 20"
+              )
+
+
+              # ----------------------------------------------
+              # 5 FUNDAMENTAL-KOMPONENTEN
+              # ----------------------------------------------
+
+              print()
+              print("KOMPONENTEN:")
+
+              for component in result.get(
+                  "components",
+                  []
+              ):
+                  print(
+                      " -",
+                      component["name"],
+                      ":",
+                      component["score"],
+                      "/",
+                      component["max"],
+                  )
+
+
+              # ----------------------------------------------
+              # REVENUE
+              # ----------------------------------------------
+
+              revenue = result.get(
+                  "revenue",
+                  {}
+              )
+
+              print()
+              print("REVENUE:")
+
+              print(
+                  " Wachstum:",
+                  revenue.get(
+                      "current_growth"
+                  )
+              )
+
+              print(
+                  " Beschleunigung:",
+                  revenue.get(
+                      "acceleration"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # PROFIT
+              # ----------------------------------------------
+
+              profit = result.get(
+                  "profit",
+                  {}
+              )
+
+              print()
+              print("PROFIT:")
+
+              print(
+                  " Wachstum:",
+                  profit.get(
+                      "current_growth"
+                  )
+              )
+
+              print(
+                  " Beschleunigung:",
+                  profit.get(
+                      "acceleration"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # EPS
+              # ----------------------------------------------
+
+              eps = result.get(
+                  "eps",
+                  {}
+              )
+
+              print()
+              print("EPS:")
+
+              print(
+                  " Wachstum:",
+                  eps.get(
+                      "current_growth"
+                  )
+              )
+
+              print(
+                  " Beschleunigung:",
+                  eps.get(
+                      "acceleration"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # MARGE
+              # ----------------------------------------------
+
+              margin = result.get(
+                  "margin",
+                  {}
+              )
+
+              print()
+              print("MARGE:")
+
+              print(
+                  " Aktuell:",
+                  margin.get(
+                      "current_margin"
+                  )
+              )
+
+              print(
+                  " Veränderung:",
+                  margin.get(
+                      "margin_change"
+                  )
+              )
+
+              print(
+                  " Beschleunigung:",
+                  margin.get(
+                      "margin_acceleration"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # FREE CASHFLOW
+              # ----------------------------------------------
+
+              fcf = result.get(
+                  "fcf",
+                  {}
+              )
+
+              print()
+              print("FREE CASHFLOW:")
+
+              print(
+                  " Wachstum:",
+                  fcf.get(
+                      "current_growth"
+                  )
+              )
+
+              print(
+                  " Beschleunigung:",
+                  fcf.get(
+                      "acceleration"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # GUIDANCE
+              # ----------------------------------------------
+
+              guidance = result.get(
+                  "guidance",
+                  {}
+              )
+
+              print()
+              print("GUIDANCE:")
+
+              print(
+                  " Score:",
+                  guidance.get(
+                      "score"
+                  )
+              )
+
+              print(
+                  " Status:",
+                  guidance.get(
+                      "status"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # ORDERS / BACKLOG
+              # ----------------------------------------------
+
+              orders = result.get(
+                  "orders_backlog",
+                  {}
+              )
+
+              print()
+              print("ORDERS / BACKLOG:")
+
+              print(
+                  " Metrik:",
+                  orders.get(
+                      "metric"
+                  )
+              )
+
+              print(
+                  " Veränderung:",
+                  orders.get(
+                      "change"
+                  )
+              )
+
+              print(
+                  " Score:",
+                  orders.get(
+                      "score"
+                  )
+              )
+
+              print(
+                  " Status:",
+                  orders.get(
+                      "status"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # SUPPLY / DEMAND
+              # ----------------------------------------------
+
+              supply = result.get(
+                  "supply_demand",
+                  {}
+              )
+
+              print()
+              print("SUPPLY / DEMAND:")
+
+              print(
+                  " Score:",
+                  supply.get(
+                      "score"
+                  ),
+                  "/ 4"
+              )
+
+              print(
+                  " Status:",
+                  supply.get(
+                      "status"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # ANOMALY
+              # ----------------------------------------------
+
+              anomaly = result.get(
+                  "anomaly",
+                  {}
+              )
+
+              print()
+              print("FUNDAMENTAL ANOMALY:")
+
+              print(
+                  " Level:",
+                  anomaly.get(
+                      "level"
+                  )
+              )
+
+              print(
+                  " Starke Signale:",
+                  anomaly.get(
+                      "strong_signal_count"
+                  )
+              )
+
+              print(
+                  " Demand-Signale:",
+                  anomaly.get(
+                      "demand_signal_count"
+                  )
+              )
+
+              print(
+                  " Profit-Signale:",
+                  anomaly.get(
+                      "profit_signal_count"
+                  )
+              )
+
+              print(
+                  " Aktive Signale:",
+                  anomaly.get(
+                      "active_signals"
+                  )
+              )
+
+
+              # ----------------------------------------------
+              # TECHNISCHE PLAUSIBILITÄT
+              # ----------------------------------------------
+
+              if score is None:
+                  raise RuntimeError(
+                      f"{symbol}: "
+                      "Kein Fundamental-Score erzeugt."
+                  )
+
+              if not (
+                  0 <= score <= 20
+              ):
+                  raise RuntimeError(
+                      f"{symbol}: "
+                      f"Ungültiger Score {score}"
+                  )
+
+              if anomaly.get(
+                  "level"
+              ) not in (
+                  "NONE",
+                  "WATCH",
+                  "MEDIUM",
+                  "HIGH",
+              ):
+                  raise RuntimeError(
+                      f"{symbol}: "
+                      "Ungültiger Anomaly-Status."
+                  )
+
+
+          print()
+          print("=" * 80)
+          print(
+              "=== FUNDAMENTAL INTEGRATION "
+              "TEST ERFOLGREICH ==="
+          )
+          PY
