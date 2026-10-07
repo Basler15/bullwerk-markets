@@ -1,0 +1,71 @@
+name: Bullwerk Guidance Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-guidance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Guidance Modul testen
+        run: |
+          python - <<'PY'
+          from scanner.guidance import get_guidance_data
+
+          companies = {
+              "AAPL": "0000320193",
+              "MSFT": "0000789019",
+              "NVDA": "0001045810",
+              "AVGO": "0001730168",
+              "MU":   "0000723125",
+              "ORCL": "0001341439",
+          }
+
+          print("=== BULLWERK GUIDANCE MODULE TEST ===")
+
+          for symbol, cik in companies.items():
+              print()
+              print("=" * 80)
+              print("Unternehmen:", symbol)
+
+              result = get_guidance_data(cik)
+
+              score = result.get("score")
+              status = result.get("status")
+              reason = result.get("reason")
+
+              print("GUIDANCE SCORE:", score)
+              print("STATUS:", status)
+              print("GRUND:", reason)
+
+              for detail in result.get("details", []):
+                  print(
+                      detail.get("metric"),
+                      "| vorher:",
+                      detail.get("previous"),
+                      "| aktuell:",
+                      detail.get("current"),
+                      "| Veränderung:",
+                      detail.get("change"),
+                  )
+
+              # N/A ist ausdrücklich erlaubt.
+              # Der Test soll nur prüfen, ob das Modul
+              # technisch korrekt arbeitet.
+              if status is None:
+                  raise RuntimeError(
+                      f"{symbol}: Guidance-Modul lieferte keinen Status."
+                  )
+
+          print()
+          print("=== GUIDANCE MODULE TEST ERFOLGREICH ===")
+          PY
