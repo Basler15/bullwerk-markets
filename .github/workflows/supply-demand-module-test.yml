@@ -1,0 +1,192 @@
+name: Bullwerk Supply Demand Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-supply-demand:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Supply Demand Modul testen
+        run: |
+          python - <<'PY'
+          from scanner.supply_demand import get_supply_demand_data
+
+
+          def run_test(
+              name,
+              expected_score,
+              **kwargs,
+          ):
+              print()
+              print("=" * 80)
+              print("TEST:", name)
+
+              result = get_supply_demand_data(
+                  **kwargs
+              )
+
+              print("SCORE:", result["score"])
+              print("STATUS:", result["status"])
+              print("GRUND:", result["reason"])
+              print("SIGNALE:", result["signals"])
+
+              print(
+                  "Demand:",
+                  result["demand_signals"]
+              )
+
+              print(
+                  "Market Power:",
+                  result["market_power_signals"]
+              )
+
+              print(
+                  "Financial:",
+                  result["financial_confirmation"]
+              )
+
+              if result["score"] != expected_score:
+                  raise RuntimeError(
+                      f"{name}: "
+                      f"Erwartet {expected_score}/4, "
+                      f"erhalten {result['score']}/4"
+                  )
+
+
+          print(
+              "=== BULLWERK SUPPLY / DEMAND TEST ==="
+          )
+
+
+          # --------------------------------------------------
+          # TEST 1
+          # Komplette positive Wirkungskette
+          # --------------------------------------------------
+
+          run_test(
+              "Starke komplette Wirkungskette",
+              4,
+              revenue_growth=22.0,
+              revenue_acceleration=6.0,
+              margin_change=2.0,
+              fcf_growth=30.0,
+              orders_change=25.0,
+              guidance_score=3,
+              supply_constraint=True,
+              pricing_power=True,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 2
+          # Nachfrage stark + finanzielle Bestätigung,
+          # aber keine bestätigte Knappheit/Pricing Power
+          # --------------------------------------------------
+
+          run_test(
+              "Starke Nachfrage ohne Market-Power-Nachweis",
+              3,
+              revenue_growth=18.0,
+              revenue_acceleration=5.0,
+              margin_change=1.5,
+              fcf_growth=20.0,
+              orders_change=12.0,
+              guidance_score=3,
+              supply_constraint=False,
+              pricing_power=False,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 3
+          # Entwicklung beginnt, aber noch nicht komplett
+          # --------------------------------------------------
+
+          run_test(
+              "Frühe bestätigte Entwicklung",
+              2,
+              revenue_growth=12.0,
+              revenue_acceleration=1.0,
+              margin_change=0.8,
+              fcf_growth=4.0,
+              orders_change=2.0,
+              guidance_score=1,
+              supply_constraint=False,
+              pricing_power=False,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 4
+          # Nur ein erstes positives Signal
+          # --------------------------------------------------
+
+          run_test(
+              "Nur erstes Nachfragesignal",
+              1,
+              revenue_growth=11.0,
+              revenue_acceleration=0.0,
+              margin_change=0.0,
+              fcf_growth=0.0,
+              orders_change=0.0,
+              guidance_score=0,
+              supply_constraint=False,
+              pricing_power=False,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 5
+          # WICHTIGER GEGENCHECK:
+          # Knappheit allein darf NICHT stark punkten
+          # --------------------------------------------------
+
+          run_test(
+              "Knappheit allein",
+              1,
+              revenue_growth=0.0,
+              revenue_acceleration=0.0,
+              margin_change=0.0,
+              fcf_growth=0.0,
+              orders_change=0.0,
+              guidance_score=0,
+              supply_constraint=True,
+              pricing_power=False,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 6
+          # Keine positiven Signale
+          # --------------------------------------------------
+
+          run_test(
+              "Keine positive Dynamik",
+              0,
+              revenue_growth=-5.0,
+              revenue_acceleration=-3.0,
+              margin_change=-1.0,
+              fcf_growth=-10.0,
+              orders_change=-8.0,
+              guidance_score=0,
+              supply_constraint=False,
+              pricing_power=False,
+          )
+
+
+          print()
+          print(
+              "=== SUPPLY / DEMAND MODULE TEST "
+              "ERFOLGREICH ==="
+          )
+          PY
