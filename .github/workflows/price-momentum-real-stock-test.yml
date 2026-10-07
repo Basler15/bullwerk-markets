@@ -1,28 +1,230 @@
-name: Price Momentum Real Stock Test
+name: Bullwerk Price Momentum Real Stock Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  real-stock-test:
+  test-real-stocks:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Check module import
+      - name: Install test dependency
+        run: |
+          pip install yfinance
+
+      - name: Test AMD NVDA MSFT NKE vs QQQ
         run: |
           python - <<'PY'
+          import yfinance as yf
+
           from scanner.price_momentum import calculate_price_momentum
 
-          print("Price Momentum Modul erfolgreich geladen.")
-          print("Realaktien-Test vorbereitet.")
-          print("Aktien: NVDA, MSFT, AMD, NKE")
-          print("Benchmark: QQQ")
+
+          STOCKS = [
+              "AMD",
+              "NVDA",
+              "MSFT",
+              "NKE",
+          ]
+
+          BENCHMARK = "QQQ"
+
+
+          def download_prices(ticker):
+              data = yf.download(
+                  ticker,
+                  period="18mo",
+                  interval="1d",
+                  auto_adjust=True,
+                  progress=False,
+              )
+
+              if data.empty:
+                  raise RuntimeError(
+                      f"Keine Kursdaten für {ticker}"
+                  )
+
+              close = data["Close"]
+
+              # yfinance kann je nach Version bei einem
+              # einzelnen Ticker Series oder DataFrame liefern.
+              if hasattr(close, "columns"):
+                  close = close.iloc[:, 0]
+
+              prices = (
+                  close
+                  .dropna()
+                  .astype(float)
+                  .tolist()
+              )
+
+              if len(prices) < 252:
+                  raise RuntimeError(
+                      f"Zu wenig Kursdaten für {ticker}: "
+                      f"{len(prices)} Handelstage"
+                  )
+
+              return prices
+
+
+          def fmt(value):
+              if value is None:
+                  return "N/A"
+
+              return f"{value:.2f}"
+
+
+          print()
+          print("=" * 70)
+          print("BULLWERK PRICE & RS MOMENTUM V2.1")
+          print("REAL-STOCK CALIBRATION")
+          print("=" * 70)
+
+          benchmark_prices = download_prices(
+              BENCHMARK
+          )
+
+          for ticker in STOCKS:
+
+              stock_prices = download_prices(
+                  ticker
+              )
+
+              # Damit Aktie und QQQ für die Berechnung
+              # gleich lange Reihen verwenden.
+              common_length = min(
+                  len(stock_prices),
+                  len(benchmark_prices),
+              )
+
+              stock = stock_prices[-common_length:]
+              benchmark = benchmark_prices[-common_length:]
+
+              result = calculate_price_momentum(
+                  stock,
+                  benchmark,
+              )
+
+              components = result["components"]
+              metrics = result["metrics"]
+
+              print()
+              print("-" * 70)
+              print(ticker)
+              print("-" * 70)
+
+              print(
+                  "TOTAL:",
+                  result["score"],
+                  "/ 20"
+              )
+
+              print(
+                  "RAW:",
+                  result["raw_score"],
+                  "/ 20"
+              )
+
+              print(
+                  "RS GATE:",
+                  result["rs_gate"]
+              )
+
+              print()
+              print("COMPONENTS")
+
+              print(
+                  "RS vs QQQ:",
+                  components["relative_strength"],
+                  "/ 5"
+              )
+
+              print(
+                  "RS acceleration:",
+                  components["rs_acceleration"],
+                  "/ 5"
+              )
+
+              print(
+                  "Momentum 1-3M:",
+                  components["momentum_1_3m"],
+                  "/ 4"
+              )
+
+              print(
+                  "Momentum 3-6M:",
+                  components["momentum_3_6m"],
+                  "/ 3"
+              )
+
+              print(
+                  "52W High:",
+                  components["high_52w"],
+                  "/ 3"
+              )
+
+              print()
+              print("METRICS")
+
+              print(
+                  "Return 1M:",
+                  fmt(metrics["return_1m"]),
+                  "%"
+              )
+
+              print(
+                  "Return 3M:",
+                  fmt(metrics["return_3m"]),
+                  "%"
+              )
+
+              print(
+                  "Return 6M:",
+                  fmt(metrics["return_6m"]),
+                  "%"
+              )
+
+              print(
+                  "RS 1M:",
+                  fmt(metrics["rs_1m"]),
+                  "pp"
+              )
+
+              print(
+                  "RS 3M:",
+                  fmt(metrics["rs_3m"]),
+                  "pp"
+              )
+
+              print(
+                  "RS 6M:",
+                  fmt(metrics["rs_6m"]),
+                  "pp"
+              )
+
+              print(
+                  "RS acceleration:",
+                  fmt(metrics["rs_acceleration"]),
+                  "pp"
+              )
+
+              print(
+                  "Distance 52W High:",
+                  fmt(metrics["distance_52w_high"]),
+                  "%"
+              )
+
+          print()
+          print("=" * 70)
+          print("CALIBRATION COMPLETE")
+          print("=" * 70)
+
           PY
