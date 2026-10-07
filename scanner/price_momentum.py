@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 # ============================================================
 # Bullwerk Markets
-# Price & Relative Strength Momentum V2
+# Price & Relative Strength Momentum V2.1
 #
 # Säule 2 des Bullwerk Scores
 #
@@ -45,40 +45,6 @@ def price_return(
     return percent_change(
         prices[-1],
         prices[-1 - periods_back],
-    )
-
-
-def window_return(
-    prices: List[float],
-    start_back: int,
-    end_back: int,
-) -> Optional[float]:
-    """
-    Rendite eines historischen Fensters.
-
-    Beispiel:
-    start_back = 63
-    end_back   = 21
-
-    misst die Rendite vom Zeitpunkt vor
-    63 Handelstagen bis vor 21 Handelstagen.
-    """
-
-    if not prices:
-        return None
-
-    if start_back <= end_back:
-        return None
-
-    if len(prices) <= start_back:
-        return None
-
-    start_price = prices[-1 - start_back]
-    end_price = prices[-1 - end_back]
-
-    return percent_change(
-        end_price,
-        start_price,
     )
 
 
@@ -128,55 +94,26 @@ def calculate_rs_metrics(
     )
 
     # --------------------------------------------------------
-    # Echte RS-Beschleunigung:
+    # Bullwerk V2.1:
     #
-    # aktuelle 21 Handelstage
-    # gegen
-    # vorherige 42 Handelstage.
+    # Einfache RS-Beschleunigung
     #
-    # Damit messen wir nicht nur Stärke,
-    # sondern ob die Outperformance gerade zunimmt.
+    # Positive Zahl:
+    # Aktie schlägt QQQ kurzfristig stärker als über 3 Monate.
+    #
+    # Negative Zahl:
+    # relative Stärke lässt aktuell nach.
     # --------------------------------------------------------
-
-    stock_previous = window_return(
-        stock_prices,
-        63,
-        21,
-    )
-
-    benchmark_previous = window_return(
-        benchmark_prices,
-        63,
-        21,
-    )
-
-    previous_rs = None
-
-    if (
-        stock_previous is not None
-        and benchmark_previous is not None
-    ):
-        previous_rs = (
-            stock_previous
-            - benchmark_previous
-        )
 
     rs_acceleration = None
 
-    if (
-        rs_1m is not None
-        and previous_rs is not None
-    ):
-        rs_acceleration = (
-            rs_1m
-            - previous_rs
-        )
+    if rs_1m is not None and rs_3m is not None:
+        rs_acceleration = rs_1m - rs_3m
 
     return {
         "rs_1m": rs_1m,
         "rs_3m": rs_3m,
         "rs_6m": rs_6m,
-        "previous_rs": previous_rs,
         "rs_acceleration": rs_acceleration,
     }
 
@@ -254,28 +191,16 @@ def score_short_momentum(
     if return_1m is None or return_3m is None:
         return 0
 
-    if (
-        return_1m >= 10
-        and return_3m >= 20
-    ):
+    if return_1m >= 10 and return_3m >= 20:
         return 4
 
-    if (
-        return_1m >= 5
-        and return_3m >= 10
-    ):
+    if return_1m >= 5 and return_3m >= 10:
         return 3
 
-    if (
-        return_1m >= 0
-        and return_3m >= 5
-    ):
+    if return_1m >= 0 and return_3m >= 5:
         return 2
 
-    if (
-        return_1m >= 0
-        or return_3m >= 0
-    ):
+    if return_1m >= 0 or return_3m >= 0:
         return 1
 
     return 0
@@ -294,22 +219,13 @@ def score_medium_momentum(
     if return_3m is None or return_6m is None:
         return 0
 
-    if (
-        return_3m >= 15
-        and return_6m >= 30
-    ):
+    if return_3m >= 15 and return_6m >= 30:
         return 3
 
-    if (
-        return_3m >= 5
-        and return_6m >= 15
-    ):
+    if return_3m >= 5 and return_6m >= 15:
         return 2
 
-    if (
-        return_3m >= 0
-        and return_6m >= 0
-    ):
+    if return_3m >= 0 and return_6m >= 0:
         return 1
 
     return 0
@@ -339,9 +255,7 @@ def distance_from_52w_high(
 
     current = prices[-1]
 
-    return (
-        (current / high_52w) - 1
-    ) * 100.0
+    return ((current / high_52w) - 1) * 100.0
 
 
 def score_52w_high(
@@ -427,17 +341,11 @@ def calculate_price_momentum(
     )
 
     # --------------------------------------------------------
-    # BULLWERK RS-GATE
+    # Bullwerk RS-Gate
     #
-    # Eine Aktie darf nicht nur durch absolutes Momentum
-    # oder Nähe zum Hoch zum Leader werden, wenn sie den
-    # Nasdaq/QQQ nicht schlägt.
-    #
-    # Leichte Underperformance:
-    # maximal 14/20.
-    #
-    # Deutliche Underperformance <= -5 Prozentpunkte:
-    # maximal 10/20.
+    # Eine Aktie mit klarer Underperformance gegenüber QQQ
+    # darf nicht allein durch absolutes Kursmomentum oder
+    # Nähe zum 52-Wochen-Hoch zum Momentum-Leader werden.
     # --------------------------------------------------------
 
     final_score = raw_score
@@ -446,17 +354,11 @@ def calculate_price_momentum(
     if rs["rs_3m"] is not None:
 
         if rs["rs_3m"] <= -5:
-            final_score = min(
-                final_score,
-                10,
-            )
+            final_score = min(final_score, 10)
             rs_gate = "STRONG_UNDERPERFORMANCE"
 
         elif rs["rs_3m"] < 0:
-            final_score = min(
-                final_score,
-                14,
-            )
+            final_score = min(final_score, 14)
             rs_gate = "UNDERPERFORMANCE"
 
     return {
@@ -481,7 +383,6 @@ def calculate_price_momentum(
             "rs_3m": rs["rs_3m"],
             "rs_6m": rs["rs_6m"],
 
-            "previous_rs": rs["previous_rs"],
             "rs_acceleration": rs["rs_acceleration"],
 
             "distance_52w_high": high_distance,
