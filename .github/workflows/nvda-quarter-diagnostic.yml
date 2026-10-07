@@ -1,0 +1,177 @@
+name: NVDA Quarter Diagnostic
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose-nvda:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: NVDA Quartale diagnostizieren
+        run: |
+          python - <<'PY'
+          from scanner.sec_data import get_company_facts
+          from scanner.revenue import get_revenue_data
+          from scanner.profit_eps import get_profit_eps_data
+          from scanner.fundamental import (
+              dedupe_quarters,
+              find_yoy_previous,
+              numeric_value,
+              percent_change,
+          )
+
+
+          CIK = "0001045810"
+
+          print("=" * 90)
+          print("NVDA QUARTER DIAGNOSTIC")
+          print("=" * 90)
+
+          facts = get_company_facts(CIK)
+
+          revenue = get_revenue_data(facts)
+          profit_eps = get_profit_eps_data(facts)
+
+
+          def diagnose(name, rows):
+              print()
+              print("=" * 90)
+              print(name)
+              print("=" * 90)
+
+              quarters = dedupe_quarters(rows)
+
+              print(
+                  "Anzahl erkannter Einzelquartale:",
+                  len(quarters)
+              )
+
+              print()
+
+              for current in quarters[:10]:
+
+                  current_end = current.get("end")
+                  current_start = current.get("start")
+                  current_value = numeric_value(current)
+
+                  previous = find_yoy_previous(
+                      quarters,
+                      current,
+                  )
+
+                  print("-" * 90)
+
+                  print(
+                      "AKTUELL:"
+                  )
+
+                  print(
+                      " Zeitraum:",
+                      current_start,
+                      "bis",
+                      current_end
+                  )
+
+                  print(
+                      " Wert:",
+                      current_value
+                  )
+
+                  print(
+                      " Form:",
+                      current.get("form")
+                  )
+
+                  print(
+                      " Filed:",
+                      current.get("filed")
+                  )
+
+                  if previous is None:
+                      print(
+                          " VORJAHR:",
+                          "KEIN VERGLEICH GEFUNDEN"
+                      )
+                      continue
+
+                  previous_value = numeric_value(
+                      previous
+                  )
+
+                  print(
+                      "VORJAHR:"
+                  )
+
+                  print(
+                      " Zeitraum:",
+                      previous.get("start"),
+                      "bis",
+                      previous.get("end")
+                  )
+
+                  print(
+                      " Wert:",
+                      previous_value
+                  )
+
+                  print(
+                      " Form:",
+                      previous.get("form")
+                  )
+
+                  print(
+                      " Filed:",
+                      previous.get("filed")
+                  )
+
+                  change = percent_change(
+                      current_value,
+                      previous_value,
+                  )
+
+                  print(
+                      "YOY:",
+                      change,
+                      "%"
+                  )
+
+
+          diagnose(
+              "REVENUE",
+              revenue.get(
+                  "rows",
+                  []
+              )
+          )
+
+          diagnose(
+              "PROFIT",
+              profit_eps.get(
+                  "profit_rows",
+                  []
+              )
+          )
+
+          diagnose(
+              "EPS",
+              profit_eps.get(
+                  "eps_rows",
+                  []
+              )
+          )
+
+
+          print()
+          print("=" * 90)
+          print("DIAGNOSE ABGESCHLOSSEN")
+          print("=" * 90)
+          PY
