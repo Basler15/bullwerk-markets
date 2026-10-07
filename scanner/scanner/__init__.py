@@ -1,1 +1,0 @@
-# Bullwerk Markets Scanner
