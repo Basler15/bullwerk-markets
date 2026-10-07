@@ -1,0 +1,195 @@
+name: Bullwerk Anomaly Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-anomaly:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Anomaly Modul testen
+        run: |
+          python - <<'PY'
+          from scanner.anomaly import get_anomaly_data
+
+
+          def run_test(
+              name,
+              expected_level,
+              **kwargs,
+          ):
+              print()
+              print("=" * 80)
+              print("TEST:", name)
+
+              result = get_anomaly_data(
+                  **kwargs
+              )
+
+              print("LEVEL:", result["level"])
+              print("GRUND:", result["reason"])
+
+              print(
+                  "STARKE SIGNALE:",
+                  result["strong_signal_count"]
+              )
+
+              print(
+                  "DEMAND-SIGNALE:",
+                  result["demand_signal_count"]
+              )
+
+              print(
+                  "PROFIT-SIGNALE:",
+                  result["profit_signal_count"]
+              )
+
+              print(
+                  "BESCHLEUNIGUNGEN:",
+                  result["acceleration_count"]
+              )
+
+              print(
+                  "AKTIVE SIGNALE:",
+                  result["active_signals"]
+              )
+
+              if result["level"] != expected_level:
+                  raise RuntimeError(
+                      f"{name}: "
+                      f"Erwartet {expected_level}, "
+                      f"erhalten {result['level']}"
+                  )
+
+
+          print(
+              "=== BULLWERK FUNDAMENTAL ANOMALY TEST ==="
+          )
+
+
+          # --------------------------------------------------
+          # TEST 1
+          # Mehrere starke Bereiche + Beschleunigung
+          # -> HIGH
+          # --------------------------------------------------
+
+          run_test(
+              "Starke fundamentale Beschleunigung",
+              "HIGH",
+              revenue_growth=35.0,
+              revenue_acceleration=12.0,
+              profit_growth=70.0,
+              profit_acceleration=30.0,
+              eps_growth=65.0,
+              margin_change=3.0,
+              fcf_growth=50.0,
+              orders_change=30.0,
+              guidance_score=3,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 2
+          # Umsatz + Profit stark
+          # -> noch MEDIUM
+          # --------------------------------------------------
+
+          run_test(
+              "Zwei bestätigte Bereiche",
+              "MEDIUM",
+              revenue_growth=25.0,
+              profit_growth=35.0,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 3
+          # WICHTIGER GEGENCHECK:
+          # +100 % Gewinn ALLEIN darf niemals HIGH sein
+          # --------------------------------------------------
+
+          run_test(
+              "Extremer Gewinnsprung allein",
+              "WATCH",
+              profit_growth=100.0,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 4
+          # Starker Umsatz allein
+          # -> WATCH
+          # --------------------------------------------------
+
+          run_test(
+              "Starker Umsatz allein",
+              "WATCH",
+              revenue_growth=40.0,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 5
+          # Mehrere Profit-Signale,
+          # aber KEIN Demand-/Orders-Signal.
+          # Darf ebenfalls NICHT HIGH sein.
+          # --------------------------------------------------
+
+          run_test(
+              "Profitabilität ohne Nachfragebestätigung",
+              "WATCH",
+              profit_growth=60.0,
+              eps_growth=55.0,
+              margin_change=4.0,
+              fcf_growth=45.0,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 6
+          # Revenue + Profit + Orders
+          # -> HIGH
+          # --------------------------------------------------
+
+          run_test(
+              "Demand plus Profit plus Orders",
+              "HIGH",
+              revenue_growth=28.0,
+              profit_growth=45.0,
+              orders_change=22.0,
+          )
+
+
+          # --------------------------------------------------
+          # TEST 7
+          # Keine außergewöhnliche Entwicklung
+          # --------------------------------------------------
+
+          run_test(
+              "Normale Entwicklung",
+              "NONE",
+              revenue_growth=8.0,
+              revenue_acceleration=1.0,
+              profit_growth=10.0,
+              eps_growth=9.0,
+              margin_change=0.3,
+              fcf_growth=12.0,
+              orders_change=4.0,
+              guidance_score=2,
+          )
+
+
+          print()
+          print(
+              "=== ANOMALY MODULE TEST ERFOLGREICH ==="
+          )
+          PY
