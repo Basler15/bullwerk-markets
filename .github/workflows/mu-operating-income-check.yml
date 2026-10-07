@@ -1,0 +1,222 @@
+name: MU Operating Income Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-mu-operating-income:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check MU operating income concepts
+        run: |
+          python - <<'PY'
+          from scanner.sec_data import get_company_facts
+
+          CIK = "0000723125"
+
+          facts = get_company_facts(CIK)
+
+          us_gaap = (
+              facts
+              .get("facts", {})
+              .get("us-gaap", {})
+          )
+
+          print("=" * 90)
+          print("MU OPERATING INCOME CONCEPT CHECK")
+          print("CIK:", CIK)
+          print("=" * 90)
+
+          keywords = [
+              "operating",
+              "income",
+              "profit",
+              "loss",
+          ]
+
+          candidates = []
+
+          for concept, data in us_gaap.items():
+
+              concept_lower = concept.lower()
+
+              if not any(
+                  keyword in concept_lower
+                  for keyword in keywords
+              ):
+                  continue
+
+              label = data.get(
+                  "label",
+                  ""
+              )
+
+              description = data.get(
+                  "description",
+                  ""
+              )
+
+              units = data.get(
+                  "units",
+                  {}
+              )
+
+              usd_rows = units.get(
+                  "USD",
+                  []
+              )
+
+              recent_rows = []
+
+              for row in usd_rows:
+
+                  if row.get("form") not in (
+                      "10-Q",
+                      "10-K",
+                  ):
+                      continue
+
+                  end = row.get("end")
+
+                  if not end:
+                      continue
+
+                  if end < "2025-01-01":
+                      continue
+
+                  recent_rows.append(
+                      row
+                  )
+
+              if not recent_rows:
+                  continue
+
+              candidates.append(
+                  (
+                      concept,
+                      label,
+                      description,
+                      recent_rows,
+                  )
+              )
+
+          candidates.sort(
+              key=lambda item:
+                  item[0].lower()
+          )
+
+          for (
+              concept,
+              label,
+              description,
+              rows,
+          ) in candidates:
+
+              print()
+              print("=" * 90)
+              print("CONCEPT:", concept)
+              print("LABEL:", label)
+              print("DESCRIPTION:", description)
+              print("-" * 90)
+
+              rows = sorted(
+                  rows,
+                  key=lambda row: (
+                      row.get("end") or "",
+                      row.get("filed") or "",
+                  ),
+                  reverse=True,
+              )
+
+              for row in rows[:12]:
+
+                  print(
+                      "START:",
+                      row.get("start"),
+                      "| END:",
+                      row.get("end"),
+                      "| VALUE:",
+                      row.get("val"),
+                      "| FORM:",
+                      row.get("form"),
+                      "| FILED:",
+                      row.get("filed"),
+                      "| FY:",
+                      row.get("fy"),
+                      "| FP:",
+                      row.get("fp"),
+                      "| FRAME:",
+                      row.get("frame"),
+                  )
+
+          print()
+          print("=" * 90)
+          print("FOCUS: OperatingIncomeLoss")
+          print("=" * 90)
+
+          target = us_gaap.get(
+              "OperatingIncomeLoss"
+          )
+
+          if target is None:
+              print(
+                  "OperatingIncomeLoss NOT FOUND"
+              )
+
+          else:
+              print(
+                  "LABEL:",
+                  target.get("label")
+              )
+
+              print(
+                  "DESCRIPTION:",
+                  target.get("description")
+              )
+
+              usd_rows = (
+                  target
+                  .get("units", {})
+                  .get("USD", [])
+              )
+
+              usd_rows = sorted(
+                  usd_rows,
+                  key=lambda row: (
+                      row.get("end") or "",
+                      row.get("filed") or "",
+                  ),
+                  reverse=True,
+              )
+
+              for row in usd_rows[:25]:
+
+                  print(
+                      "START:",
+                      row.get("start"),
+                      "| END:",
+                      row.get("end"),
+                      "| VALUE:",
+                      row.get("val"),
+                      "| FORM:",
+                      row.get("form"),
+                      "| FILED:",
+                      row.get("filed"),
+                      "| FY:",
+                      row.get("fy"),
+                      "| FP:",
+                      row.get("fp"),
+                      "| FRAME:",
+                      row.get("frame"),
+                  )
+
+          PY
