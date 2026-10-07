@@ -1,0 +1,108 @@
+name: Bullwerk Orders Backlog Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-orders-backlog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Orders Backlog Modul testen
+        run: |
+          python - <<'PY'
+          from scanner.orders_backlog import get_orders_backlog_data
+
+          companies = {
+              "AAPL": "0000320193",
+              "MSFT": "0000789019",
+              "NVDA": "0001045810",
+              "AVGO": "0001730168",
+              "MU":   "0000723125",
+              "ORCL": "0001341439",
+          }
+
+          print("=== BULLWERK ORDERS / BACKLOG MODULE TEST ===")
+
+          for symbol, cik in companies.items():
+              print()
+              print("=" * 80)
+              print("Unternehmen:", symbol)
+
+              result = get_orders_backlog_data(cik)
+
+              print("METRIK:", result.get("metric"))
+              print("SCORE:", result.get("score"))
+              print("STATUS:", result.get("status"))
+              print("GRUND:", result.get("reason"))
+
+              if result.get("change") is not None:
+                  print(
+                      "VERÄNDERUNG:",
+                      f"{result['change']:+.1f}%"
+                  )
+
+              current = result.get("current")
+              previous = result.get("previous")
+
+              if current:
+                  print(
+                      "AKTUELL:",
+                      current.get("value"),
+                      "Mrd. USD |",
+                      current.get("form"),
+                      "|",
+                      current.get("date"),
+                  )
+
+              if previous:
+                  print(
+                      "VORHER:",
+                      previous.get("value"),
+                      "Mrd. USD |",
+                      previous.get("form"),
+                      "|",
+                      previous.get("date"),
+                  )
+
+              print("ALLE VERGLEICHE:")
+
+              for comparison in result.get(
+                  "comparisons",
+                  []
+              ):
+                  print(
+                      comparison.get("metric"),
+                      "| Veränderung:",
+                      round(
+                          comparison.get("change"),
+                          1
+                      ),
+                      "%",
+                      "| Score:",
+                      comparison.get("score"),
+                      "| Status:",
+                      comparison.get("status"),
+                  )
+
+              # N/A und CHECK_REQUIRED sind gültige
+              # Ergebnisse und dürfen den Test
+              # nicht fehlschlagen lassen.
+              if result.get("status") is None:
+                  raise RuntimeError(
+                      f"{symbol}: Kein Status zurückgegeben."
+                  )
+
+          print()
+          print(
+              "=== ORDERS / BACKLOG MODULE TEST ERFOLGREICH ==="
+          )
+          PY
