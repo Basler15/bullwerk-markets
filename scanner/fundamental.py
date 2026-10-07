@@ -1,26 +1,14 @@
 # Bullwerk Markets - Fundamental Scanner
 #
-# Zentrale Schaltstelle für die getesteten
-# Fundamental-Module.
+# Zentrale Fundamental-Schaltstelle
 #
-# Verbindet:
-# - SEC Company Facts
-# - Revenue
-# - Profit / EPS
-# - Margin / FCF
-# - Guidance
-# - Orders / Backlog
-# - Supply / Demand
-# - Fundamental Anomaly
-#
-# ANOMALY bleibt separat und verändert
-# den normalen Fundamental-Score nicht.
-#
-# V2:
-# - Profit/EPS-Konsistenz verbessert
-# - extreme Basiseffekte werden erkannt
-# - extreme Prozentwerte führen nicht
-#   automatisch zu Maximalpunkten
+# V3:
+# - direkte SEC-Quartale bevorzugen
+# - fehlende Quartale aus kumulierten Perioden ableiten
+# - SEC-Duplikate bereinigen
+# - Profit/EPS-Konsistenz
+# - Basiseffekt-/Qualitätsflags
+# - Anomaly bleibt separat vom 0-20 Score
 
 from datetime import datetime
 
@@ -34,18 +22,12 @@ from scanner.supply_demand import get_supply_demand_data
 from scanner.anomaly import get_anomaly_data
 
 
-# ============================================================
-# GRENZWERTE
-# ============================================================
-
 EXTREME_GROWTH = 200.0
-EXTREME_ACCELERATION = 150.0
-
 PROFIT_EPS_DIVERGENCE = 75.0
 
 
 # ============================================================
-# HILFSFUNKTIONEN
+# DATUM / BASIS
 # ============================================================
 
 def parse_date(value):
@@ -64,14 +46,24 @@ def parse_date(value):
         return None
 
 
-def row_duration(row):
-    start = parse_date(
-        row.get("start")
-    )
+def numeric_value(row):
+    if not row:
+        return None
 
-    end = parse_date(
-        row.get("end")
-    )
+    value = row.get("val")
+
+    if value is None:
+        return None
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def row_duration(row):
+    start = parse_date(row.get("start"))
+    end = parse_date(row.get("end"))
 
     if not start or not end:
         return None
@@ -79,27 +71,127 @@ def row_duration(row):
     return (end - start).days
 
 
-def is_quarter(row):
-    duration = row_duration(row)
-
-    if duration is None:
-        return False
-
-    return 70 <= duration <= 110
+def is_valid_form(row):
+    return row.get("form") in (
+        "10-Q",
+        "10-K",
+    )
 
 
-def dedupe_quarters(rows):
+# ============================================================
+# SEC-DUPLIKATE
+# ============================================================
+
+def dedupe_period_rows(rows):
     """
-    Bereinigt doppelte SEC-Einträge.
+    Gleiche wirtschaftliche Periode kann durch spätere
+    SEC-Filings mehrfach vorkommen.
 
-    Pro wirtschaftlichem Quartalsende wird
-    der zuletzt eingereichte Wert verwendet.
+    Pro Start-/Enddatum wird der zuletzt eingereichte
+    Datensatz verwendet.
     """
+
+    periods = {}
+
+    for row in rows:
+        if not is_valid_form(row):
+            continue
+
+        start = parse_date(
+            row.get("start")
+        )
+
+        end = parse_date(
+            row.get("end")
+        )
+
+        if not start or not end:
+            continue
+
+        key = (
+            start,
+            end,
+        )
+
+        filed = parse_date(
+            row.get("filed")
+        )
+
+        existing = periods.get(key)
+
+        if existing is None:
+            periods[key] = row
+            continue
+
+        existing_filed = parse_date(
+            existing.get("filed")
+        )
+
+        if (
+            filed
+            and (
+                existing_filed is None
+                or filed > existing_filed
+            )
+        ):
+            periods[key] = row
+
+    return list(
+        periods.values()
+    )
+
+
+# ============================================================
+# PERIODENTYP
+# ============================================================
+
+def period_type(row):
+    """
+    SEC-Zeiträume werden anhand ihrer Länge eingeordnet.
+
+    Q  = Einzelquartal
+    H  = ca. 6 Monate
+    9M = ca. 9 Monate
+    FY = ca. 12 Monate
+    """
+
+    days = row_duration(row)
+
+    if days is None:
+        return None
+
+    if 70 <= days <= 110:
+        return "Q"
+
+    if 150 <= days <= 210:
+        return "H"
+
+    if 240 <= days <= 300:
+        return "9M"
+
+    if 330 <= days <= 390:
+        return "FY"
+
+    return None
+
+
+# ============================================================
+# DIREKTE QUARTALE
+# ============================================================
+
+def direct_quarters(rows):
+    """
+    Holt echte, direkt gemeldete Einzelquartale.
+    """
+
+    cleaned = dedupe_period_rows(
+        rows
+    )
 
     by_end = {}
 
-    for row in rows:
-        if not is_quarter(row):
+    for row in cleaned:
+        if period_type(row) != "Q":
             continue
 
         end = parse_date(
@@ -132,28 +224,398 @@ def dedupe_quarters(rows):
         ):
             by_end[end] = row
 
+    return by_end
+
+
+# ============================================================
+# KUMULIERTE PERIODEN
+# ============================================================
+
+def cumulative_periods(rows):
+    cleaned = dedupe_period_rows(
+        rows
+    )
+
+    result = []
+
+    for row in cleaned:
+        kind = period_type(row)
+
+        if kind in (
+            "H",
+            "9M",
+            "FY",
+        ):
+            result.append(row)
+
+    return result
+
+
+def make_derived_row(
+    cumulative_row,
+    previous_row,
+):
+    """
+    Einzelquartal =
+    längere kumulierte Periode
+    minus kürzere kumulierte Periode
+    desselben Geschäftsjahresbeginns.
+    """
+
+    cumulative_value = numeric_value(
+        cumulative_row
+    )
+
+    previous_value = numeric_value(
+        previous_row
+    )
+
+    if (
+        cumulative_value is None
+        or previous_value is None
+    ):
+        return None
+
+    previous_end = parse_date(
+        previous_row.get("end")
+    )
+
+    cumulative_end = parse_date(
+        cumulative_row.get("end")
+    )
+
+    if (
+        previous_end is None
+        or cumulative_end is None
+    ):
+        return None
+
+    start = previous_end
+
+    # Der abgeleitete Zeitraum beginnt am Tag
+    # nach dem Ende der vorherigen Periode.
+    from datetime import timedelta
+
+    derived_start = (
+        previous_end
+        + timedelta(days=1)
+    )
+
+    return {
+        "start":
+            derived_start.isoformat(),
+
+        "end":
+            cumulative_end.isoformat(),
+
+        "filed":
+            cumulative_row.get("filed"),
+
+        "form":
+            cumulative_row.get("form"),
+
+        "val":
+            cumulative_value
+            - previous_value,
+
+        "derived":
+            True,
+    }
+
+
+def derive_from_cumulative(rows):
+    """
+    Leitet fehlende Einzelquartale aus kumulierten
+    SEC-Perioden ab.
+
+    Beispiele:
+
+    9M - 6M = Q3
+    6M - Q1 = Q2
+    FY - 9M = Q4
+    """
+
+    cleaned = dedupe_period_rows(
+        rows
+    )
+
+    direct = direct_quarters(
+        rows
+    )
+
+    cumulative = cumulative_periods(
+        rows
+    )
+
+    derived = {}
+
+    # --------------------------------------------------------
+    # 6M - Q1 = Q2
+    # --------------------------------------------------------
+
+    half_years = [
+        row
+        for row in cumulative
+        if period_type(row) == "H"
+    ]
+
+    direct_rows = list(
+        direct.values()
+    )
+
+    for half in half_years:
+        half_start = parse_date(
+            half.get("start")
+        )
+
+        half_end = parse_date(
+            half.get("end")
+        )
+
+        if not half_start or not half_end:
+            continue
+
+        candidates = []
+
+        for quarter in direct_rows:
+            q_start = parse_date(
+                quarter.get("start")
+            )
+
+            q_end = parse_date(
+                quarter.get("end")
+            )
+
+            if not q_start or not q_end:
+                continue
+
+            if (
+                abs(
+                    (
+                        q_start
+                        - half_start
+                    ).days
+                )
+                <= 3
+                and q_end < half_end
+            ):
+                candidates.append(
+                    quarter
+                )
+
+        if candidates:
+            q1 = sorted(
+                candidates,
+                key=lambda row:
+                    parse_date(
+                        row.get("end")
+                    ),
+            )[0]
+
+            new_row = make_derived_row(
+                half,
+                q1,
+            )
+
+            if new_row:
+                end = parse_date(
+                    new_row.get("end")
+                )
+
+                if end not in direct:
+                    derived[end] = new_row
+
+    # --------------------------------------------------------
+    # 9M - 6M = Q3
+    # --------------------------------------------------------
+
+    nine_months = [
+        row
+        for row in cumulative
+        if period_type(row) == "9M"
+    ]
+
+    for nine in nine_months:
+        nine_start = parse_date(
+            nine.get("start")
+        )
+
+        nine_end = parse_date(
+            nine.get("end")
+        )
+
+        if not nine_start or not nine_end:
+            continue
+
+        candidates = []
+
+        for half in half_years:
+            half_start = parse_date(
+                half.get("start")
+            )
+
+            half_end = parse_date(
+                half.get("end")
+            )
+
+            if not half_start or not half_end:
+                continue
+
+            if (
+                abs(
+                    (
+                        half_start
+                        - nine_start
+                    ).days
+                )
+                <= 3
+                and half_end < nine_end
+            ):
+                candidates.append(
+                    half
+                )
+
+        if candidates:
+            half = sorted(
+                candidates,
+                key=lambda row:
+                    parse_date(
+                        row.get("end")
+                    ),
+                reverse=True,
+            )[0]
+
+            new_row = make_derived_row(
+                nine,
+                half,
+            )
+
+            if new_row:
+                end = parse_date(
+                    new_row.get("end")
+                )
+
+                if end not in direct:
+                    derived[end] = new_row
+
+    # --------------------------------------------------------
+    # FY - 9M = Q4
+    # --------------------------------------------------------
+
+    full_years = [
+        row
+        for row in cumulative
+        if period_type(row) == "FY"
+    ]
+
+    for full in full_years:
+        full_start = parse_date(
+            full.get("start")
+        )
+
+        full_end = parse_date(
+            full.get("end")
+        )
+
+        if not full_start or not full_end:
+            continue
+
+        candidates = []
+
+        for nine in nine_months:
+            nine_start = parse_date(
+                nine.get("start")
+            )
+
+            nine_end = parse_date(
+                nine.get("end")
+            )
+
+            if not nine_start or not nine_end:
+                continue
+
+            if (
+                abs(
+                    (
+                        nine_start
+                        - full_start
+                    ).days
+                )
+                <= 3
+                and nine_end < full_end
+            ):
+                candidates.append(
+                    nine
+                )
+
+        if candidates:
+            nine = sorted(
+                candidates,
+                key=lambda row:
+                    parse_date(
+                        row.get("end")
+                    ),
+                reverse=True,
+            )[0]
+
+            new_row = make_derived_row(
+                full,
+                nine,
+            )
+
+            if new_row:
+                end = parse_date(
+                    new_row.get("end")
+                )
+
+                if end not in direct:
+                    derived[end] = new_row
+
+    return derived
+
+
+# ============================================================
+# EINHEITLICHE QUARTALSREIHE
+# ============================================================
+
+def normalized_quarters(rows):
+    """
+    Direkte Quartale haben immer Vorrang.
+
+    Nur wenn ein Quartal fehlt, darf ein aus
+    kumulierten SEC-Werten abgeleitetes Quartal
+    eingesetzt werden.
+    """
+
+    direct = direct_quarters(
+        rows
+    )
+
+    derived = derive_from_cumulative(
+        rows
+    )
+
+    combined = dict(
+        derived
+    )
+
+    combined.update(
+        direct
+    )
+
     return sorted(
-        by_end.values(),
+        combined.values(),
         key=lambda row:
-            parse_date(row.get("end")),
+            parse_date(
+                row.get("end")
+            ),
         reverse=True,
     )
 
 
-def numeric_value(row):
-    if not row:
-        return None
-
-    value = row.get("val")
-
-    if value is None:
-        return None
-
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
+# ============================================================
+# YOY
+# ============================================================
 
 def find_yoy_previous(
     rows,
@@ -177,7 +639,8 @@ def find_yoy_previous(
             continue
 
         gap = (
-            current_end - end
+            current_end
+            - end
         ).days
 
         if 330 <= gap <= 400:
@@ -217,25 +680,9 @@ def percent_change(
 
 
 def quarter_yoy_growth(rows):
-    """
-    Liefert aktuelles YoY-Wachstum,
-    vorheriges YoY-Wachstum und
-    Beschleunigung.
-    """
-
-    quarters = dedupe_quarters(
+    quarters = normalized_quarters(
         rows
     )
-
-    if not quarters:
-        return {
-            "current_growth": None,
-            "previous_growth": None,
-            "acceleration": None,
-            "current_value": None,
-            "previous_value": None,
-            "base_effect": False,
-        }
 
     growth_rates = []
 
@@ -309,11 +756,6 @@ def quarter_yoy_growth(rows):
             - previous_growth
         )
 
-    base_effect = (
-        abs(current_growth)
-        >= EXTREME_GROWTH
-    )
-
     return {
         "current_growth":
             current_growth,
@@ -335,7 +777,8 @@ def quarter_yoy_growth(rows):
             ],
 
         "base_effect":
-            base_effect,
+            abs(current_growth)
+            >= EXTREME_GROWTH,
     }
 
 
@@ -343,75 +786,54 @@ def quarter_yoy_growth(rows):
 # MARGE
 # ============================================================
 
-def align_quarters(
-    first_rows,
-    second_rows,
-):
-    first = {
-        row.get("end"): row
-        for row in dedupe_quarters(
-            first_rows
-        )
-    }
-
-    second = {
-        row.get("end"): row
-        for row in dedupe_quarters(
-            second_rows
-        )
-    }
-
-    common_dates = sorted(
-        set(first.keys())
-        & set(second.keys()),
-        reverse=True,
-    )
-
-    return [
-        (
-            date,
-            first[date],
-            second[date],
-        )
-        for date in common_dates
-    ]
-
-
 def margin_metrics(
     revenue_rows,
     operating_income_rows,
 ):
-    aligned = align_quarters(
-        revenue_rows,
-        operating_income_rows,
+    revenues = {
+        row.get("end"): row
+        for row in normalized_quarters(
+            revenue_rows
+        )
+    }
+
+    incomes = {
+        row.get("end"): row
+        for row in normalized_quarters(
+            operating_income_rows
+        )
+    }
+
+    common_dates = sorted(
+        set(revenues.keys())
+        & set(incomes.keys()),
+        reverse=True,
     )
 
     margins = []
 
-    for end, revenue_row, income_row in aligned:
+    for end in common_dates:
         revenue = numeric_value(
-            revenue_row
+            revenues[end]
         )
 
-        operating_income = numeric_value(
-            income_row
+        income = numeric_value(
+            incomes[end]
         )
 
         if (
             revenue is None
-            or operating_income is None
+            or income is None
             or revenue == 0
         ):
             continue
 
-        margin = (
-            operating_income
-            / revenue
-        ) * 100.0
-
         margins.append({
             "end": end,
-            "margin": margin,
+            "margin":
+                income
+                / revenue
+                * 100.0,
         })
 
     if not margins:
@@ -462,69 +884,86 @@ def margin_metrics(
 # FREE CASHFLOW
 # ============================================================
 
-def fcf_rows(
+def build_fcf_quarters(
     operating_cashflow_rows,
     capex_rows,
 ):
-    aligned = align_quarters(
-        operating_cashflow_rows,
-        capex_rows,
+    ocf = {
+        row.get("end"): row
+        for row in normalized_quarters(
+            operating_cashflow_rows
+        )
+    }
+
+    capex = {
+        row.get("end"): row
+        for row in normalized_quarters(
+            capex_rows
+        )
+    }
+
+    common_dates = sorted(
+        set(ocf.keys())
+        & set(capex.keys()),
+        reverse=True,
     )
 
     results = []
 
-    for end, ocf_row, capex_row in aligned:
-        ocf = numeric_value(
-            ocf_row
+    for end in common_dates:
+        ocf_value = numeric_value(
+            ocf[end]
         )
 
-        capex = numeric_value(
-            capex_row
+        capex_value = numeric_value(
+            capex[end]
         )
 
         if (
-            ocf is None
-            or capex is None
+            ocf_value is None
+            or capex_value is None
         ):
             continue
 
         results.append({
             "start":
-                ocf_row.get("start"),
+                ocf[end].get("start"),
 
             "end":
                 end,
 
             "filed":
-                ocf_row.get("filed"),
+                ocf[end].get("filed"),
 
             "form":
-                ocf_row.get("form"),
+                ocf[end].get("form"),
 
             "val":
-                ocf - abs(capex),
+                ocf_value
+                - abs(capex_value),
         })
 
     return results
 
 
 # ============================================================
-# REVENUE SCORE
+# SCORES
 # ============================================================
 
 def revenue_score(
     growth,
     acceleration,
-    base_effect=False,
 ):
     if growth is None:
         return None
 
-    # Extreme Wachstumsraten bleiben positiv,
-    # werden aber nicht allein wegen ihrer
-    # Größenordnung stärker als 4/4 gewertet.
-
-    if growth >= 20:
+    if (
+        growth >= 20
+        and (
+            acceleration is None
+            or acceleration >= 0
+        )
+    ):
         return 4
 
     if growth >= 10:
@@ -539,63 +978,46 @@ def revenue_score(
     return 0
 
 
-# ============================================================
-# PROFIT / EPS SCORE
-# ============================================================
+def single_growth_score(
+    growth,
+):
+    if growth is None:
+        return None
+
+    if growth >= 25:
+        return 4
+
+    if growth >= 10:
+        return 3
+
+    if growth >= 0:
+        return 2
+
+    if growth >= -10:
+        return 1
+
+    return 0
+
 
 def profit_eps_score(
     profit_growth,
     eps_growth,
-    profit_base_effect=False,
-    eps_base_effect=False,
 ):
-    """
-    Profit und EPS werden gemeinsam bewertet.
-
-    Wichtig:
-    Ein sehr starkes EPS darf einen stark
-    fallenden Gewinn nicht vollständig
-    überstimmen.
-    """
-
     if (
         profit_growth is None
         and eps_growth is None
     ):
         return None
 
-    # Nur Profit vorhanden
-    if eps_growth is None:
-        if profit_growth >= 25:
-            return 4
-        if profit_growth >= 10:
-            return 3
-        if profit_growth >= 0:
-            return 2
-        if profit_growth >= -10:
-            return 1
-        return 0
-
-    # Nur EPS vorhanden
     if profit_growth is None:
-        if eps_growth >= 25:
-            return 4
-        if eps_growth >= 10:
-            return 3
-        if eps_growth >= 0:
-            return 2
-        if eps_growth >= -10:
-            return 1
-        return 0
+        return single_growth_score(
+            eps_growth
+        )
 
-    # --------------------------------------------------------
-    # Widerspruch zwischen Profit und EPS
-    # --------------------------------------------------------
-
-    divergence = abs(
-        profit_growth
-        - eps_growth
-    )
+    if eps_growth is None:
+        return single_growth_score(
+            profit_growth
+        )
 
     opposite_direction = (
         (
@@ -604,27 +1026,24 @@ def profit_eps_score(
         )
         or
         (
-            eps_growth < 0
-            and profit_growth > 0
+            profit_growth > 0
+            and eps_growth < 0
         )
     )
 
-    if (
-        opposite_direction
-        and divergence
-        >= PROFIT_EPS_DIVERGENCE
-    ):
-        # AVGO-artiger Fall:
-        # ein Wert extrem positiv,
-        # der andere klar negativ.
-        return 2
+    divergence = abs(
+        profit_growth
+        - eps_growth
+    )
 
     if opposite_direction:
-        return 2
+        if (
+            divergence
+            >= PROFIT_EPS_DIVERGENCE
+        ):
+            return 2
 
-    # --------------------------------------------------------
-    # Beide positiv
-    # --------------------------------------------------------
+        return 2
 
     if (
         profit_growth >= 25
@@ -644,10 +1063,6 @@ def profit_eps_score(
     ):
         return 2
 
-    # --------------------------------------------------------
-    # Beide negativ
-    # --------------------------------------------------------
-
     if (
         profit_growth >= -10
         and eps_growth >= -10
@@ -657,14 +1072,9 @@ def profit_eps_score(
     return 0
 
 
-# ============================================================
-# MARGIN / FCF SCORE
-# ============================================================
-
 def margin_fcf_score(
     margin_change,
     fcf_growth,
-    fcf_base_effect=False,
 ):
     points = 0
     available = 0
@@ -691,14 +1101,12 @@ def margin_fcf_score(
         return None
 
     return round(
-        points / available * 4,
+        points
+        / available
+        * 4,
         2,
     )
 
-
-# ============================================================
-# GUIDANCE / ORDERS
-# ============================================================
 
 def operational_score(
     guidance_score,
@@ -728,18 +1136,9 @@ def operational_score(
     )
 
 
-# ============================================================
-# NORMALISIERTER FUNDAMENTAL SCORE
-# ============================================================
-
 def normalized_score(
     components,
 ):
-    """
-    N/A wird nicht automatisch als
-    Null gewertet.
-    """
-
     earned = 0.0
     available = 0.0
 
@@ -809,19 +1208,22 @@ def build_quality_flags(
             "FCF_EXTREME_BASE_EFFECT"
         )
 
-    profit_growth = profit_metrics.get(
-        "current_growth"
+    profit_growth = (
+        profit_metrics.get(
+            "current_growth"
+        )
     )
 
-    eps_growth = eps_metrics.get(
-        "current_growth"
+    eps_growth = (
+        eps_metrics.get(
+            "current_growth"
+        )
     )
 
     if (
         profit_growth is not None
         and eps_growth is not None
-    ):
-        opposite = (
+        and (
             (
                 profit_growth < 0
                 and eps_growth > 0
@@ -832,11 +1234,10 @@ def build_quality_flags(
                 and eps_growth < 0
             )
         )
-
-        if opposite:
-            flags.append(
-                "PROFIT_EPS_DIVERGENCE"
-            )
+    ):
+        flags.append(
+            "PROFIT_EPS_DIVERGENCE"
+        )
 
     return flags
 
@@ -849,8 +1250,12 @@ def get_fundamental_data(
     cik,
     symbol=None,
 ):
-    facts = get_company_facts(
+    normalized_cik = str(
         cik
+    ).zfill(10)
+
+    facts = get_company_facts(
+        normalized_cik
     )
 
     revenue = get_revenue_data(
@@ -865,10 +1270,6 @@ def get_fundamental_data(
         facts
     )
 
-    normalized_cik = str(
-        cik
-    ).zfill(10)
-
     guidance = get_guidance_data(
         normalized_cik
     )
@@ -878,21 +1279,12 @@ def get_fundamental_data(
     )
 
 
-    # --------------------------------------------------------
-    # REVENUE
-    # --------------------------------------------------------
-
     revenue_metrics = quarter_yoy_growth(
         revenue.get(
             "rows",
             [],
         )
     )
-
-
-    # --------------------------------------------------------
-    # PROFIT
-    # --------------------------------------------------------
 
     profit_metrics = quarter_yoy_growth(
         profit_eps.get(
@@ -901,11 +1293,6 @@ def get_fundamental_data(
         )
     )
 
-
-    # --------------------------------------------------------
-    # EPS
-    # --------------------------------------------------------
-
     eps_metrics = quarter_yoy_growth(
         profit_eps.get(
             "eps_rows",
@@ -913,12 +1300,7 @@ def get_fundamental_data(
         )
     )
 
-
-    # --------------------------------------------------------
-    # MARGIN
-    # --------------------------------------------------------
-
-    margin_metrics_data = margin_metrics(
+    margin_data = margin_metrics(
         revenue.get(
             "rows",
             [],
@@ -929,12 +1311,7 @@ def get_fundamental_data(
         ),
     )
 
-
-    # --------------------------------------------------------
-    # FREE CASHFLOW
-    # --------------------------------------------------------
-
-    calculated_fcf_rows = fcf_rows(
+    fcf_quarters = build_fcf_quarters(
         margin_fcf.get(
             "operating_cashflow_rows",
             [],
@@ -945,14 +1322,9 @@ def get_fundamental_data(
         ),
     )
 
-    fcf_metrics_data = quarter_yoy_growth(
-        calculated_fcf_rows
+    fcf_metrics = quarter_yoy_growth(
+        fcf_quarters
     )
-
-
-    # --------------------------------------------------------
-    # ORDERS / GUIDANCE
-    # --------------------------------------------------------
 
     orders_change = orders.get(
         "change"
@@ -967,10 +1339,6 @@ def get_fundamental_data(
     )
 
 
-    # --------------------------------------------------------
-    # SUPPLY / DEMAND
-    # --------------------------------------------------------
-
     supply_demand = get_supply_demand_data(
         revenue_growth=
             revenue_metrics[
@@ -983,12 +1351,12 @@ def get_fundamental_data(
             ],
 
         margin_change=
-            margin_metrics_data[
+            margin_data[
                 "margin_change"
             ],
 
         fcf_growth=
-            fcf_metrics_data[
+            fcf_metrics[
                 "current_growth"
             ],
 
@@ -1002,10 +1370,6 @@ def get_fundamental_data(
         pricing_power=False,
     )
 
-
-    # --------------------------------------------------------
-    # ANOMALY
-    # --------------------------------------------------------
 
     anomaly = get_anomaly_data(
         revenue_growth=
@@ -1039,22 +1403,22 @@ def get_fundamental_data(
             ],
 
         margin_change=
-            margin_metrics_data[
+            margin_data[
                 "margin_change"
             ],
 
         margin_acceleration=
-            margin_metrics_data[
+            margin_data[
                 "margin_acceleration"
             ],
 
         fcf_growth=
-            fcf_metrics_data[
+            fcf_metrics[
                 "current_growth"
             ],
 
         fcf_acceleration=
-            fcf_metrics_data[
+            fcf_metrics[
                 "acceleration"
             ],
 
@@ -1068,21 +1432,12 @@ def get_fundamental_data(
     )
 
 
-    # --------------------------------------------------------
-    # SCORES
-    # --------------------------------------------------------
-
     revenue_component = revenue_score(
         revenue_metrics[
             "current_growth"
         ],
-
         revenue_metrics[
             "acceleration"
-        ],
-
-        revenue_metrics[
-            "base_effect"
         ],
     )
 
@@ -1090,31 +1445,17 @@ def get_fundamental_data(
         profit_metrics[
             "current_growth"
         ],
-
         eps_metrics[
             "current_growth"
-        ],
-
-        profit_metrics[
-            "base_effect"
-        ],
-
-        eps_metrics[
-            "base_effect"
         ],
     )
 
     margin_component = margin_fcf_score(
-        margin_metrics_data[
+        margin_data[
             "margin_change"
         ],
-
-        fcf_metrics_data[
+        fcf_metrics[
             "current_growth"
-        ],
-
-        fcf_metrics_data[
-            "base_effect"
         ],
     )
 
@@ -1123,39 +1464,44 @@ def get_fundamental_data(
         orders_score,
     )
 
-    supply_component = supply_demand.get(
-        "score"
+    supply_component = (
+        supply_demand.get(
+            "score"
+        )
     )
 
 
     components = [
         {
             "name": "Revenue",
-            "score": revenue_component,
+            "score":
+                revenue_component,
             "max": 4,
         },
-
         {
             "name": "Profit_EPS",
-            "score": profit_component,
+            "score":
+                profit_component,
             "max": 4,
         },
-
         {
             "name": "Margin_FCF",
-            "score": margin_component,
+            "score":
+                margin_component,
             "max": 4,
         },
-
         {
-            "name": "Guidance_Orders",
-            "score": operational_component,
+            "name":
+                "Guidance_Orders",
+            "score":
+                operational_component,
             "max": 4,
         },
-
         {
-            "name": "Supply_Demand",
-            "score": supply_component,
+            "name":
+                "Supply_Demand",
+            "score":
+                supply_component,
             "max": 4,
         },
     ]
@@ -1165,22 +1511,13 @@ def get_fundamental_data(
         components
     )
 
-
-    # --------------------------------------------------------
-    # QUALITY FLAGS
-    # --------------------------------------------------------
-
     quality_flags = build_quality_flags(
         revenue_metrics,
         profit_metrics,
         eps_metrics,
-        fcf_metrics_data,
+        fcf_metrics,
     )
 
-
-    # --------------------------------------------------------
-    # AUSGABE
-    # --------------------------------------------------------
 
     return {
         "symbol":
@@ -1211,10 +1548,10 @@ def get_fundamental_data(
             eps_metrics,
 
         "margin":
-            margin_metrics_data,
+            margin_data,
 
         "fcf":
-            fcf_metrics_data,
+            fcf_metrics,
 
         "guidance":
             guidance,
