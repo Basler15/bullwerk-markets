@@ -15,6 +15,12 @@
 #
 # ANOMALY bleibt separat und verändert
 # den normalen Fundamental-Score nicht.
+#
+# V2:
+# - Profit/EPS-Konsistenz verbessert
+# - extreme Basiseffekte werden erkannt
+# - extreme Prozentwerte führen nicht
+#   automatisch zu Maximalpunkten
 
 from datetime import datetime
 
@@ -26,6 +32,16 @@ from scanner.guidance import get_guidance_data
 from scanner.orders_backlog import get_orders_backlog_data
 from scanner.supply_demand import get_supply_demand_data
 from scanner.anomaly import get_anomaly_data
+
+
+# ============================================================
+# GRENZWERTE
+# ============================================================
+
+EXTREME_GROWTH = 200.0
+EXTREME_ACCELERATION = 150.0
+
+PROFIT_EPS_DIVERGENCE = 75.0
 
 
 # ============================================================
@@ -77,8 +93,7 @@ def dedupe_quarters(rows):
     Bereinigt doppelte SEC-Einträge.
 
     Pro wirtschaftlichem Quartalsende wird
-    möglichst der zuletzt eingereichte Wert
-    verwendet.
+    der zuletzt eingereichte Wert verwendet.
     """
 
     by_end = {}
@@ -144,11 +159,6 @@ def find_yoy_previous(
     rows,
     current_row,
 ):
-    """
-    Sucht das Quartal ungefähr ein Jahr
-    vor dem aktuellen Quartal.
-    """
-
     current_end = parse_date(
         current_row.get("end")
     )
@@ -208,11 +218,9 @@ def percent_change(
 
 def quarter_yoy_growth(rows):
     """
-    Liefert aktuelles YoY-Wachstum und
-    vorheriges YoY-Wachstum.
-
-    Daraus kann die Beschleunigung
-    berechnet werden.
+    Liefert aktuelles YoY-Wachstum,
+    vorheriges YoY-Wachstum und
+    Beschleunigung.
     """
 
     quarters = dedupe_quarters(
@@ -224,6 +232,9 @@ def quarter_yoy_growth(rows):
             "current_growth": None,
             "previous_growth": None,
             "acceleration": None,
+            "current_value": None,
+            "previous_value": None,
+            "base_effect": False,
         }
 
     growth_rates = []
@@ -256,8 +267,15 @@ def quarter_yoy_growth(rows):
         growth_rates.append({
             "end":
                 current.get("end"),
+
             "growth":
                 growth,
+
+            "current_value":
+                current_value,
+
+            "previous_value":
+                previous_value,
         })
 
     if not growth_rates:
@@ -265,10 +283,15 @@ def quarter_yoy_growth(rows):
             "current_growth": None,
             "previous_growth": None,
             "acceleration": None,
+            "current_value": None,
+            "previous_value": None,
+            "base_effect": False,
         }
 
+    current_data = growth_rates[0]
+
     current_growth = (
-        growth_rates[0]["growth"]
+        current_data["growth"]
     )
 
     previous_growth = None
@@ -286,6 +309,11 @@ def quarter_yoy_growth(rows):
             - previous_growth
         )
 
+    base_effect = (
+        abs(current_growth)
+        >= EXTREME_GROWTH
+    )
+
     return {
         "current_growth":
             current_growth,
@@ -295,6 +323,19 @@ def quarter_yoy_growth(rows):
 
         "acceleration":
             acceleration,
+
+        "current_value":
+            current_data[
+                "current_value"
+            ],
+
+        "previous_value":
+            current_data[
+                "previous_value"
+            ],
+
+        "base_effect":
+            base_effect,
     }
 
 
@@ -306,11 +347,6 @@ def align_quarters(
     first_rows,
     second_rows,
 ):
-    """
-    Verbindet zwei Quartalsserien über
-    das wirtschaftliche Quartalsende.
-    """
-
     first = {
         row.get("end"): row
         for row in dedupe_quarters(
@@ -473,23 +509,22 @@ def fcf_rows(
 
 
 # ============================================================
-# EINZEL-SCORES
+# REVENUE SCORE
 # ============================================================
 
 def revenue_score(
     growth,
     acceleration,
+    base_effect=False,
 ):
     if growth is None:
         return None
 
-    if (
-        growth >= 20
-        and (
-            acceleration is None
-            or acceleration >= 0
-        )
-    ):
+    # Extreme Wachstumsraten bleiben positiv,
+    # werden aber nicht allein wegen ihrer
+    # Größenordnung stärker als 4/4 gewertet.
+
+    if growth >= 20:
         return 4
 
     if growth >= 10:
@@ -504,42 +539,132 @@ def revenue_score(
     return 0
 
 
+# ============================================================
+# PROFIT / EPS SCORE
+# ============================================================
+
 def profit_eps_score(
     profit_growth,
     eps_growth,
+    profit_base_effect=False,
+    eps_base_effect=False,
 ):
-    values = [
-        value
-        for value in (
-            profit_growth,
-            eps_growth,
-        )
-        if value is not None
-    ]
+    """
+    Profit und EPS werden gemeinsam bewertet.
 
-    if not values:
+    Wichtig:
+    Ein sehr starkes EPS darf einen stark
+    fallenden Gewinn nicht vollständig
+    überstimmen.
+    """
+
+    if (
+        profit_growth is None
+        and eps_growth is None
+    ):
         return None
 
-    best = max(values)
+    # Nur Profit vorhanden
+    if eps_growth is None:
+        if profit_growth >= 25:
+            return 4
+        if profit_growth >= 10:
+            return 3
+        if profit_growth >= 0:
+            return 2
+        if profit_growth >= -10:
+            return 1
+        return 0
 
-    if best >= 25:
-        return 4
+    # Nur EPS vorhanden
+    if profit_growth is None:
+        if eps_growth >= 25:
+            return 4
+        if eps_growth >= 10:
+            return 3
+        if eps_growth >= 0:
+            return 2
+        if eps_growth >= -10:
+            return 1
+        return 0
 
-    if best >= 10:
-        return 3
+    # --------------------------------------------------------
+    # Widerspruch zwischen Profit und EPS
+    # --------------------------------------------------------
 
-    if best >= 0:
+    divergence = abs(
+        profit_growth
+        - eps_growth
+    )
+
+    opposite_direction = (
+        (
+            profit_growth < 0
+            and eps_growth > 0
+        )
+        or
+        (
+            eps_growth < 0
+            and profit_growth > 0
+        )
+    )
+
+    if (
+        opposite_direction
+        and divergence
+        >= PROFIT_EPS_DIVERGENCE
+    ):
+        # AVGO-artiger Fall:
+        # ein Wert extrem positiv,
+        # der andere klar negativ.
         return 2
 
-    if best >= -10:
+    if opposite_direction:
+        return 2
+
+    # --------------------------------------------------------
+    # Beide positiv
+    # --------------------------------------------------------
+
+    if (
+        profit_growth >= 25
+        and eps_growth >= 25
+    ):
+        return 4
+
+    if (
+        profit_growth >= 10
+        and eps_growth >= 10
+    ):
+        return 3
+
+    if (
+        profit_growth >= 0
+        and eps_growth >= 0
+    ):
+        return 2
+
+    # --------------------------------------------------------
+    # Beide negativ
+    # --------------------------------------------------------
+
+    if (
+        profit_growth >= -10
+        and eps_growth >= -10
+    ):
         return 1
 
     return 0
 
 
+# ============================================================
+# MARGIN / FCF SCORE
+# ============================================================
+
 def margin_fcf_score(
     margin_change,
     fcf_growth,
+    fcf_base_effect=False,
 ):
     points = 0
     available = 0
@@ -549,6 +674,7 @@ def margin_fcf_score(
 
         if margin_change >= 1.5:
             points += 2
+
         elif margin_change >= 0:
             points += 1
 
@@ -557,6 +683,7 @@ def margin_fcf_score(
 
         if fcf_growth >= 20:
             points += 2
+
         elif fcf_growth >= 0:
             points += 1
 
@@ -568,6 +695,10 @@ def margin_fcf_score(
         2,
     )
 
+
+# ============================================================
+# GUIDANCE / ORDERS
+# ============================================================
 
 def operational_score(
     guidance_score,
@@ -605,16 +736,21 @@ def normalized_score(
     components,
 ):
     """
-    Fehlende N/A-Komponenten werden nicht
-    automatisch als Null gewertet.
+    N/A wird nicht automatisch als
+    Null gewertet.
     """
 
     earned = 0.0
     available = 0.0
 
     for component in components:
-        score = component.get("score")
-        maximum = component.get("max")
+        score = component.get(
+            "score"
+        )
+
+        maximum = component.get(
+            "max"
+        )
 
         if score is None:
             continue
@@ -626,9 +762,83 @@ def normalized_score(
         return None
 
     return round(
-        earned / available * 20,
+        earned
+        / available
+        * 20,
         1,
     )
+
+
+# ============================================================
+# QUALITY FLAGS
+# ============================================================
+
+def build_quality_flags(
+    revenue_metrics,
+    profit_metrics,
+    eps_metrics,
+    fcf_metrics,
+):
+    flags = []
+
+    if revenue_metrics.get(
+        "base_effect"
+    ):
+        flags.append(
+            "REVENUE_EXTREME_BASE_EFFECT"
+        )
+
+    if profit_metrics.get(
+        "base_effect"
+    ):
+        flags.append(
+            "PROFIT_EXTREME_BASE_EFFECT"
+        )
+
+    if eps_metrics.get(
+        "base_effect"
+    ):
+        flags.append(
+            "EPS_EXTREME_BASE_EFFECT"
+        )
+
+    if fcf_metrics.get(
+        "base_effect"
+    ):
+        flags.append(
+            "FCF_EXTREME_BASE_EFFECT"
+        )
+
+    profit_growth = profit_metrics.get(
+        "current_growth"
+    )
+
+    eps_growth = eps_metrics.get(
+        "current_growth"
+    )
+
+    if (
+        profit_growth is not None
+        and eps_growth is not None
+    ):
+        opposite = (
+            (
+                profit_growth < 0
+                and eps_growth > 0
+            )
+            or
+            (
+                profit_growth > 0
+                and eps_growth < 0
+            )
+        )
+
+        if opposite:
+            flags.append(
+                "PROFIT_EPS_DIVERGENCE"
+            )
+
+    return flags
 
 
 # ============================================================
@@ -639,11 +849,6 @@ def get_fundamental_data(
     cik,
     symbol=None,
 ):
-    """
-    Führt die getesteten Bullwerk-
-    Fundamentalmodule zusammen.
-    """
-
     facts = get_company_facts(
         cik
     )
@@ -660,12 +865,16 @@ def get_fundamental_data(
         facts
     )
 
+    normalized_cik = str(
+        cik
+    ).zfill(10)
+
     guidance = get_guidance_data(
-        str(cik).zfill(10)
+        normalized_cik
     )
 
     orders = get_orders_backlog_data(
-        str(cik).zfill(10)
+        normalized_cik
     )
 
 
@@ -742,7 +951,7 @@ def get_fundamental_data(
 
 
     # --------------------------------------------------------
-    # ORDERS
+    # ORDERS / GUIDANCE
     # --------------------------------------------------------
 
     orders_change = orders.get(
@@ -753,11 +962,6 @@ def get_fundamental_data(
         "score"
     )
 
-
-    # --------------------------------------------------------
-    # GUIDANCE
-    # --------------------------------------------------------
-
     guidance_score = guidance.get(
         "score"
     )
@@ -765,10 +969,6 @@ def get_fundamental_data(
 
     # --------------------------------------------------------
     # SUPPLY / DEMAND
-    #
-    # supply_constraint und pricing_power
-    # bleiben False, bis wir dafür eine
-    # belastbare Datenquelle angeschlossen haben.
     # --------------------------------------------------------
 
     supply_demand = get_supply_demand_data(
@@ -869,15 +1069,20 @@ def get_fundamental_data(
 
 
     # --------------------------------------------------------
-    # 5 FUNDAMENTAL-KOMPONENTEN
+    # SCORES
     # --------------------------------------------------------
 
     revenue_component = revenue_score(
         revenue_metrics[
             "current_growth"
         ],
+
         revenue_metrics[
             "acceleration"
+        ],
+
+        revenue_metrics[
+            "base_effect"
         ],
     )
 
@@ -885,8 +1090,17 @@ def get_fundamental_data(
         profit_metrics[
             "current_growth"
         ],
+
         eps_metrics[
             "current_growth"
+        ],
+
+        profit_metrics[
+            "base_effect"
+        ],
+
+        eps_metrics[
+            "base_effect"
         ],
     )
 
@@ -894,8 +1108,13 @@ def get_fundamental_data(
         margin_metrics_data[
             "margin_change"
         ],
+
         fcf_metrics_data[
             "current_growth"
+        ],
+
+        fcf_metrics_data[
+            "base_effect"
         ],
     )
 
@@ -904,11 +1123,10 @@ def get_fundamental_data(
         orders_score,
     )
 
-    supply_component = (
-        supply_demand.get(
-            "score"
-        )
+    supply_component = supply_demand.get(
+        "score"
     )
+
 
     components = [
         {
@@ -916,21 +1134,25 @@ def get_fundamental_data(
             "score": revenue_component,
             "max": 4,
         },
+
         {
             "name": "Profit_EPS",
             "score": profit_component,
             "max": 4,
         },
+
         {
             "name": "Margin_FCF",
             "score": margin_component,
             "max": 4,
         },
+
         {
             "name": "Guidance_Orders",
             "score": operational_component,
             "max": 4,
         },
+
         {
             "name": "Supply_Demand",
             "score": supply_component,
@@ -945,6 +1167,18 @@ def get_fundamental_data(
 
 
     # --------------------------------------------------------
+    # QUALITY FLAGS
+    # --------------------------------------------------------
+
+    quality_flags = build_quality_flags(
+        revenue_metrics,
+        profit_metrics,
+        eps_metrics,
+        fcf_metrics_data,
+    )
+
+
+    # --------------------------------------------------------
     # AUSGABE
     # --------------------------------------------------------
 
@@ -953,7 +1187,7 @@ def get_fundamental_data(
             symbol,
 
         "cik":
-            str(cik).zfill(10),
+            normalized_cik,
 
         "fundamental_score":
             fundamental_score,
@@ -963,6 +1197,9 @@ def get_fundamental_data(
 
         "components":
             components,
+
+        "quality_flags":
+            quality_flags,
 
         "revenue":
             revenue_metrics,
