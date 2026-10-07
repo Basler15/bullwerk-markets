@@ -1,10 +1,10 @@
-name: NVDA Duplicate Period Check
+name: NVDA Current Revenue Period Check
 
 on:
   workflow_dispatch:
 
 jobs:
-  check-nvda-periods:
+  check-nvda-current-period:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: NVDA doppelte SEC Perioden prüfen
+      - name: NVDA aktuellen Revenue Wert prüfen
         run: |
           python - <<'PY'
           from scanner.sec_data import get_company_facts
@@ -25,20 +25,13 @@ jobs:
 
           CIK = "0001045810"
 
-          TARGET_PERIODS = [
-              (
-                  "2025-04-28",
-                  "2025-07-27",
-              ),
-              (
-                  "2025-01-27",
-                  "2025-04-27",
-              ),
-          ]
+          TARGET_START = "2026-04-27"
+          TARGET_END = "2026-07-26"
+          TARGET_VALUE = 96221000000
 
 
           print("=" * 90)
-          print("NVDA DUPLICATE PERIOD CHECK")
+          print("NVDA CURRENT REVENUE PERIOD CHECK")
           print("=" * 90)
 
           facts = get_company_facts(CIK)
@@ -49,7 +42,7 @@ jobs:
 
           print()
           print(
-              "VERWENDETES REVENUE CONCEPT:",
+              "REVENUE CONCEPT:",
               revenue.get("concept")
           )
 
@@ -58,162 +51,183 @@ jobs:
               []
           )
 
+          matches = []
 
-          for target_start, target_end in TARGET_PERIODS:
+          for row in rows:
 
-              print()
-              print("=" * 90)
-
-              print(
-                  "GESUCHTER ZEITRAUM:",
-                  target_start,
-                  "bis",
-                  target_end
-              )
-
-              matches = []
-
-              for row in rows:
-
-                  if (
-                      row.get("start")
-                      == target_start
-                      and
-                      row.get("end")
-                      == target_end
-                  ):
-                      matches.append(
-                          row
-                      )
-
-
-              print(
-                  "ANZAHL FUNDSTELLEN:",
-                  len(matches)
-              )
-
-
-              if not matches:
-
-                  print(
-                      "KEINE PASSENDEN "
-                      "SEC-EINTRÄGE GEFUNDEN"
-                  )
-
-                  continue
-
-
-              matches.sort(
-                  key=lambda row:
-                      row.get("filed", "")
-              )
-
-
-              unique_values = set()
-
-
-              for number, row in enumerate(
-                  matches,
-                  start=1,
+              if (
+                  row.get("start") == TARGET_START
+                  and
+                  row.get("end") == TARGET_END
               ):
-
-                  value = row.get(
-                      "val"
-                  )
-
-                  unique_values.add(
-                      value
-                  )
-
-                  print()
-                  print(
-                      "EINTRAG:",
-                      number
-                  )
-
-                  print(
-                      " Wert:",
-                      value
-                  )
-
-                  print(
-                      " Filed:",
-                      row.get(
-                          "filed"
-                      )
-                  )
-
-                  print(
-                      " Form:",
-                      row.get(
-                          "form"
-                      )
-                  )
-
-                  print(
-                      " FY:",
-                      row.get(
-                          "fy"
-                      )
-                  )
-
-                  print(
-                      " FP:",
-                      row.get(
-                          "fp"
-                      )
-                  )
-
-                  print(
-                      " Frame:",
-                      row.get(
-                          "frame"
-                      )
-                  )
-
-                  print(
-                      " Accession:",
-                      row.get(
-                          "accn"
-                      )
-                  )
-
-
-              print()
-              print(
-                  "UNTERSCHIEDLICHE WERTE:",
-                  len(unique_values)
-              )
-
-              print(
-                  "WERTE:",
-                  sorted(
-                      unique_values
-                  )
-              )
-
-
-              if len(unique_values) == 1:
-
-                  print(
-                      "ERGEBNIS: "
-                      "Alle SEC-Fundstellen "
-                      "melden denselben Wert."
-                  )
-
-              else:
-
-                  print(
-                      "ERGEBNIS: ACHTUNG - "
-                      "Für denselben Zeitraum "
-                      "existieren unterschiedliche Werte."
+                  matches.append(
+                      row
                   )
 
 
           print()
-          print("=" * 90)
           print(
-              "DUPLICATE PERIOD CHECK ABGESCHLOSSEN"
+              "GESUCHTER ZEITRAUM:",
+              TARGET_START,
+              "bis",
+              TARGET_END
           )
+
+          print(
+              "ERWARTETER WERT:",
+              TARGET_VALUE
+          )
+
+          print(
+              "ANZAHL FUNDSTELLEN:",
+              len(matches)
+          )
+
+
+          if not matches:
+              raise RuntimeError(
+                  "Kein SEC-Eintrag für "
+                  "den gesuchten Zeitraum gefunden."
+              )
+
+
+          for number, row in enumerate(
+              matches,
+              start=1,
+          ):
+
+              print()
+              print("-" * 90)
+
+              print(
+                  "EINTRAG:",
+                  number
+              )
+
+              print(
+                  "Wert:",
+                  row.get("val")
+              )
+
+              print(
+                  "Start:",
+                  row.get("start")
+              )
+
+              print(
+                  "Ende:",
+                  row.get("end")
+              )
+
+              print(
+                  "Filed:",
+                  row.get("filed")
+              )
+
+              print(
+                  "Form:",
+                  row.get("form")
+              )
+
+              print(
+                  "FY:",
+                  row.get("fy")
+              )
+
+              print(
+                  "FP:",
+                  row.get("fp")
+              )
+
+              print(
+                  "Frame:",
+                  row.get("frame")
+              )
+
+              print(
+                  "Accession:",
+                  row.get("accn")
+              )
+
+              print(
+                  "Wert entspricht 96,221 Mrd.:",
+                  row.get("val") == TARGET_VALUE
+              )
+
+
+          exact_matches = [
+              row
+              for row in matches
+              if row.get("val") == TARGET_VALUE
+          ]
+
+
+          print()
+          print("=" * 90)
+
+          print(
+              "EXAKTE 96,221-MRD-FUNDSTELLEN:",
+              len(exact_matches)
+          )
+
+
+          for row in exact_matches:
+
+              print()
+              print(
+                  "96,221 MRD SEC CONTEXT:"
+              )
+
+              print(
+                  "Start:",
+                  row.get("start")
+              )
+
+              print(
+                  "Ende:",
+                  row.get("end")
+              )
+
+              print(
+                  "Form:",
+                  row.get("form")
+              )
+
+              print(
+                  "Filed:",
+                  row.get("filed")
+              )
+
+              print(
+                  "FY:",
+                  row.get("fy")
+              )
+
+              print(
+                  "FP:",
+                  row.get("fp")
+              )
+
+              print(
+                  "Frame:",
+                  row.get("frame")
+              )
+
+              print(
+                  "Accession:",
+                  row.get("accn")
+              )
+
+
+          if not exact_matches:
+              raise RuntimeError(
+                  "96,221 Mrd. wurden für diesen "
+                  "Zeitraum nicht gefunden."
+              )
+
+
+          print()
+          print("=" * 90)
+          print("CHECK ERFOLGREICH")
           print("=" * 90)
           PY
