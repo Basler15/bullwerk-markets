@@ -1,0 +1,28 @@
+name: Price Momentum Real Stock Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  real-stock-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check module import
+        run: |
+          python - <<'PY'
+          from scanner.price_momentum import calculate_price_momentum
+
+          print("Price Momentum Modul erfolgreich geladen.")
+          print("Realaktien-Test vorbereitet.")
+          print("Aktien: NVDA, MSFT, AMD, NKE")
+          print("Benchmark: QQQ")
+          PY
