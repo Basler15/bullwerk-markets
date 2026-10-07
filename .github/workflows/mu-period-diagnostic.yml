@@ -1,0 +1,213 @@
+name: MU Period Diagnostic
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose-mu:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Diagnose MU SEC periods
+        run: |
+          python - <<'PY'
+          from scanner.sec_data import get_company_facts
+          from scanner.revenue import get_revenue_data
+          from scanner.margin_fcf import get_margin_fcf_data
+
+          CIK = "0000723125"
+
+          facts = get_company_facts(CIK)
+
+          revenue = get_revenue_data(facts)
+          margin_fcf = get_margin_fcf_data(facts)
+
+          revenue_rows = revenue.get("rows", [])
+          operating_income_rows = margin_fcf.get(
+              "operating_income_rows", []
+          )
+          ocf_rows = margin_fcf.get(
+              "operating_cashflow_rows", []
+          )
+          capex_rows = margin_fcf.get(
+              "capex_rows", []
+          )
+
+          def duration(row):
+              start = row.get("start")
+              end = row.get("end")
+
+              if not start or not end:
+                  return None
+
+              from datetime import datetime
+
+              try:
+                  start_date = datetime.strptime(
+                      start, "%Y-%m-%d"
+                  ).date()
+
+                  end_date = datetime.strptime(
+                      end, "%Y-%m-%d"
+                  ).date()
+
+                  return (
+                      end_date - start_date
+                  ).days
+
+              except Exception:
+                  return None
+
+          def show_rows(title, rows, limit=25):
+              print()
+              print("=" * 80)
+              print(title)
+              print("=" * 80)
+
+              sorted_rows = sorted(
+                  rows,
+                  key=lambda row: (
+                      row.get("end") or "",
+                      row.get("filed") or "",
+                  ),
+                  reverse=True,
+              )
+
+              count = 0
+
+              for row in sorted_rows:
+                  form = row.get("form")
+
+                  if form not in ("10-Q", "10-K"):
+                      continue
+
+                  print(
+                      "START:",
+                      row.get("start"),
+                      "| END:",
+                      row.get("end"),
+                      "| DAYS:",
+                      duration(row),
+                      "| VALUE:",
+                      row.get("val"),
+                      "| FORM:",
+                      form,
+                      "| FILED:",
+                      row.get("filed"),
+                      "| FY:",
+                      row.get("fy"),
+                      "| FP:",
+                      row.get("fp"),
+                      "| FRAME:",
+                      row.get("frame"),
+                  )
+
+                  count += 1
+
+                  if count >= limit:
+                      break
+
+          print()
+          print("=" * 80)
+          print("MU PERIOD DIAGNOSTIC")
+          print("CIK:", CIK)
+          print("=" * 80)
+
+          print()
+          print(
+              "Revenue concept:",
+              revenue.get("concept")
+          )
+
+          show_rows(
+              "REVENUE RAW PERIODS",
+              revenue_rows,
+          )
+
+          show_rows(
+              "OPERATING INCOME RAW PERIODS",
+              operating_income_rows,
+          )
+
+          show_rows(
+              "OPERATING CASH FLOW RAW PERIODS",
+              ocf_rows,
+          )
+
+          show_rows(
+              "CAPEX RAW PERIODS",
+              capex_rows,
+          )
+
+          print()
+          print("=" * 80)
+          print("DIRECT QUARTER CHECK")
+          print("=" * 80)
+
+          def direct_quarters(rows):
+              result = []
+
+              for row in rows:
+                  days = duration(row)
+
+                  if (
+                      days is not None
+                      and 70 <= days <= 110
+                  ):
+                      result.append(row)
+
+              return sorted(
+                  result,
+                  key=lambda row: (
+                      row.get("end") or "",
+                      row.get("filed") or "",
+                  ),
+                  reverse=True,
+              )
+
+          datasets = [
+              ("REVENUE", revenue_rows),
+              (
+                  "OPERATING INCOME",
+                  operating_income_rows,
+              ),
+              (
+                  "OPERATING CASH FLOW",
+                  ocf_rows,
+              ),
+              ("CAPEX", capex_rows),
+          ]
+
+          for name, rows in datasets:
+              quarters = direct_quarters(rows)
+
+              print()
+              print(name)
+              print("-" * 60)
+              print(
+                  "Direct quarter rows:",
+                  len(quarters)
+              )
+
+              for row in quarters[:12]:
+                  print(
+                      row.get("start"),
+                      "->",
+                      row.get("end"),
+                      "|",
+                      row.get("val"),
+                      "| filed:",
+                      row.get("filed"),
+                      "| frame:",
+                      row.get("frame"),
+                  )
+
+          PY
