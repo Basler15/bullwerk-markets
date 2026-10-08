@@ -1,6 +1,6 @@
 
 """
-Bullwerk Markets - Gesamtscanner V1
+Bullwerk Markets - Gesamtscanner V1.1
 
 Drei Qualitaetssaeulen:
 - Fundamental: 0-20
@@ -11,6 +11,11 @@ Qualitaetsscore = Summe / 60 * 100
 
 Darvas und Breakout sind separate Signale.
 Fehlende Daten werden nicht als Nullpunkte bewertet.
+
+Neu:
+- Score-Historie speichern
+- 28-Tage-Scoreveraenderung berechnen
+- Fruehbullen als zusaetzliches Signal erkennen
 """
 
 import json
@@ -29,6 +34,13 @@ from scanner.trend import calculate_trend_quality
 from scanner.darvas import detect_darvas_box
 from scanner.breakout import detect_breakout
 
+from scanner.score_history import (
+    load_history,
+    record_scores,
+    get_score_change,
+    classify_early_bull,
+)
+
 
 WATCHLIST = [
     "AMD", "NVDA", "MSFT", "PLTR", "DELL",
@@ -37,7 +49,9 @@ WATCHLIST = [
 
 BENCHMARK = "QQQ"
 HISTORY_PERIOD = "2y"
+
 OUTPUT_PATH = Path("data/scanner_results.json")
+SCORE_HISTORY_PATH = Path("data/score_history.json")
 
 SEC_URL = (
     "https://www.sec.gov/files/company_tickers.json"
@@ -95,7 +109,6 @@ def download_prices(symbol):
             f"Keine Kursdaten fuer {symbol}"
         )
 
-    # yfinance kann MultiIndex-Spalten liefern.
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.get_level_values(0)
 
@@ -127,7 +140,6 @@ def download_prices(symbol):
 
 
 def align_prices(stock, benchmark):
-    # Gemeinsame Handelstage verwenden.
     shared = stock.index.intersection(
         benchmark.index
     )
@@ -165,11 +177,11 @@ def evaluate_stock(symbol, cik, benchmark):
     print(f"\nPruefe {symbol} ...")
 
     stock = download_prices(symbol)
+
     stock, aligned_benchmark = align_prices(
         stock, benchmark
     )
 
-    # Die drei bestehenden Qualitaetssaeulen.
     fundamental = get_fundamental_data(
         cik=cik,
         symbol=symbol,
@@ -204,10 +216,6 @@ def evaluate_stock(symbol, cik, benchmark):
             sum(scores) / 60 * 100, 1
         )
 
-        # Erste Darstellung nach Qualitaetsniveau.
-        # Fruehbullen benoetigen spaeter
-        # zusaetzlich eine historische
-        # Score-Beschleunigungspruefung.
         if quality_score > 90:
             classification = "BULLENLEADER"
         elif quality_score > 80:
@@ -215,17 +223,16 @@ def evaluate_stock(symbol, cik, benchmark):
         else:
             classification = "BEOBACHTUNG"
 
-    # Darvas und Breakout separat.
     darvas = detect_darvas_box(stock)
+
     breakout = detect_breakout(
-        stock, darvas=darvas
+        stock,
+        darvas=darvas,
     )
 
     result = {
         "symbol": symbol,
-        "as_of": str(
-            stock.index[-1].date()
-        ),
+        "as_of": str(stock.index[-1].date()),
         "close": round(
             float(stock["close"].iloc[-1]), 2
         ),
@@ -239,6 +246,9 @@ def evaluate_stock(symbol, cik, benchmark):
         "relative_strength_gate": momentum.get(
             "rs_gate"
         ),
+        "score_change_28d": None,
+        "early_bull_status": "HISTORIE FEHLT",
+        "score_history_details": None,
     }
 
     print(
@@ -277,9 +287,83 @@ def make_json_safe(value):
     return value
 
 
+def update_score_history(results):
+    """
+    Echte Tagesbewertungen speichern.
+
+    Kein Score wird fuer vergangene Tage erfunden.
+    Unvollstaendige Bewertungen werden ignoriert.
+    """
+    valid_results = [
+        item for item in results
+        if item["quality_score"] is not None
+    ]
+
+    if not valid_results:
+        print(
+            "Score-Historie: "
+            "Keine vollstaendigen Bewertungen."
+        )
+        return
+
+    # Alle Aktien werden fuer denselben
+    # abgeschlossenen Boersentag erwartet.
+    dates = {
+        item["as_of"]
+        for item in valid_results
+    }
+
+    if len(dates) != 1:
+        raise ValueError(
+            "Uneinheitliche Kursdaten-Daten: "
+            f"{sorted(dates)}"
+        )
+
+    as_of = dates.pop()
+
+    record_scores(
+        valid_results,
+        path=SCORE_HISTORY_PATH,
+        as_of=as_of,
+    )
+
+    history = load_history(
+        SCORE_HISTORY_PATH
+    )
+
+    for item in results:
+        if item["quality_score"] is None:
+            continue
+
+        change_data = get_score_change(
+            history,
+            item["symbol"],
+            days=28,
+            as_of=item["as_of"],
+        )
+
+        item["score_history_details"] = change_data
+
+        if change_data is not None:
+            item["score_change_28d"] = (
+                change_data["change"]
+            )
+
+        item["early_bull_status"] = (
+            classify_early_bull(change_data)
+        )
+
+    print(
+        f"\nScore-Historie aktualisiert: {as_of}"
+    )
+    print(
+        f"Historien-Datei: {SCORE_HISTORY_PATH}"
+    )
+
+
 def main():
     print("=" * 65)
-    print("BULLWERK MARKETS - GESAMTSCANNER V1")
+    print("BULLWERK MARKETS - GESAMTSCANNER V1.1")
     print("=" * 65)
 
     cik_mapping = load_cik_mapping()
@@ -298,7 +382,9 @@ def main():
                 )
 
             result = evaluate_stock(
-                symbol, cik, benchmark
+                symbol,
+                cik,
+                benchmark,
             )
 
             results.append(result)
@@ -309,6 +395,13 @@ def main():
             errors.append(message)
 
         time.sleep(0.2)
+
+    if not results:
+        raise RuntimeError(
+            "Keine Aktie erfolgreich ausgewertet."
+        )
+
+    update_score_history(results)
 
     results.sort(
         key=lambda item: (
@@ -321,7 +414,7 @@ def main():
     )
 
     output = {
-        "scanner": "Bullwerk Markets V1",
+        "scanner": "Bullwerk Markets V1.1",
         "generated_at": datetime.now(
             timezone.utc
         ).isoformat(),
@@ -331,7 +424,8 @@ def main():
     }
 
     OUTPUT_PATH.parent.mkdir(
-        parents=True, exist_ok=True
+        parents=True,
+        exist_ok=True,
     )
 
     OUTPUT_PATH.write_text(
@@ -349,10 +443,19 @@ def main():
     print("=" * 65)
 
     for item in results:
+        change = item["score_change_28d"]
+        change_text = (
+            f"{change:+.1f}"
+            if change is not None
+            else "noch keine"
+        )
+
         print(
             f"{item['symbol']:6} "
             f"Score: {str(item['quality_score']):6} "
-            f"Status: {item['classification']}"
+            f"Status: {item['classification']:15} "
+            f"28T: {change_text:12} "
+            f"Fruehbulle: {item['early_bull_status']}"
         )
 
     print(
@@ -361,11 +464,7 @@ def main():
     )
 
     print(f"Ergebnisdatei: {OUTPUT_PATH}")
-
-    if not results:
-        raise RuntimeError(
-            "Keine Aktie erfolgreich ausgewertet."
-        )
+    print(f"Historie: {SCORE_HISTORY_PATH}")
 
 
 if __name__ == "__main__":
