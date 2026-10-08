@@ -1,0 +1,116 @@
+
+name: Bullwerk Darvas V4 Funktionstest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  darvas-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Pakete installieren
+        run: pip install pandas yfinance
+
+      - name: Darvas V4 pruefen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          import yfinance as yf
+
+          from scanner.darvas import detect_darvas_box
+
+          CASES = {
+              "AMD": [
+                  "2024-02-16",
+                  "2024-02-23",
+                  "2024-02-29",
+                  "2024-03-01",
+              ],
+              "NVDA": [
+                  "2024-04-22",
+                  "2024-05-10",
+                  "2024-05-22",
+                  "2024-05-23",
+              ],
+          }
+
+          for ticker, dates in CASES.items():
+              print("\n" + "=" * 65)
+              print(f"BULLWERK DARVAS V4 - {ticker}")
+              print("=" * 65)
+
+              df = yf.download(
+                  ticker,
+                  start="2023-06-01",
+                  end="2024-06-15",
+                  auto_adjust=True,
+                  progress=False,
+                  threads=False,
+              )
+
+              if df.empty:
+                  raise RuntimeError(
+                      f"Keine Kursdaten fuer {ticker}"
+                  )
+
+              if isinstance(df.columns, pd.MultiIndex):
+                  df.columns = df.columns.get_level_values(0)
+
+              df.columns = [
+                  str(col).lower() for col in df.columns
+              ]
+
+              df.index = pd.to_datetime(df.index)
+              if df.index.tz is not None:
+                  df.index = df.index.tz_localize(None)
+
+              for date in dates:
+                  history = df.loc[:date].copy()
+
+                  if history.empty:
+                      continue
+
+                  result = detect_darvas_box(history)
+
+                  print(f"\nDatum: {date}")
+                  print(
+                      f"Box vorhanden: "
+                      f"{'JA' if result['box_exists'] else 'NEIN'}"
+                  )
+                  print(
+                      f"Kurs innerhalb: "
+                      f"{'JA' if result['inside_box'] else 'NEIN'}"
+                  )
+                  print(
+                      f"Obere Grenze: {result['upper']}"
+                  )
+                  print(
+                      f"Untere Grenze: {result['lower']}"
+                  )
+                  print(
+                      f"Box-Dauer: {result['window']}"
+                  )
+                  print(
+                      f"Ausbruch nach oben: "
+                      f"{'JA' if result['breakout_up'] else 'NEIN'}"
+                  )
+                  print(
+                      f"Ausbruch nach unten: "
+                      f"{'JA' if result['breakout_down'] else 'NEIN'}"
+                  )
+
+          print("\nDARVAS-V4-TEST ABGESCHLOSSEN")
+          PY
