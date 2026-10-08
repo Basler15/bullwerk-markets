@@ -1,8 +1,12 @@
 
-name: Bullwerk Gesamtscanner V1.1
+name: Bullwerk Gesamtscanner V1.2
 
 on:
   workflow_dispatch:
+
+  schedule:
+    - cron: "30 21 * * 1-5"
+    - cron: "30 22 * * 1-5"
 
 permissions:
   contents: write
@@ -18,33 +22,86 @@ jobs:
     timeout-minutes: 25
 
     steps:
+      - name: Deutsche Startzeit pruefen
+        id: zeitpruefung
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          event = os.environ["EVENT_NAME"]
+
+          if event == "workflow_dispatch":
+              allowed = True
+              print("Manueller Start erlaubt.")
+          else:
+              now = datetime.now(
+                  ZoneInfo("Europe/Berlin")
+              )
+              print(
+                  "Aktuelle deutsche Zeit:",
+                  now.isoformat()
+              )
+
+              # Geplanter Scan nur um 23 Uhr
+              # deutscher Zeit freigeben.
+              # Die Minuten koennen durch
+              # GitHub-Verzoegerungen abweichen.
+              allowed = now.hour == 23
+
+          with open(
+              os.environ["GITHUB_OUTPUT"],
+              "a",
+              encoding="utf-8",
+          ) as file:
+              file.write(
+                  "run_scanner="
+                  + str(allowed).lower()
+                  + "\n"
+              )
+
+          print(
+              "Scanner freigegeben:",
+              allowed
+          )
+          PY
+
       - name: Repository laden
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         uses: actions/checkout@v4
         with:
           persist-credentials: true
 
       - name: Python einrichten
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Pakete installieren
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install pandas numpy requests yfinance
 
       - name: Scanner-Dateien pruefen
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         run: |
           python -m compileall -q main.py scanner
           python -c "from scanner.fundamental import get_fundamental_data; from scanner.price_momentum import calculate_price_momentum; from scanner.trend import calculate_trend_quality; from scanner.darvas import detect_darvas_box; from scanner.breakout import detect_breakout; from scanner.score_history import record_scores, get_score_change; print('Alle Scanner-Module importiert')"
 
       - name: Bullwerk Gesamtscanner starten
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
         run: |
           python main.py
 
       - name: Ergebnisse kontrollieren
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         run: |
           python - <<'PY'
           import json
@@ -107,6 +164,7 @@ jobs:
           PY
 
       - name: Score-Historie dauerhaft speichern
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email \
@@ -123,7 +181,7 @@ jobs:
           fi
 
       - name: Scanner-Ergebnisse bereitstellen
-        if: always()
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: bullwerk-scanner-ergebnisse
