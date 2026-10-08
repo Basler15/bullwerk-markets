@@ -1,0 +1,261 @@
+
+name: Bullwerk Darvas Historical Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  darvas-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Pakete installieren
+        run: |
+          pip install pandas yfinance
+
+      - name: AMD und NVIDIA historisch testen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          import yfinance as yf
+
+          WINDOWS = [10, 15, 20, 30, 40, 60, 90, 120]
+          TOLERANCE = 0.025
+
+          TESTS = {
+              "AMD": ("2024-01-01", "2024-03-08",
+                      "2024-02-29"),
+              "NVDA": ("2024-03-01", "2024-05-31",
+                       "2024-05-23"),
+          }
+
+          def touches(values, level):
+              return sum(
+                  abs(float(v) / level - 1) <= TOLERANCE
+                  for v in values
+              )
+
+          def find_box(history):
+              candidates = []
+
+              for length in WINDOWS:
+                  if len(history) < length:
+                      continue
+
+                  part = history.iloc[-length:]
+                  highs = part["high"]
+                  lows = part["low"]
+
+                  upper = float(highs.max())
+                  lower = float(lows.min())
+
+                  if lower <= 0:
+                      continue
+
+                  width = upper / lower - 1
+
+                  # Nur sehr extreme Handelsspannen
+                  # werden ausgeschlossen.
+                  if width > 0.45:
+                      continue
+
+                  upper_hits = touches(highs, upper)
+                  lower_hits = touches(lows, lower)
+
+                  # Die ersten beiden Grenztests
+                  # koennen eine entstehende Box sein.
+                  if upper_hits < 1 or lower_hits < 1:
+                      continue
+
+                  confirmed = (
+                      upper_hits >= 2
+                      and lower_hits >= 2
+                  )
+
+                  score = 20 if confirmed else 10
+
+                  candidates.append({
+                      "score": score,
+                      "length": length,
+                      "upper": upper,
+                      "lower": lower,
+                      "upper_hits": upper_hits,
+                      "lower_hits": lower_hits,
+                  })
+
+              if not candidates:
+                  return None
+
+              # Zuerst bestaetigte Boxen.
+              # Danach mehr Grenztests und Dauer.
+              return max(
+                  candidates,
+                  key=lambda b: (
+                      b["score"],
+                      min(b["upper_hits"], 4)
+                      + min(b["lower_hits"], 4),
+                      b["length"],
+                  ),
+              )
+
+          def run_test(ticker, start, end, reference):
+              data = yf.download(
+                  ticker,
+                  start="2023-06-01",
+                  end="2024-06-10",
+                  auto_adjust=True,
+                  progress=False,
+                  threads=False,
+              )
+
+              if data.empty:
+                  raise RuntimeError(
+                      f"Keine Daten fuer {ticker}"
+                  )
+
+              if isinstance(data.columns, pd.MultiIndex):
+                  data.columns = (
+                      data.columns.get_level_values(0)
+                  )
+
+              data.columns = [
+                  str(c).lower() for c in data.columns
+              ]
+
+              data = data.dropna(
+                  subset=["high", "low", "close"]
+              )
+
+              active = None
+              previous_status = None
+              events = []
+
+              for i in range(len(data)):
+                  day = data.index[i]
+                  if day < pd.Timestamp(start):
+                      continue
+                  if day > pd.Timestamp(end):
+                      break
+
+                  row = data.iloc[i]
+                  close = float(row["close"])
+                  high = float(row["high"])
+                  low = float(row["low"])
+
+                  status = "KEINE BOX"
+                  score = 0
+
+                  # Aktive Box anhand ihrer zuvor
+                  # gespeicherten Grenzen pruefen.
+                  if active is not None:
+                      if close > active["upper"] * 1.005:
+                          status = "BREAKOUT"
+                          score = 20
+                      elif close < active["lower"] * 0.995:
+                          status = "BOX GESCHEITERT"
+                          score = 0
+                      else:
+                          status = "BOX ERKANNT"
+                          score = 20
+
+                  if status in (
+                      "BREAKOUT",
+                      "BOX GESCHEITERT",
+                  ):
+                      events.append((
+                          day.date(), status, score,
+                          active.copy()
+                      ))
+                      active = None
+                      previous_status = status
+                      continue
+
+                  # Box nur aus abgeschlossenen
+                  # VORTAGEN erkennen.
+                  history = data.iloc[:i]
+
+                  candidate = find_box(history)
+
+                  if active is None and candidate:
+                      if candidate["score"] == 20:
+                          active = candidate.copy()
+                          status = "BOX ERKANNT"
+                          score = 20
+                      else:
+                          status = "BOX ENTSTEHT"
+                          score = 10
+
+                  if active is not None:
+                      status = "BOX ERKANNT"
+                      score = 20
+
+                  if status != previous_status:
+                      events.append((
+                          day.date(), status, score,
+                          active.copy()
+                          if active else candidate
+                      ))
+
+                  previous_status = status
+
+              print("\n" + "=" * 70)
+              print(f"BULLWERK DARVAS TEST: {ticker}")
+              print(f"REFERENZAUSBRUCH: {reference}")
+              print("=" * 70)
+
+              for date, status, score, box in events:
+                  detail = ""
+                  if box:
+                      detail = (
+                          f" | {box['length']} Tage"
+                          f" | Unten {box['lower']:.2f}"
+                          f" | Oben {box['upper']:.2f}"
+                          f" | Tests "
+                          f"{box['lower_hits']}/"
+                          f"{box['upper_hits']}"
+                      )
+
+                  print(
+                      f"{date} | {status:18}"
+                      f" | {score:2}/20{detail}"
+                  )
+
+              before = [
+                  e for e in events
+                  if e[1] == "BOX ERKANNT"
+                  and str(e[0]) < reference
+              ]
+
+              print("\nERGEBNIS:")
+              if before:
+                  print(
+                      "Erste bestaetigte Box vor "
+                      "Referenzausbruch:",
+                      before[0][0]
+                  )
+              else:
+                  print(
+                      "Keine bestaetigte Box vor "
+                      "Referenzausbruch gefunden."
+                  )
+
+              print(
+                  "Hinweis: Prototyp. Statuswechsel "
+                  "sind noch keine validierten "
+                  "Handelssignale."
+              )
+
+          for ticker, settings in TESTS.items():
+              run_test(ticker, *settings)
+
+          print("\nHISTORISCHER TEST ABGESCHLOSSEN")
+          PY
