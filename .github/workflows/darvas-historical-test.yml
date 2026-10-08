@@ -19,30 +19,52 @@ jobs:
 
       - name: Pakete installieren
         run: |
-          pip install pandas yfinance
+          python -m pip install pandas yfinance
 
-      - name: AMD und NVIDIA historisch testen
+      - name: Darvas V2 historisch testen
         shell: bash
         run: |
           python - <<'PY'
           import pandas as pd
           import yfinance as yf
 
-          WINDOWS = [10, 15, 20, 30, 40, 60, 90, 120]
-          TOLERANCE = 0.025
+          WINDOWS = [10, 15, 20, 30, 40, 60, 90]
+          TOUCH_TOLERANCE = 0.025
+          BREAKOUT_BUFFER = 0.005
+          MAX_WIDTH = 0.30
+          MAX_NET_CHANGE = 0.12
+          MIN_TOUCH_GAP = 3
+          BREAKOUT_HOLD_DAYS = 10
 
           TESTS = {
-              "AMD": ("2024-01-01", "2024-03-08",
-                      "2024-02-29"),
-              "NVDA": ("2024-03-01", "2024-05-31",
-                       "2024-05-23"),
+              "AMD": {
+                  "start": "2024-01-01",
+                  "end": "2024-03-15",
+                  "reference": "2024-02-29",
+              },
+              "NVDA": {
+                  "start": "2024-03-01",
+                  "end": "2024-06-07",
+                  "reference": "2024-05-23",
+              },
           }
 
-          def touches(values, level):
-              return sum(
-                  abs(float(v) / level - 1) <= TOLERANCE
-                  for v in values
-              )
+          def separated_touches(values, level):
+              indices = [
+                  i for i, value in enumerate(values)
+                  if abs(float(value) / level - 1)
+                  <= TOUCH_TOLERANCE
+              ]
+
+              count = 0
+              last = -MIN_TOUCH_GAP
+
+              for index in indices:
+                  if index - last >= MIN_TOUCH_GAP:
+                      count += 1
+                      last = index
+
+              return count
 
           def find_box(history):
               candidates = []
@@ -52,27 +74,32 @@ jobs:
                       continue
 
                   part = history.iloc[-length:]
-                  highs = part["high"]
-                  lows = part["low"]
-
-                  upper = float(highs.max())
-                  lower = float(lows.min())
+                  upper = float(part["high"].max())
+                  lower = float(part["low"].min())
 
                   if lower <= 0:
                       continue
 
                   width = upper / lower - 1
+                  net_change = abs(
+                      float(part["close"].iloc[-1])
+                      / float(part["close"].iloc[0])
+                      - 1
+                  )
 
-                  # Nur sehr extreme Handelsspannen
-                  # werden ausgeschlossen.
-                  if width > 0.45:
+                  # Kein stark laufender Trend.
+                  if width > MAX_WIDTH:
+                      continue
+                  if net_change > MAX_NET_CHANGE:
                       continue
 
-                  upper_hits = touches(highs, upper)
-                  lower_hits = touches(lows, lower)
+                  upper_hits = separated_touches(
+                      part["high"], upper
+                  )
+                  lower_hits = separated_touches(
+                      part["low"], lower
+                  )
 
-                  # Die ersten beiden Grenztests
-                  # koennen eine entstehende Box sein.
                   if upper_hits < 1 or lower_hits < 1:
                       continue
 
@@ -81,13 +108,13 @@ jobs:
                       and lower_hits >= 2
                   )
 
-                  score = 20 if confirmed else 10
-
                   candidates.append({
-                      "score": score,
+                      "score": 20 if confirmed else 10,
                       "length": length,
                       "upper": upper,
                       "lower": lower,
+                      "width": width * 100,
+                      "net_change": net_change * 100,
                       "upper_hits": upper_hits,
                       "lower_hits": lower_hits,
                   })
@@ -95,8 +122,8 @@ jobs:
               if not candidates:
                   return None
 
-              # Zuerst bestaetigte Boxen.
-              # Danach mehr Grenztests und Dauer.
+              # Bestaetigte Grenzen zuerst,
+              # danach mehr getrennte Beruehrungen.
               return max(
                   candidates,
                   key=lambda b: (
@@ -107,11 +134,11 @@ jobs:
                   ),
               )
 
-          def run_test(ticker, start, end, reference):
+          def run_test(ticker, config):
               data = yf.download(
                   ticker,
                   start="2023-06-01",
-                  end="2024-06-10",
+                  end="2024-06-15",
                   auto_adjust=True,
                   progress=False,
                   threads=False,
@@ -135,127 +162,170 @@ jobs:
                   subset=["high", "low", "close"]
               )
 
-              active = None
+              active_box = None
+              breakout_until = None
+              breakout_box = None
               previous_status = None
               events = []
 
+              start = pd.Timestamp(config["start"])
+              end = pd.Timestamp(config["end"])
+
               for i in range(len(data)):
                   day = data.index[i]
-                  if day < pd.Timestamp(start):
+
+                  if day < start:
                       continue
-                  if day > pd.Timestamp(end):
+                  if day > end:
                       break
 
-                  row = data.iloc[i]
-                  close = float(row["close"])
-                  high = float(row["high"])
-                  low = float(row["low"])
+                  close = float(
+                      data["close"].iloc[i]
+                  )
 
                   status = "KEINE BOX"
                   score = 0
+                  box = None
 
-                  # Aktive Box anhand ihrer zuvor
-                  # gespeicherten Grenzen pruefen.
-                  if active is not None:
-                      if close > active["upper"] * 1.005:
+                  # Bereits erkannter Ausbruch
+                  # bleibt fuer 10 Handelstage
+                  # sichtbar.
+                  if breakout_until is not None:
+                      if i <= breakout_until:
                           status = "BREAKOUT"
                           score = 20
-                      elif close < active["lower"] * 0.995:
+                          box = breakout_box
+                      else:
+                          breakout_until = None
+                          breakout_box = None
+
+                  # Bestehende Box pruefen.
+                  elif active_box is not None:
+                      box = active_box
+
+                      if close > (
+                          box["upper"]
+                          * (1 + BREAKOUT_BUFFER)
+                      ):
+                          status = "BREAKOUT"
+                          score = 20
+                          breakout_box = box.copy()
+                          breakout_until = (
+                              i + BREAKOUT_HOLD_DAYS - 1
+                          )
+                          active_box = None
+
+                      elif close < (
+                          box["lower"]
+                          * (1 - BREAKOUT_BUFFER)
+                      ):
                           status = "BOX GESCHEITERT"
                           score = 0
+                          active_box = None
+
                       else:
                           status = "BOX ERKANNT"
                           score = 20
 
-                  if status in (
-                      "BREAKOUT",
-                      "BOX GESCHEITERT",
+                  # Neue Box nur suchen, wenn
+                  # weder aktive Box noch
+                  # Breakout-Sperre besteht.
+                  if (
+                      active_box is None
+                      and breakout_until is None
+                      and status not in (
+                          "BREAKOUT",
+                          "BOX GESCHEITERT",
+                      )
                   ):
-                      events.append((
-                          day.date(), status, score,
-                          active.copy()
-                      ))
-                      active = None
-                      previous_status = status
-                      continue
+                      # Nur abgeschlossene
+                      # Vortage verwenden.
+                      candidate = find_box(
+                          data.iloc[:i]
+                      )
 
-                  # Box nur aus abgeschlossenen
-                  # VORTAGEN erkennen.
-                  history = data.iloc[:i]
+                      if candidate is not None:
+                          box = candidate
 
-                  candidate = find_box(history)
-
-                  if active is None and candidate:
-                      if candidate["score"] == 20:
-                          active = candidate.copy()
-                          status = "BOX ERKANNT"
-                          score = 20
-                      else:
-                          status = "BOX ENTSTEHT"
-                          score = 10
-
-                  if active is not None:
-                      status = "BOX ERKANNT"
-                      score = 20
+                          if candidate["score"] == 20:
+                              active_box = (
+                                  candidate.copy()
+                              )
+                              status = "BOX ERKANNT"
+                              score = 20
+                          else:
+                              status = "BOX ENTSTEHT"
+                              score = 10
 
                   if status != previous_status:
-                      events.append((
-                          day.date(), status, score,
-                          active.copy()
-                          if active else candidate
-                      ))
+                      events.append({
+                          "date": str(day.date()),
+                          "status": status,
+                          "score": score,
+                          "box": box.copy()
+                          if box else None,
+                      })
 
                   previous_status = status
 
-              print("\n" + "=" * 70)
-              print(f"BULLWERK DARVAS TEST: {ticker}")
-              print(f"REFERENZAUSBRUCH: {reference}")
-              print("=" * 70)
+              print("\n" + "=" * 72)
+              print(f"BULLWERK DARVAS V2: {ticker}")
+              print(
+                  "REFERENZAUSBRUCH:",
+                  config["reference"]
+              )
+              print("=" * 72)
 
-              for date, status, score, box in events:
+              for event in events:
+                  box = event["box"]
                   detail = ""
+
                   if box:
                       detail = (
                           f" | {box['length']} Tage"
                           f" | Unten {box['lower']:.2f}"
                           f" | Oben {box['upper']:.2f}"
+                          f" | Breite {box['width']:.1f}%"
                           f" | Tests "
                           f"{box['lower_hits']}/"
                           f"{box['upper_hits']}"
                       )
 
                   print(
-                      f"{date} | {status:18}"
-                      f" | {score:2}/20{detail}"
+                      f"{event['date']} | "
+                      f"{event['status']:18} | "
+                      f"{event['score']:2}/20"
+                      f"{detail}"
                   )
 
+              reference = config["reference"]
+
               before = [
-                  e for e in events
-                  if e[1] == "BOX ERKANNT"
-                  and str(e[0]) < reference
+                  event for event in events
+                  if event["status"] == "BOX ERKANNT"
+                  and event["date"] < reference
               ]
 
               print("\nERGEBNIS:")
               if before:
                   print(
-                      "Erste bestaetigte Box vor "
-                      "Referenzausbruch:",
-                      before[0][0]
+                      "Erste bestaetigte Box:",
+                      before[0]["date"]
                   )
               else:
                   print(
-                      "Keine bestaetigte Box vor "
-                      "Referenzausbruch gefunden."
+                      "Keine bestaetigte Box "
+                      "vor Referenzausbruch."
                   )
 
               print(
-                  "Hinweis: Prototyp. Statuswechsel "
-                  "sind noch keine validierten "
+                  "Hinweis: Historischer "
+                  "Prototyp, keine validierten "
                   "Handelssignale."
               )
 
-          for ticker, settings in TESTS.items():
-              run_test(ticker, *settings)
+          for ticker, config in TESTS.items():
+              run_test(ticker, config)
 
-          print("\nHISTORISCHER TEST ABGESCHLOSSEN")
+          print("\nDARVAS V2 TEST ABGESCHLOSSEN")
           PY
