@@ -1,0 +1,151 @@
+
+name: Bullwerk Fruehtrend Historical Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  historical-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhaengigkeiten installieren
+        run: pip install pandas yfinance
+
+      - name: Historische Fruehtrend-Analyse
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          import yfinance as yf
+
+          from scanner.price_momentum import calculate_price_momentum
+          from scanner.trend import calculate_trend_quality
+
+          TICKERS = ["AMD", "NVDA", "PLTR"]
+          START = "2021-01-01"
+          END = "2026-01-01"
+
+          def load_prices(ticker):
+              df = yf.download(
+                  ticker,
+                  start=START,
+                  end=END,
+                  auto_adjust=True,
+                  progress=False,
+                  threads=False,
+              )
+
+              if df.empty:
+                  raise RuntimeError(f"Keine Daten fuer {ticker}")
+
+              if isinstance(df.columns, pd.MultiIndex):
+                  df.columns = df.columns.get_level_values(0)
+
+              df.columns = [str(c).lower() for c in df.columns]
+              df = df[["close", "high", "low"]].dropna()
+              df.index = pd.to_datetime(df.index).tz_localize(None)
+              return df
+
+          benchmark = load_prices("QQQ")
+
+          for ticker in TICKERS:
+              stock = load_prices(ticker)
+              dates = stock.index.intersection(benchmark.index)
+              dates = dates[(dates >= "2022-01-01") & (dates < "2026-01-01")]
+
+              print("\n" + "=" * 75)
+              print(f"BULLWERK FRUEHTREND: {ticker}")
+              print("Saeule 2 + 3: maximal 40 Punkte")
+              print("=" * 75)
+
+              previous = None
+              records = []
+
+              for date in dates:
+                  # Nur historische Daten bis zum jeweiligen Datum
+                  s = stock.loc[:date]
+                  q = benchmark.loc[:date]
+
+                  common = s.index.intersection(q.index)
+                  s = s.loc[common]
+                  q = q.loc[common]
+
+                  if len(s) < 252:
+                      continue
+
+                  # Unveraenderte Bullwerk-Funktionen
+                  momentum = calculate_price_momentum(
+                      s["close"].astype(float).tolist(),
+                      q["close"].astype(float).tolist(),
+                  )
+
+                  trend = calculate_trend_quality(s)
+
+                  m = int(momentum["score"])
+                  t = int(trend["score"])
+                  total = m + t
+
+                  records.append({
+                      "date": date,
+                      "momentum": m,
+                      "trend": t,
+                      "total": total,
+                      "close": float(s["close"].iloc[-1]),
+                  })
+
+              if not records:
+                  print("Keine auswertbaren Daten.")
+                  continue
+
+              result = pd.DataFrame(records).set_index("date")
+
+              # Nur letzter Handelstag jeder Kalenderwoche
+              weekly = result.resample("W-FRI").last().dropna()
+
+              print("\nWoechentliche Entwicklung:")
+              print("Datum       Momentum Trend Gesamt Veraenderung_4W")
+
+              for i, (date, row) in enumerate(weekly.iterrows()):
+                  change = (
+                      int(row["total"] - weekly.iloc[i - 4]["total"])
+                      if i >= 4 else None
+                  )
+
+                  change_text = (
+                      f"{change:+d}" if change is not None else "---"
+                  )
+
+                  print(
+                      f"{date:%Y-%m-%d}  "
+                      f"{int(row['momentum']):2d}/20     "
+                      f"{int(row['trend']):2d}/20  "
+                      f"{int(row['total']):2d}/40     "
+                      f"{change_text}"
+                  )
+
+              filename = f"fruehtrend_{ticker}_2022_2025.csv"
+              weekly.to_csv(filename)
+              print(f"\nCSV gespeichert: {filename}")
+
+          print("\nTEST ABGESCHLOSSEN")
+          print("Hinweis: Fundamental Momentum ist noch nicht enthalten.")
+          PY
+
+      - name: Testergebnisse bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: bullwerk-fruehtrend-historie
+          path: fruehtrend_*.csv
+          if-no-files-found: error
