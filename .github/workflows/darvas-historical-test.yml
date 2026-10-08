@@ -22,39 +22,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas yfinance
 
-      - name: Darvas V3 historisch testen
+      - name: Darvas V3 Blindtest 2024
         shell: bash
         run: |
           python - <<'PY'
           import pandas as pd
           import yfinance as yf
 
+          # Originale V3-Regeln unveraendert
           WINDOWS = [10, 15, 20, 30, 40, 60, 90, 120]
-
           TOUCH_TOLERANCE = 0.025
           MIN_TOUCH_GAP = 3
           BREAKOUT_BUFFER = 0.005
-
           MAX_WIDTH = 0.35
           MAX_NET_CHANGE = 0.12
-
-          # Nach einem Ausbruch bleibt das Ereignis
-          # sichtbar. Eine neue Box braucht neue Daten.
           BREAKOUT_HOLD_DAYS = 10
           MIN_NEW_BARS = 10
 
-          TESTS = {
-              "AMD": {
-                  "start": "2024-01-01",
-                  "end": "2024-03-15",
-                  "reference": "2024-02-29",
-              },
-              "NVDA": {
-                  "start": "2024-03-01",
-                  "end": "2024-06-07",
-                  "reference": "2024-05-23",
-              },
-          }
+          TICKERS = ["MSFT", "PLTR", "NKE"]
+          START = pd.Timestamp("2024-01-01")
+          END = pd.Timestamp("2024-12-31")
 
           def separated_touches(values, level):
               indices = [
@@ -81,7 +68,6 @@ jobs:
                       continue
 
                   part = history.iloc[-length:]
-
                   upper = float(part["high"].max())
                   lower = float(part["low"].min())
 
@@ -105,7 +91,6 @@ jobs:
                   upper_hits = separated_touches(
                       part["high"], upper
                   )
-
                   lower_hits = separated_touches(
                       part["low"], lower
                   )
@@ -141,12 +126,10 @@ jobs:
                       confirmed,
                       key=lambda b: b["length"],
                   )
-
                   long = max(
                       confirmed,
                       key=lambda b: b["length"],
                   )
-
                   return short, long
 
               if candidates:
@@ -160,14 +143,12 @@ jobs:
 
           def breakout(close, box):
               return close > (
-                  box["upper"]
-                  * (1 + BREAKOUT_BUFFER)
+                  box["upper"] * (1 + BREAKOUT_BUFFER)
               )
 
           def failed(close, box):
               return close < (
-                  box["lower"]
-                  * (1 - BREAKOUT_BUFFER)
+                  box["lower"] * (1 - BREAKOUT_BUFFER)
               )
 
           def box_text(box):
@@ -177,17 +158,17 @@ jobs:
               return (
                   f"{box['length']}T "
                   f"[{box['lower']:.2f} - "
-                  f"{box['upper']:.2f}]"
-                  f" Tests "
+                  f"{box['upper']:.2f}] "
+                  f"Tests "
                   f"{box['lower_hits']}/"
                   f"{box['upper_hits']}"
               )
 
-          def run_test(ticker, config):
+          def run_test(ticker):
               data = yf.download(
                   ticker,
                   start="2023-06-01",
-                  end="2024-06-15",
+                  end="2025-01-10",
                   auto_adjust=True,
                   progress=False,
                   threads=False,
@@ -212,9 +193,6 @@ jobs:
                   subset=["high", "low", "close"]
               )
 
-              start = pd.Timestamp(config["start"])
-              end = pd.Timestamp(config["end"])
-
               small_box = None
               large_box = None
 
@@ -223,26 +201,22 @@ jobs:
 
               last_breakout_index = -999999
               breakout_until = -1
-
               previous_signature = None
               events = []
 
               for i in range(len(data)):
                   day = data.index[i]
 
-                  if day < start:
+                  if day < START:
                       continue
 
-                  if day > end:
+                  if day > END:
                       break
 
                   close = float(
                       data["close"].iloc[i]
                   )
 
-                  # 1. Bestehende Boxen zuerst
-                  # gegen den aktuellen Schluss
-                  # pruefen.
                   current_boxes = [
                       ("KLEIN", small_box),
                       ("GROSS", large_box),
@@ -294,8 +268,6 @@ jobs:
                           i + BREAKOUT_HOLD_DAYS - 1
                       )
 
-                  # 2. Neue Boxen nur nach
-                  # ausreichend neuen Kerzen.
                   can_scan = (
                       i - last_breakout_index
                       >= MIN_NEW_BARS
@@ -306,9 +278,8 @@ jobs:
                       and not triggered
                       and not invalidated
                   ):
-                      # Nur abgeschlossene Vortage.
+                      # Nur abgeschlossene Vortage
                       history = data.iloc[:i]
-
                       candidates = find_candidates(
                           history
                       )
@@ -317,8 +288,6 @@ jobs:
                           select_boxes(candidates)
                       )
 
-                      # Bestehende Grenzen nicht
-                      # nachtraeglich veraendern.
                       if small_box is None:
                           if candidate_small is not None:
                               small_box = (
@@ -327,8 +296,6 @@ jobs:
 
                       if large_box is None:
                           if candidate_large is not None:
-                              # Nur wirklich groessere
-                              # Formation separat halten.
                               if (
                                   small_box is None
                                   or candidate_large["length"]
@@ -338,7 +305,6 @@ jobs:
                                       candidate_large.copy()
                                   )
 
-                  # 3. Status und Punkte.
                   if i <= breakout_until:
                       status = "BREAKOUT"
                       score = 20
@@ -364,8 +330,6 @@ jobs:
                       status = "KEINE BOX"
                       score = 0
 
-                  # Bei gleichem Status auch
-                  # Boxwechsel protokollieren.
                   signature = (
                       status,
                       None if small_box is None else (
@@ -404,11 +368,8 @@ jobs:
                   previous_signature = signature
 
               print("\n" + "=" * 75)
-              print(f"BULLWERK DARVAS V3: {ticker}")
-              print(
-                  "REFERENZAUSBRUCH:",
-                  config["reference"]
-              )
+              print(f"BULLWERK DARVAS V3 BLINDTEST: {ticker}")
+              print("ZEITRAUM: 2024")
               print("=" * 75)
 
               for event in events:
@@ -422,7 +383,6 @@ jobs:
                       "   Kleine Box:",
                       box_text(event["small"])
                   )
-
                   print(
                       "   Grosse Box:",
                       box_text(event["large"])
@@ -451,7 +411,7 @@ jobs:
                       box_text(event["box"]),
                   )
 
-              print("\nGESCH EITERTE BOXEN:")
+              print("\nGESCHEITERTE BOXEN:")
               if not failed_events:
                   print("Keine gescheiterten Boxen.")
 
@@ -462,33 +422,22 @@ jobs:
                       box_text(event["box"]),
                   )
 
-              print("\nREFERENZPRUEFUNG:")
-              reference = config["reference"]
-
-              matched = [
-                  event
-                  for event in breakout_events
-                  if event["date"] == reference
-              ]
-
-              if matched:
-                  print(
-                      "Breakout am Referenztag erkannt:",
-                      reference
-                  )
-              else:
-                  print(
-                      "Kein Breakout am Referenztag:",
-                      reference
-                  )
-
+              print("\nZUSAMMENFASSUNG:")
               print(
-                  "Hinweis: V3 ist ein "
-                  "historischer Prototyp."
+                  "Breakout-Ereignisse:",
+                  len(breakout_events)
+              )
+              print(
+                  "Gescheiterte Boxen:",
+                  len(failed_events)
+              )
+              print(
+                  "Statuswechsel:",
+                  len(events)
               )
 
-          for ticker, config in TESTS.items():
-              run_test(ticker, config)
+          for ticker in TICKERS:
+              run_test(ticker)
 
-          print("\nDARVAS V3 TEST ABGESCHLOSSEN")
+          print("\nDARVAS V3 BLINDTEST ABGESCHLOSSEN")
           PY
