@@ -1,0 +1,94 @@
+
+name: Bullwerk Gesamtscanner V1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gesamtscanner:
+    name: Bullwerk Aktien pruefen
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Pakete installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy requests yfinance
+
+      - name: Scanner-Dateien pruefen
+        run: |
+          python -m compileall -q main.py scanner
+          python -c "from scanner.fundamental import get_fundamental_data; from scanner.price_momentum import calculate_price_momentum; from scanner.trend import calculate_trend_quality; from scanner.darvas import detect_darvas_box; from scanner.breakout import detect_breakout; print('Alle Scanner-Module importiert')"
+
+      - name: Bullwerk Gesamtscanner starten
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: |
+          python main.py
+
+      - name: Ergebnisse kontrollieren
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/scanner_results.json")
+          assert path.exists(), "Ergebnisdatei fehlt"
+
+          data = json.loads(
+              path.read_text(encoding="utf-8")
+          )
+
+          stocks = data.get("stocks", [])
+          errors = data.get("errors", [])
+
+          print("\nBULLWERK ERGEBNISKONTROLLE")
+          print("=" * 55)
+
+          for stock in stocks:
+              symbol = stock["symbol"]
+              score = stock["quality_score"]
+              status = stock["classification"]
+
+              print(
+                  f"{symbol:6} "
+                  f"Score: {str(score):6} "
+                  f"Status: {status}"
+              )
+
+              if score is not None:
+                  assert 0 <= score <= 100
+
+          print("\nErfolgreich:", len(stocks))
+          print("Fehler:", len(errors))
+
+          for error in errors:
+              print("FEHLER:", error)
+
+          assert len(stocks) > 0, (
+              "Keine Aktie erfolgreich ausgewertet"
+          )
+
+          print("\nERGEBNISKONTROLLE BESTANDEN")
+          PY
+
+      - name: Scanner-Ergebnisse bereitstellen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bullwerk-scanner-ergebnisse
+          path: data/scanner_results.json
+          if-no-files-found: warn
+          retention-days: 7
