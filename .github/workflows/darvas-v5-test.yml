@@ -1,0 +1,192 @@
+
+name: Bullwerk Darvas V5 Funktionstest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  darvas-v5-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Pakete installieren
+        run: pip install pandas yfinance
+
+      - name: Darvas V5 pruefen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          import yfinance as yf
+
+          from scanner.darvas import detect_darvas_box
+
+          CASES = {
+              "AMD": [
+                  "2024-02-16",
+                  "2024-02-23",
+                  "2024-02-29",
+                  "2024-03-01",
+                  "2024-03-08",
+              ],
+              "NVDA": [
+                  "2024-04-22",
+                  "2024-05-10",
+                  "2024-05-22",
+                  "2024-05-23",
+                  "2024-05-24",
+              ],
+          }
+
+          for ticker, dates in CASES.items():
+
+              print("\n" + "=" * 65)
+              print(f"BULLWERK DARVAS V5 - {ticker}")
+              print("=" * 65)
+
+              df = yf.download(
+                  ticker,
+                  start="2023-06-01",
+                  end="2024-06-15",
+                  auto_adjust=True,
+                  progress=False,
+                  threads=False,
+              )
+
+              if df.empty:
+                  raise RuntimeError(
+                      f"Keine Kursdaten fuer {ticker}"
+                  )
+
+              if isinstance(df.columns, pd.MultiIndex):
+                  df.columns = df.columns.get_level_values(0)
+
+              df.columns = [
+                  str(col).lower() for col in df.columns
+              ]
+
+              df.index = pd.to_datetime(df.index)
+
+              if df.index.tz is not None:
+                  df.index = df.index.tz_localize(None)
+
+              for date in dates:
+
+                  history = df.loc[:date].copy()
+
+                  result = detect_darvas_box(history)
+
+                  print(f"\nDatum: {date}")
+                  print(f"Status: {result['status']}")
+                  print(
+                      "Box vorhanden:",
+                      "JA" if result["box_exists"] else "NEIN"
+                  )
+                  print(
+                      "Kurs innerhalb:",
+                      "JA" if result["inside_box"] else "NEIN"
+                  )
+                  print("Obere Grenze:", result["upper"])
+                  print("Untere Grenze:", result["lower"])
+                  print("Box-Dauer:", result["window"])
+                  print("Box-Start:", result["box_start"])
+                  print("Box-Ende:", result["box_end"])
+                  print(
+                      "Ausbruch nach oben:",
+                      "JA" if result["breakout_up"] else "NEIN"
+                  )
+                  print(
+                      "Ausbruch nach unten:",
+                      "JA" if result["breakout_down"] else "NEIN"
+                  )
+
+          print("\n" + "=" * 65)
+          print("ZUSAETZLICHER STABILITAETSTEST")
+          print("=" * 65)
+
+          # Kuenstliche Kursdaten mit klarer Box.
+          # Hier kennen wir das erwartete Verhalten.
+
+          dates = pd.bdate_range(
+              "2024-01-01",
+              periods=40,
+          )
+
+          rows = []
+
+          for i in range(40):
+              if i < 30:
+                  high = 110 if i % 4 == 0 else 108
+                  low = 90 if i % 4 == 2 else 92
+                  close = 100
+              elif i == 30:
+                  high = 114
+                  low = 108
+                  close = 113
+              else:
+                  high = 117
+                  low = 112
+                  close = 115
+
+              rows.append({
+                  "high": high,
+                  "low": low,
+                  "close": close,
+              })
+
+          synthetic = pd.DataFrame(
+              rows,
+              index=dates,
+          )
+
+          before = detect_darvas_box(
+              synthetic.iloc[:30]
+          )
+
+          breakout = detect_darvas_box(
+              synthetic.iloc[:31]
+          )
+
+          after = detect_darvas_box(
+              synthetic.iloc[:32]
+          )
+
+          print("\nVor Ausbruch:", before)
+          print("Am Ausbruch:", breakout)
+          print("Tag danach:", after)
+
+          assert before["box_exists"], (
+              "Vor dem Ausbruch fehlt die Box"
+          )
+
+          assert before["inside_box"], (
+              "Kurs sollte innerhalb der Box liegen"
+          )
+
+          assert breakout["breakout_up"], (
+              "Ausbruch nach oben nicht erkannt"
+          )
+
+          assert not breakout["inside_box"], (
+              "Kurs darf beim Ausbruch nicht "
+              "innerhalb der Box liegen"
+          )
+
+          assert after["status"] != "BOX AKTIV", (
+              "Alte Box wurde nach Ausbruch "
+              "erneut aktiviert"
+          )
+
+          print("\nALLE STABILITAETSPRUEFUNGEN BESTANDEN")
+          PY
