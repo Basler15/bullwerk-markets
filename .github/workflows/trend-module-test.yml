@@ -1,0 +1,114 @@
+
+name: Bullwerk Trend Module Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-trend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas yfinance
+
+      - name: Trend Quality mit echten Aktien testen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import math
+          import pandas as pd
+          import yfinance as yf
+
+          from scanner.trend import calculate_trend_quality
+
+          tickers = ["AMD", "NVDA", "MSFT", "NKE"]
+
+          print("=" * 60)
+          print("BULLWERK MARKETS - TREND QUALITY MODULE TEST")
+          print("=" * 60)
+
+          for ticker in tickers:
+              print(f"\nAKTIE: {ticker}")
+
+              data = yf.download(
+                  ticker,
+                  period="18mo",
+                  interval="1d",
+                  auto_adjust=True,
+                  progress=False,
+                  threads=False,
+              )
+
+              if data.empty:
+                  raise RuntimeError(
+                      f"Keine Kursdaten fuer {ticker} erhalten."
+                  )
+
+              if isinstance(data.columns, pd.MultiIndex):
+                  data.columns = data.columns.get_level_values(0)
+
+              data.columns = [
+                  str(column).lower()
+                  for column in data.columns
+              ]
+
+              result = calculate_trend_quality(data)
+
+              score = result["score"]
+              components = result["components"]
+              metrics = result["metrics"]
+
+              print(f"GESAMTSCORE: {score}/20")
+
+              for name, points in components.items():
+                  print(f"  {name}: {points}/4")
+
+              print(
+                  "Kurs / EMA50 Abstand: "
+                  f"{metrics['price_distance_ema50']:+.2f}%"
+              )
+              print(
+                  "EMA50 / EMA200 Abstand: "
+                  f"{metrics['ema50_distance_ema200']:+.2f}%"
+              )
+              print(
+                  "20T Rendite: "
+                  f"{metrics['return20']:+.2f}%"
+              )
+              print(
+                  "60T Rendite: "
+                  f"{metrics['return60']:+.2f}%"
+              )
+
+              assert isinstance(score, int)
+              assert 0 <= score <= 20
+              assert len(components) == 5
+              assert all(
+                  isinstance(value, int) and 0 <= value <= 4
+                  for value in components.values()
+              )
+              assert sum(components.values()) == score
+              assert all(
+                  math.isfinite(metrics[key])
+                  for key in [
+                      "close",
+                      "ema50",
+                      "ema200",
+                      "return20",
+                      "return60",
+                  ]
+              )
+
+          print("\nALLE MODULPRUEFUNGEN BESTANDEN")
+          PY
