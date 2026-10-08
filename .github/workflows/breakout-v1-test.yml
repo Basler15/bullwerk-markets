@@ -1,0 +1,171 @@
+
+name: Bullwerk Breakout V1 Funktionstest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  breakout-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Pakete installieren
+        run: pip install pandas
+
+      - name: Breakout V1 pruefen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pandas as pd
+
+          from scanner.breakout import detect_breakout
+
+          def make_data(
+              final_close=100,
+              final_volume=1000,
+              previous_red=False,
+          ):
+              dates = pd.bdate_range(
+                  "2024-01-01", periods=26
+              )
+
+              rows = []
+
+              for i in range(25):
+                  if previous_red and i == 24:
+                      rows.append({
+                          "open": 101,
+                          "high": 105,
+                          "low": 97,
+                          "close": 99,
+                          "volume": 1000,
+                      })
+                  else:
+                      rows.append({
+                          "open": 99,
+                          "high": 102,
+                          "low": 98,
+                          "close": 100,
+                          "volume": 1000,
+                      })
+
+              rows.append({
+                  "open": 100,
+                  "high": max(103, final_close),
+                  "low": 99,
+                  "close": final_close,
+                  "volume": final_volume,
+              })
+
+              return pd.DataFrame(
+                  rows, index=dates
+              )
+
+          print("\nTEST 1: KEIN AUSBRUCH")
+          data = make_data()
+          r = detect_breakout(data)
+          print(r)
+
+          assert not r["signal"]
+          assert r["score"] == 0
+
+          print("\nTEST 2: 20-TAGE-HOCH")
+          data = make_data(
+              final_close=104,
+              final_volume=2000,
+          )
+          r = detect_breakout(data)
+          print(r)
+
+          assert r["signal"]
+          assert r["high_20_breakout"]
+          assert r["volume_confirmed"]
+          assert r["score"] == 18
+
+          print("\nTEST 3: LETZTE ROTE KERZE")
+          data = make_data(
+              final_close=106,
+              final_volume=1500,
+              previous_red=True,
+          )
+          r = detect_breakout(data)
+          print(r)
+
+          assert r["signal"]
+          assert r["red_candle_breakout"]
+          assert r["volume_confirmed"]
+
+          print("\nTEST 4: DARVAS BREAKOUT")
+          data = make_data(
+              final_close=104,
+              final_volume=2000,
+          )
+
+          darvas = {
+              "breakout_up": True,
+              "upper": 102,
+              "box_end": str(
+                  data.index[-1].date()
+              ),
+          }
+
+          r = detect_breakout(
+              data, darvas=darvas
+          )
+          print(r)
+
+          assert r["signal"]
+          assert r["darvas_breakout"]
+          assert r["signal_type"] == "DARVAS BREAKOUT"
+          assert r["score"] == 20
+
+          print("\nTEST 5: ALTER DARVAS-AUSBRUCH")
+          darvas["box_end"] = "2024-01-15"
+
+          r = detect_breakout(
+              make_data(), darvas=darvas
+          )
+          print(r)
+
+          assert not r["darvas_breakout"]
+          assert not r["signal"]
+
+          print("\nTEST 6: AUSBRUCH OHNE HOHES VOLUMEN")
+          data = make_data(
+              final_close=104,
+              final_volume=700,
+          )
+          r = detect_breakout(data)
+          print(r)
+
+          assert r["signal"]
+          assert not r["volume_confirmed"]
+          assert r["score"] == 10
+
+          print("\nTEST 7: KEIN DOPPELTES SIGNAL")
+          data = make_data(
+              final_close=104,
+              final_volume=2000,
+          )
+
+          first = detect_breakout(data)
+          second = detect_breakout(data)
+
+          assert first == second
+          print("Identische Eingaben liefern identische Ergebnisse.")
+
+          print("\n" + "=" * 60)
+          print("ALLE BREAKOUT-V1-FUNKTIONSTESTS BESTANDEN")
+          print("=" * 60)
+          PY
