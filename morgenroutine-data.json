@@ -1,0 +1,49 @@
+
+{
+  "projekt": "Bullwerk Markets",
+  "bereich": "Morgenroutine",
+  "version": "1.0",
+  "datenstand": null,
+  "status": "in_vorbereitung",
+  "marktampel": {
+    "farbe": null,
+    "score": null,
+    "begruendung": []
+  },
+  "indizes": {
+    "nasdaq_100": null,
+    "nasdaq_composite": null,
+    "sp500": null,
+    "dow_jones": null,
+    "russell_2000": null,
+    "dax": null
+  },
+  "marktbreite": {
+    "advance_decline": null,
+    "up_down_volume": null,
+    "neue_52w_hochs": null,
+    "neue_52w_tiefs": null,
+    "distribution_days": null
+  },
+  "zinsen": {
+    "us_10y": null,
+    "us_2y": null,
+    "fed_erwartungen": null
+  },
+  "rohstoffe": {
+    "gold": null,
+    "silber": null,
+    "oel": null,
+    "erdgas": null,
+    "kupfer": null
+  },
+  "geldfluesse": {
+    "aktien_etfs": null,
+    "sektor_etfs": null,
+    "anleihen": null,
+    "krypto": null
+  },
+  "wirtschaftskalender": [],
+  "ampel_historie": [],
+  "hinweis": "Noch keine geprüften Marktdaten vorhanden."
+}
