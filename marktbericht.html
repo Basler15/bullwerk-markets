@@ -329,27 +329,19 @@ main{max-width:1120px}
 .calendar-guidelines strong{font-size:12px;color:#483720}
 .calendar-guidelines p{font-size:12px;line-height:1.55;color:#6b5e4e;margin:7px 0 0}
 @media(max-width:720px){.calendar-guidelines{grid-template-columns:1fr}.calendar-head{flex-direction:column;align-items:flex-start}.calendar-pending{align-self:flex-start}}
-
-/* Bullwerk: Freigegebener redaktioneller Morgenbericht – Zusatz, Originaldesign bleibt erhalten. */
-#bullwerk-bericht{display:none;margin:26px 0 34px;padding:25px 27px;border:1px solid #dec999;border-radius:15px;background:#fffdf6;box-shadow:0 4px 20px rgba(30,23,10,.06)}
-#bullwerk-bericht .bw-release{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;padding-bottom:16px;border-bottom:1px solid #e8d9b8;color:#76551c;font-size:.83rem;font-weight:700;letter-spacing:.04em}
-#bullwerk-bericht .bw-report-body{overflow-wrap:anywhere}
-#bullwerk-bericht h2{margin:28px 0 9px;font-size:1.5rem;color:#28231a}
-#bullwerk-bericht h3{margin:21px 0 8px;font-size:1.17rem;color:#332b1e}
-#bullwerk-bericht h4{margin:16px 0 7px}
-#bullwerk-bericht p{margin:10px 0 14px}
-#bullwerk-bericht hr{border:0;border-top:1px solid #e8d9b8;margin:24px 0}
-#bullwerk-bericht ul,#bullwerk-bericht ol{padding-left:24px}
-#bullwerk-bericht .bw-table-scroll{overflow-x:auto;margin:14px 0 20px}
-#bullwerk-bericht table{width:100%;border-collapse:collapse;min-width:360px;font-size:.94rem}
-#bullwerk-bericht th,#bullwerk-bericht td{padding:9px 10px;text-align:left;border-bottom:1px solid #e8d9b8}
-#bullwerk-bericht th{background:#f7edda;color:#5c451e}
-#bullwerk-bericht a{color:#8c641e;text-decoration:underline}
-#bullwerk-hintergrund{margin:24px 0 35px}
-#bullwerk-hintergrund>summary{cursor:pointer;font-weight:700;padding:14px 18px;background:#f4e9d0;border:1px solid #dfc99a;border-radius:10px;color:#493b25}
-#bullwerk-hintergrund[open]>summary{margin-bottom:22px}
-@media(max-width:650px){#bullwerk-bericht{padding:18px 15px}#bullwerk-bericht h2{font-size:1.25rem}}
-</style></head><body>
+</style><style id="bullwerk-freigabe-stil">
+#bullwerk-freigegebener-bericht[hidden]{display:none!important}
+#bullwerk-freigegebener-bericht .bullwerk-freigabe-kennung{font-size:.84rem;font-weight:800;letter-spacing:.08em;color:#8b661f;border-bottom:1px solid #e8d9b8;padding-bottom:12px}
+#bullwerk-freigegebener-bericht h2{margin-top:1.6em}
+#bullwerk-freigegebener-bericht h3{margin-top:1.1em}
+#bullwerk-freigegebener-bericht table{width:100%;border-collapse:collapse;display:block;overflow-x:auto;margin:14px 0}
+#bullwerk-freigegebener-bericht th,#bullwerk-freigegebener-bericht td{border-bottom:1px solid #e8d9b8;padding:9px 12px;text-align:left;vertical-align:top}
+#bullwerk-freigegebener-bericht th{background:#f5ecd9}
+#bullwerk-freigegebener-bericht a{color:#815b1c;text-decoration:underline;overflow-wrap:anywhere}
+#bullwerk-freigegebener-bericht blockquote{border-left:3px solid #bc8b38;padding-left:15px;margin-left:0}
+#bullwerk-freigegebener-bericht .bullwerk-stand{font-weight:700;color:#675d4b}
+</style>
+</head><body>
 <header class="banner"><a class="back" href="morgenroutine.html">← Zur Morgenroutine</a></header>
 <main>
 <div class="intro">
@@ -372,12 +364,11 @@ main{max-width:1120px}
 </div>
 <p class="editorial-dateline">Morgenbriefing · Redaktionelle Vorlage · Aktueller Datenstand wird nach Prüfung ergänzt</p>
 </div>
-<article id="bullwerk-bericht" aria-label="Freigegebene Bullwerk Morgenroutine" aria-live="polite">
-  <div class="bw-release"><span>🐂 BULLWERK MARKETS · REDAKTIONELL FREIGEGEBEN</span><span id="bw-bericht-datum"></span></div>
-  <div class="bw-report-body" id="bw-bericht-inhalt"></div>
-</article>
-<details id="bullwerk-hintergrund" open>
-  <summary id="bw-hintergrund-label">Marktindikatoren und Hintergrundinformationen</summary>
+<!-- Bullwerk Freigabe: Nur ein explizit freigegebener GitHub-Bericht wird eingeblendet. -->
+<section id="bullwerk-freigegebener-bericht" hidden aria-live="polite">
+  <p class="bullwerk-freigabe-kennung">🐂 BULLWERK MARKETS · FREIGEGEBENE MORGENROUTINE</p>
+  <div id="bullwerk-freigabe-inhalt"></div>
+</section>
 <section>
 <h2>1. 🌍 Was ist seit gestern passiert?</h2>
 <p>Jeden Morgen betrachten wir, wie sich die US-Börsen am vorherigen Handelstag entwickelt haben und welche wichtigen Nachrichten über Nacht aus Asien, Europa und den USA hinzugekommen sind.</p>
@@ -677,7 +668,6 @@ main{max-width:1120px}
 </div>
 </section>
 <p class="notice"><strong>Stand der Umsetzung:</strong> Abschnitte 1 bis 12 sind redaktionell und gestalterisch vorbereitet. Es werden noch keine Live-Daten angezeigt. Die Tiingo-Bestätigung erlaubt isolierte tägliche Index-Prozentwerte unter den genannten Lizenzbedingungen; die tatsächliche Verfügbarkeit der sechs Indexdaten und etwaige Rechte Dritter müssen vor automatischer Veröffentlichung geprüft werden. Weitere Abschnitte folgen nach Prüfung.</p>
-</details>
 </main><footer>© Bullwerk Markets · Bullen finden, bevor sie ausbrechen.</footer>
 <script>
 /* Bullwerk Morgenroutine – sichere Anzeige der vom GitHub-Workflow gepflegten FRED-Daten.
@@ -736,101 +726,68 @@ main{max-width:1120px}
   setInterval(refresh, 30 * 60 * 1000);
 })();
 </script>
-
 <script>
-/* Nur manuell freigegebene Berichte werden angezeigt. Keine Schreibrechte/Token im Browser. */
+/* Bullwerk: Nur manuell freigegebene Berichte aus dem eigenen Repository anzeigen.
+   Die Chat-Freigabe selbst veröffentlicht NICHTS; erst der GitHub-Commit der JSON-Datei. */
 (function () {
   'use strict';
-  const reportBox = document.getElementById('bullwerk-bericht');
-  const contentBox = document.getElementById('bw-bericht-inhalt');
-  const details = document.getElementById('bullwerk-hintergrund');
-  function escapeHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
-  function inline(text) {
-    let out = escapeHtml(text);
-    // Only safe, absolute HTTPS links; markdown is otherwise escaped.
-    out = out.replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, function (_m, label, url) {
-      return '<a href="' + url.replace(/&amp;/g, '&amp;') + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
-    });
-    out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-    return out;
-  }
-  function renderMarkdown(source) {
-    const lines = String(source).replace(/\r\n?/g, '\n').split('\n');
-    const result = [];
-    let paragraph = [], listType = null;
-    function flushParagraph() {
-      if (paragraph.length) { result.push('<p>' + paragraph.map(inline).join('<br>') + '</p>'); paragraph = []; }
-    }
-    function closeList() { if (listType) { result.push('</' + listType + '>'); listType = null; } }
-    function isTableRow(line) { return /^\s*\|.+\|\s*$/.test(line); }
-    function splitCells(line) { return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(s => s.trim()); }
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) { flushParagraph(); closeList(); continue; }
-      if (/^---+$/.test(line)) { flushParagraph(); closeList(); result.push('<hr>'); continue; }
-      const heading = /^(#{1,4})\s+(.+)$/.exec(line);
-      if (heading) {
-        flushParagraph(); closeList();
-        const level = Math.max(2, heading[1].length + 1);
-        result.push('<h' + level + '>' + inline(heading[2]) + '</h' + level + '>'); continue;
-      }
-      if (isTableRow(line) && i + 1 < lines.length && /^\s*\|?[\s:|\-]+\|?\s*$/.test(lines[i + 1]) && lines[i + 1].includes('-')) {
-        flushParagraph(); closeList();
-        const headers = splitCells(line);
-        let table = '<div class="bw-table-scroll"><table><thead><tr>' + headers.map(c => '<th>' + inline(c) + '</th>').join('') + '</tr></thead><tbody>';
-        i += 2;
-        while (i < lines.length && isTableRow(lines[i])) {
-          table += '<tr>' + splitCells(lines[i]).map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>';
-          i++;
+  const host = document.getElementById('bullwerk-freigegebener-bericht');
+  const target = document.getElementById('bullwerk-freigabe-inhalt');
+  if (!host || !target) return;
+  const main = host.parentElement;
+  const fallbackSections = Array.from(main.children).filter(el => el.tagName === 'SECTION' && el !== host);
+  const fallbackNotice = Array.from(main.children).filter(el => el.matches('p.notice'));
+
+  function cleanReport(html) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const allowed = new Set(['H1','H2','H3','H4','P','STRONG','B','EM','I','UL','OL','LI','TABLE','THEAD','TBODY','TR','TH','TD','BLOCKQUOTE','HR','A','BR','SMALL','DIV','SPAN']);
+    function scrub(node) {
+      for (const child of Array.from(node.children)) {
+        if (!allowed.has(child.tagName)) { child.remove(); continue; }
+        for (const attr of Array.from(child.attributes)) {
+          if (child.tagName === 'A' && attr.name === 'href') {
+            try {
+              const u = new URL(attr.value, location.href);
+              if (!['https:', 'http:'].includes(u.protocol)) child.removeAttribute('href');
+              else { child.setAttribute('rel','noopener noreferrer'); child.setAttribute('target','_blank'); }
+            } catch (_) { child.removeAttribute('href'); }
+          } else if (attr.name !== 'href') child.removeAttribute(attr.name);
         }
-        result.push(table + '</tbody></table></div>'); i--; continue;
+        scrub(child);
       }
-      const bullet = /^[-*]\s+(.+)$/.exec(line);
-      const numbered = /^\d+\.\s+(.+)$/.exec(line);
-      if (bullet || numbered) {
-        flushParagraph(); const type = bullet ? 'ul' : 'ol';
-        if (listType !== type) { closeList(); result.push('<' + type + '>'); listType = type; }
-        result.push('<li>' + inline((bullet || numbered)[1]) + '</li>'); continue;
-      }
-      closeList(); paragraph.push(line);
     }
-    flushParagraph(); closeList(); return result.join('\n');
+    scrub(template.content);
+    return template.content;
   }
-  async function loadApprovedReport() {
+
+  async function showApproved() {
     try {
-      const response = await fetch('freigegebene-morgenroutine.json?stand=' + Date.now(), {cache:'no-store'});
-      if (!response.ok) return; // No approval file: leave existing website unchanged.
-      const data = await response.json();
-      if (!data || data.status !== 'freigegeben' || !/^\d{4}-\d{2}-\d{2}$/.test(data.datum)
-          || typeof data.inhalt_markdown !== 'string' || data.inhalt_markdown.length < 100
-          || data.inhalt_markdown.length > 120000 || !['ROT','GELB','GRÜN'].includes(data.ampel)) return;
-      contentBox.innerHTML = renderMarkdown(data.inhalt_markdown);
-      document.getElementById('bw-bericht-datum').textContent = 'Ausgabe: ' + data.datum.split('-').reverse().join('.');
-      reportBox.style.display = 'block';
-      details.open = false;
-      document.getElementById('bw-hintergrund-label').textContent = 'Weitere Marktindikatoren und Hintergrundinformationen anzeigen';
+      const response = await fetch('morgenroutine-freigegeben.json', {cache:'no-store'});
+      if (!response.ok) return;
+      const report = await response.json();
+      if (!report || report.status !== 'freigegeben' ||
+          typeof report.datum !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(report.datum) ||
+          typeof report.html !== 'string' || report.html.trim().length < 50) return;
+      const date = new Date(report.datum + 'T12:00:00Z');
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0,10) !== report.datum) return;
+      const stamp = date.toLocaleDateString('de-DE', {day:'2-digit', month:'long', year:'numeric', timeZone:'UTC'});
+      const title = document.createElement('h1');
+      title.textContent = 'Morgenroutine – ' + stamp;
+      const status = document.createElement('p');
+      status.className = 'bullwerk-stand';
+      status.textContent = 'Redaktionell freigegeben · ' + stamp;
+      target.replaceChildren(title, status, cleanReport(report.html));
+      for (const el of [...fallbackSections,...fallbackNotice]) el.hidden = true;
+      host.hidden = false;
+      document.title = 'Bullwerk Markets – Morgenroutine ' + stamp;
       const dateline = document.querySelector('.editorial-dateline');
-      if (dateline) dateline.textContent = 'Freigegebene Bullwerk-Morgenroutine · Ausgabe vom ' + data.datum.split('-').reverse().join('.') + ' · Marktdaten mit jeweiligem Datenstand';
-      const light = document.querySelector('.traffic-panel');
-      if (light) {
-        light.setAttribute('aria-label', 'Bullwerk Marktampel: ' + data.ampel);
-        const title = light.querySelector('.traffic-heading');
-        const message = light.querySelector('.traffic-message');
-        if (title) title.innerHTML = 'MARKTAMPEL <span>FREIGEGEBEN</span>';
-        if (message) {
-          const strong = message.querySelector('strong');
-          const desc = message.querySelector('p');
-          if (strong) strong.textContent = data.ampel + (typeof data.trend === 'string' ? ' ' + data.trend.slice(0, 4) : '');
-          if (desc) desc.textContent = 'Redaktionelle Bewertung der freigegebenen Morgenroutine.';
-        }
-      }
-    } catch (_error) { /* A missing or invalid file never publishes an unapproved report. */ }
+      if (dateline) dateline.textContent = 'Morgenbriefing · Redaktionell freigegeben · ' + stamp;
+    } catch (_) {
+      /* Keine gültige Freigabe: Bestehende Webseite unverändert anzeigen. */
+    }
   }
-  loadApprovedReport();
+  showApproved();
 })();
 </script>
 </body></html>
