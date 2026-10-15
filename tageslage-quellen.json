@@ -1,7 +1,7 @@
 {
-  "erstellt_am": "2026-10-15T10:03:28.991910+02:00",
-  "status": "quellensammlung",
-  "hinweis": "Rohmeldungen und Messwerte; noch keine gepruefte Marktanalyse oder Marktampel.",
+  "erstellt_am": "2026-10-15T10:37:32.880205+02:00",
+  "status": "quellensammlung_mit_vorauswahl",
+  "hinweis": "Rohmeldungen und Messwerte mit regelbasierter Themen-Vorauswahl; keine gepruefte Marktanalyse und keine Marktampel.",
   "erfolgreiche_quellen": [
     "Federal Reserve",
     "BEA",
@@ -43,5 +43,19 @@
       "link": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261008a.htm",
       "veroeffentlicht": "2026-10-08T20:30:00+00:00"
     }
-  ]
+  ],
+  "relevante_meldungen": [
+    {
+      "quelle": "Federal Reserve",
+      "titel": "Minutes of the Board's discount rate meetings on August 17, September 9, and September 16, 2026",
+      "link": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm",
+      "veroeffentlicht": "2026-10-13T18:00:00+00:00",
+      "themen": [
+        "Geldpolitik"
+      ],
+      "relevanz_score": 6,
+      "bewertung": "Regelbasierte Vorauswahl anhand der Ueberschrift; nicht redaktionell geprueft."
+    }
+  ],
+  "bewertungsmethode": "Schluesselwoerter in Ueberschriften plus Aktualitaetsbonus"
 }
