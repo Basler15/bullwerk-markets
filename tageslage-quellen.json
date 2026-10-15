@@ -1,17 +1,29 @@
 {
-  "erstellt_am": "2026-10-15T09:56:00.604894+02:00",
+  "erstellt_am": "2026-10-15T10:03:28.991910+02:00",
   "status": "quellensammlung",
-  "hinweis": "Ungeprüfte Rohmeldungen, keine fertige Marktanalyse.",
+  "hinweis": "Rohmeldungen und Messwerte; noch keine gepruefte Marktanalyse oder Marktampel.",
   "erfolgreiche_quellen": [
     "Federal Reserve",
-    "BEA"
+    "BEA",
+    "FRED/CPIAUCSL",
+    "FRED/UNRATE"
   ],
-  "fehlgeschlagene_quellen": [
-    {
-      "quelle": "BLS",
-      "fehler": "HTTP Error 403: Forbidden"
+  "fehlgeschlagene_quellen": [],
+  "konjunktur": {
+    "verbraucherpreise_cpi": {
+      "wert": 336.298,
+      "datum": "2026-09-01",
+      "quelle": "FRED/CPIAUCSL",
+      "einheit": "Index",
+      "veraenderung_12m_prozent": 3.72
+    },
+    "arbeitslosenquote": {
+      "wert": 4.2,
+      "datum": "2026-09-01",
+      "quelle": "FRED/UNRATE (BLS)",
+      "einheit": "Prozent"
     }
-  ],
+  },
   "meldungen": [
     {
       "quelle": "Federal Reserve",
