@@ -1,10 +1,9 @@
-
 name: Bullwerk Morgenroutine - Tageslage
 
 on:
   workflow_dispatch:
   schedule:
-    # 07:30 Uhr in Deutschland, Sommer- und Winterzeit
+    # Zwei UTC-Termine; Python waehlt 07 Uhr Berliner Zeit (Sommer/Winter).
     - cron: "30 5,6 * * 1-5"
 
 permissions:
@@ -17,7 +16,6 @@ concurrency:
 jobs:
   nachrichten:
     runs-on: ubuntu-latest
-
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
@@ -27,11 +25,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Offizielle Nachrichten abrufen
+      - name: Offizielle Meldungen und Konjunkturdaten abrufen
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           python - <<'PY'
+          import csv
+          import io
           import json
           import os
           import urllib.request
@@ -43,106 +43,136 @@ jobs:
 
           now = datetime.now(timezone.utc)
           berlin = now.astimezone(ZoneInfo("Europe/Berlin"))
+          if os.environ.get("EVENT_NAME") == "schedule" and berlin.hour != 7:
+              print("Nicht 07 Uhr in Deutschland - Lauf uebersprungen.")
+              raise SystemExit(0)
 
-          if os.environ.get("EVENT_NAME") == "schedule":
-              if berlin.hour != 7:
-                  print("Nicht 07 Uhr in Deutschland - Lauf übersprungen.")
-                  raise SystemExit(0)
+          def download(url):
+              request = urllib.request.Request(
+                  url, headers={"User-Agent": "BullwerkMarkets/1.0 (public economic data)", "Accept": "application/xml,text/xml,text/csv,*/*"}
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return response.read(2_000_000)
 
           feeds = {
               "Federal Reserve": "https://www.federalreserve.gov/feeds/press_all.xml",
-              "BLS": "https://www.bls.gov/feed/bls_latest.rss",
-              "BEA": "https://apps.bea.gov/rss/rss.xml"
+              "BEA": "https://apps.bea.gov/rss/rss.xml",
           }
-
           meldungen = []
           erfolge = []
           fehler = []
-
           for quelle, url in feeds.items():
               try:
-                  request = urllib.request.Request(
-                      url,
-                      headers={"User-Agent": "BullwerkMarkets/1.0"}
-                  )
-                  with urllib.request.urlopen(request, timeout=25) as response:
-                      xml_data = response.read(2_000_000)
-
-                  root = ET.fromstring(xml_data)
-
+                  root = ET.fromstring(download(url))
                   for item in root.findall(".//item"):
                       titel = (item.findtext("title") or "").strip()
                       link = (item.findtext("link") or "").strip()
                       datum = (item.findtext("pubDate") or "").strip()
-
                       if not titel or not link.startswith("https://"):
                           continue
-
                       try:
                           zeit = parsedate_to_datetime(datum)
                           if zeit.tzinfo is None:
                               zeit = zeit.replace(tzinfo=timezone.utc)
                           zeit = zeit.astimezone(timezone.utc)
-                      except (ValueError, TypeError, IndexError):
+                      except (TypeError, ValueError, IndexError):
                           continue
-
-                      if not now - timedelta(days=7) <= zeit <= now + timedelta(hours=1):
-                          continue
-
-                      meldungen.append({
-                          "quelle": quelle,
-                          "titel": titel,
-                          "link": link,
-                          "veroeffentlicht": zeit.isoformat()
-                      })
-
+                      if now - timedelta(days=7) <= zeit <= now + timedelta(hours=1):
+                          meldungen.append({
+                              "quelle": quelle,
+                              "titel": titel,
+                              "link": link,
+                              "veroeffentlicht": zeit.isoformat(),
+                          })
                   erfolge.append(quelle)
-                  print(f"{quelle}: Abruf erfolgreich")
-
+                  print(f"{quelle}: RSS-Abruf erfolgreich")
               except Exception as exc:
                   fehler.append({"quelle": quelle, "fehler": str(exc)})
-                  print(f"{quelle}: Abruf fehlgeschlagen: {exc}")
+                  print(f"{quelle}: RSS-Abruf fehlgeschlagen: {exc}")
+
+          # BLS blockiert automatisierte RSS-Abrufe teilweise (HTTP 403).
+          # Alternative fuer BLS-Konjunkturindikatoren: oeffentliche FRED-Zeitreihen.
+          # Das sind Messwerte, KEINE BLS-Nachrichten oder Erscheinungstermine.
+          def fred_series(series_id):
+              url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=" + series_id
+              csv_text = download(url).decode("utf-8-sig")
+              rows = list(csv.DictReader(io.StringIO(csv_text)))
+              werte = []
+              for row in rows:
+                  datum = row.get("observation_date") or row.get("DATE")
+                  raw = row.get(series_id)
+                  if datum and raw and raw != ".":
+                      try:
+                          werte.append((datum, float(raw)))
+                      except ValueError:
+                          pass
+              if not werte:
+                  raise ValueError(f"Keine Beobachtungen fuer {series_id}")
+              return werte
+
+          konjunktur = {}
+          try:
+              cpi = fred_series("CPIAUCSL")
+              datum, wert = cpi[-1]
+              # Fuer die 12-Monatsrate muss ein exakt 12 Monate aelterer Wert vorliegen.
+              jahr, monat = map(int, datum[:7].split("-"))
+              alt_jahr = jahr - 1
+              alter_monat = f"{alt_jahr:04d}-{monat:02d}"
+              alt = next((v for d, v in cpi if d.startswith(alter_monat)), None)
+              eintrag = {"wert": round(wert, 3), "datum": datum, "quelle": "FRED/CPIAUCSL", "einheit": "Index"}
+              if alt is not None and alt != 0:
+                  eintrag["veraenderung_12m_prozent"] = round((wert / alt - 1) * 100, 2)
+              konjunktur["verbraucherpreise_cpi"] = eintrag
+              erfolge.append("FRED/CPIAUCSL")
+              print("FRED CPI: erfolgreich")
+          except Exception as exc:
+              fehler.append({"quelle": "FRED/CPIAUCSL", "fehler": str(exc)})
+              print(f"FRED CPI: {exc}")
+
+          try:
+              arbeitslosigkeit = fred_series("UNRATE")
+              datum, wert = arbeitslosigkeit[-1]
+              konjunktur["arbeitslosenquote"] = {
+                  "wert": round(wert, 2), "datum": datum,
+                  "quelle": "FRED/UNRATE (BLS)", "einheit": "Prozent",
+              }
+              erfolge.append("FRED/UNRATE")
+              print("FRED Arbeitslosenquote: erfolgreich")
+          except Exception as exc:
+              fehler.append({"quelle": "FRED/UNRATE", "fehler": str(exc)})
+              print(f"FRED Arbeitslosenquote: {exc}")
 
           if not erfolge:
-              raise RuntimeError("Keine Quelle erreichbar. Vorhandene Daten bleiben erhalten.")
+              raise RuntimeError("Keine Datenquelle erreichbar; vorhandene Datei bleibt unveraendert.")
 
-          meldungen.sort(
-              key=lambda x: x["veroeffentlicht"],
-              reverse=True
-          )
-
+          meldungen.sort(key=lambda x: x["veroeffentlicht"], reverse=True)
           daten = {
               "erstellt_am": berlin.isoformat(),
               "status": "quellensammlung",
-              "hinweis": "Ungeprüfte Rohmeldungen, keine fertige Marktanalyse.",
+              "hinweis": "Rohmeldungen und Messwerte; noch keine gepruefte Marktanalyse oder Marktampel.",
               "erfolgreiche_quellen": erfolge,
               "fehlgeschlagene_quellen": fehler,
-              "meldungen": meldungen[:20]
+              "konjunktur": konjunktur,
+              "meldungen": meldungen[:20],
           }
-
           Path("tageslage-quellen.json").write_text(
-              json.dumps(daten, ensure_ascii=False, indent=2) + "\n",
-              encoding="utf-8"
+              json.dumps(daten, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
           )
-
-          print(f"{len(daten['meldungen'])} Meldungen gespeichert.")
+          print(f"{len(daten['meldungen'])} Meldungen; {len(konjunktur)} Konjunkturindikatoren gespeichert.")
           PY
 
-      - name: Nachrichten speichern
+      - name: Daten speichern
         run: |
           if [ ! -f tageslage-quellen.json ]; then
             echo "Kein neuer Datenstand."
             exit 0
           fi
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add tageslage-quellen.json
-
           if git diff --cached --quiet; then
-            echo "Keine Änderungen."
+            echo "Keine Aenderungen."
           else
-            git commit -m "Bullwerk Tageslage: offizielle Nachrichten aktualisieren"
+            git commit -m "Bullwerk Tageslage: offizielle Meldungen und Konjunkturdaten"
             git push
           fi
