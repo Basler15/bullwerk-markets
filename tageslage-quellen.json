@@ -1,0 +1,35 @@
+{
+  "erstellt_am": "2026-10-15T09:56:00.604894+02:00",
+  "status": "quellensammlung",
+  "hinweis": "Ungeprüfte Rohmeldungen, keine fertige Marktanalyse.",
+  "erfolgreiche_quellen": [
+    "Federal Reserve",
+    "BEA"
+  ],
+  "fehlgeschlagene_quellen": [
+    {
+      "quelle": "BLS",
+      "fehler": "HTTP Error 403: Forbidden"
+    }
+  ],
+  "meldungen": [
+    {
+      "quelle": "Federal Reserve",
+      "titel": "Minutes of the Board's discount rate meetings on August 17, September 9, and September 16, 2026",
+      "link": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm",
+      "veroeffentlicht": "2026-10-13T18:00:00+00:00"
+    },
+    {
+      "quelle": "Federal Reserve",
+      "titel": "Federal Reserve Board releases results of the 2025 Survey of Consumer Finances, which provides the public and policymakers with detailed insights into the economic condition of American families",
+      "link": "https://www.federalreserve.gov/newsevents/pressreleases/other20261009a.htm",
+      "veroeffentlicht": "2026-10-09T14:00:00+00:00"
+    },
+    {
+      "quelle": "Federal Reserve",
+      "titel": "Federal Reserve Board announces enforcement action against American Express Company to address, among other things, the firm’s failure to sufficiently detect and report certain suspicious activity related to money laundering",
+      "link": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261008a.htm",
+      "veroeffentlicht": "2026-10-08T20:30:00+00:00"
+    }
+  ]
+}
