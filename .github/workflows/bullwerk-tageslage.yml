@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Offizielle Meldungen und Konjunkturdaten abrufen
+      - name: Offizielle Meldungen und Konjunkturdaten abrufen und bewerten
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
@@ -49,7 +49,11 @@ jobs:
 
           def download(url):
               request = urllib.request.Request(
-                  url, headers={"User-Agent": "BullwerkMarkets/1.0 (public economic data)", "Accept": "application/xml,text/xml,text/csv,*/*"}
+                  url,
+                  headers={
+                      "User-Agent": "BullwerkMarkets/1.0 (public economic data)",
+                      "Accept": "application/xml,text/xml,text/csv,*/*",
+                  },
               )
               with urllib.request.urlopen(request, timeout=30) as response:
                   return response.read(2_000_000)
@@ -61,6 +65,7 @@ jobs:
           meldungen = []
           erfolge = []
           fehler = []
+
           for quelle, url in feeds.items():
               try:
                   root = ET.fromstring(download(url))
@@ -90,9 +95,8 @@ jobs:
                   fehler.append({"quelle": quelle, "fehler": str(exc)})
                   print(f"{quelle}: RSS-Abruf fehlgeschlagen: {exc}")
 
-          # BLS blockiert automatisierte RSS-Abrufe teilweise (HTTP 403).
-          # Alternative fuer BLS-Konjunkturindikatoren: oeffentliche FRED-Zeitreihen.
-          # Das sind Messwerte, KEINE BLS-Nachrichten oder Erscheinungstermine.
+          # FRED ist eine alternative Quelle fuer BLS-Konjunktur-Messwerte.
+          # Diese Daten sind keine BLS-Nachrichten und keine Erscheinungstermine.
           def fred_series(series_id):
               url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=" + series_id
               csv_text = download(url).decode("utf-8-sig")
@@ -114,12 +118,15 @@ jobs:
           try:
               cpi = fred_series("CPIAUCSL")
               datum, wert = cpi[-1]
-              # Fuer die 12-Monatsrate muss ein exakt 12 Monate aelterer Wert vorliegen.
               jahr, monat = map(int, datum[:7].split("-"))
-              alt_jahr = jahr - 1
-              alter_monat = f"{alt_jahr:04d}-{monat:02d}"
+              alter_monat = f"{jahr - 1:04d}-{monat:02d}"
               alt = next((v for d, v in cpi if d.startswith(alter_monat)), None)
-              eintrag = {"wert": round(wert, 3), "datum": datum, "quelle": "FRED/CPIAUCSL", "einheit": "Index"}
+              eintrag = {
+                  "wert": round(wert, 3),
+                  "datum": datum,
+                  "quelle": "FRED/CPIAUCSL",
+                  "einheit": "Index",
+              }
               if alt is not None and alt != 0:
                   eintrag["veraenderung_12m_prozent"] = round((wert / alt - 1) * 100, 2)
               konjunktur["verbraucherpreise_cpi"] = eintrag
@@ -133,8 +140,10 @@ jobs:
               arbeitslosigkeit = fred_series("UNRATE")
               datum, wert = arbeitslosigkeit[-1]
               konjunktur["arbeitslosenquote"] = {
-                  "wert": round(wert, 2), "datum": datum,
-                  "quelle": "FRED/UNRATE (BLS)", "einheit": "Prozent",
+                  "wert": round(wert, 2),
+                  "datum": datum,
+                  "quelle": "FRED/UNRATE (BLS)",
+                  "einheit": "Prozent",
               }
               erfolge.append("FRED/UNRATE")
               print("FRED Arbeitslosenquote: erfolgreich")
@@ -143,22 +152,113 @@ jobs:
               print(f"FRED Arbeitslosenquote: {exc}")
 
           if not erfolge:
-              raise RuntimeError("Keine Datenquelle erreichbar; vorhandene Datei bleibt unveraendert.")
+              raise RuntimeError(
+                  "Keine Datenquelle erreichbar; vorhandene Datei bleibt unveraendert."
+              )
+
+          # Regelbasierte Themenklassifikation: kein KI-Urteil und kein Handelssignal.
+          # Fuer einen Treffer zaehlt jeweils das hoechste Gewicht pro Thema.
+          themen = {
+              "Geldpolitik": {
+                  "gewicht": 5,
+                  "woerter": [
+                      "federal funds", "interest rate", "discount rate",
+                      "monetary policy", "fomc", "rate decision",
+                      "policy rate", "balance sheet", "quantitative tightening",
+                  ],
+              },
+              "Inflation": {
+                  "gewicht": 5,
+                  "woerter": [
+                      "inflation", "consumer price", "price index",
+                      "personal consumption expenditures", "pce price",
+                      "producer price",
+                  ],
+              },
+              "Arbeitsmarkt": {
+                  "gewicht": 4,
+                  "woerter": [
+                      "employment", "unemployment", "nonfarm payroll",
+                      "job openings", "labor market", "labour market",
+                      "wages", "jobless claims",
+                  ],
+              },
+              "Konjunktur": {
+                  "gewicht": 4,
+                  "woerter": [
+                      "gross domestic product", "gdp", "economic growth",
+                      "retail sales", "consumer spending", "industrial production",
+                      "personal income", "economic activity",
+                  ],
+              },
+              "Finanzsystem und Liquiditaet": {
+                  "gewicht": 3,
+                  "woerter": [
+                      "financial stability", "liquidity", "banking system",
+                      "credit conditions", "financial conditions",
+                      "bank lending", "repo market",
+                  ],
+              },
+          }
+          ausschluss_woerter = [
+              "enforcement action", "civil money penalty",
+              "termination of enforcement", "consent order",
+              "prohibition order",
+          ]
+
+          def bewerte(meldung):
+              titel = meldung["titel"].casefold()
+              treffer = []
+              for thema, regel in themen.items():
+                  if any(wort in titel for wort in regel["woerter"]):
+                      treffer.append((thema, regel["gewicht"]))
+              if not treffer:
+                  return None
+              if any(wort in titel for wort in ausschluss_woerter):
+                  return None
+
+              zeit = datetime.fromisoformat(meldung["veroeffentlicht"])
+              alter_stunden = max(0, (now - zeit).total_seconds() / 3600)
+              # Aktuellere Meldungen erhalten einen kleinen Zusatzbonus.
+              aktualitaet = 2 if alter_stunden <= 24 else (1 if alter_stunden <= 72 else 0)
+              score = min(10, max(gewicht for _, gewicht in treffer) + aktualitaet)
+              return {
+                  **meldung,
+                  "themen": [thema for thema, _ in treffer],
+                  "relevanz_score": score,
+                  "bewertung": "Regelbasierte Vorauswahl anhand der Ueberschrift; nicht redaktionell geprueft.",
+              }
 
           meldungen.sort(key=lambda x: x["veroeffentlicht"], reverse=True)
+          bewertete = [ergebnis for m in meldungen if (ergebnis := bewerte(m))]
+          bewertete.sort(
+              key=lambda x: (x["relevanz_score"], x["veroeffentlicht"]),
+              reverse=True,
+          )
+
           daten = {
               "erstellt_am": berlin.isoformat(),
-              "status": "quellensammlung",
-              "hinweis": "Rohmeldungen und Messwerte; noch keine gepruefte Marktanalyse oder Marktampel.",
+              "status": "quellensammlung_mit_vorauswahl",
+              "hinweis": (
+                  "Rohmeldungen und Messwerte mit regelbasierter Themen-Vorauswahl; "
+                  "keine gepruefte Marktanalyse und keine Marktampel."
+              ),
               "erfolgreiche_quellen": erfolge,
               "fehlgeschlagene_quellen": fehler,
               "konjunktur": konjunktur,
               "meldungen": meldungen[:20],
+              "relevante_meldungen": bewertete[:5],
+              "bewertungsmethode": "Schluesselwoerter in Ueberschriften plus Aktualitaetsbonus",
           }
           Path("tageslage-quellen.json").write_text(
-              json.dumps(daten, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+              json.dumps(daten, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
           )
-          print(f"{len(daten['meldungen'])} Meldungen; {len(konjunktur)} Konjunkturindikatoren gespeichert.")
+          print(
+              f"{len(daten['meldungen'])} Meldungen; "
+              f"{len(konjunktur)} Konjunkturindikatoren; "
+              f"{len(daten['relevante_meldungen'])} relevante Meldungen gespeichert."
+          )
           PY
 
       - name: Daten speichern
@@ -173,6 +273,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Keine Aenderungen."
           else
-            git commit -m "Bullwerk Tageslage: offizielle Meldungen und Konjunkturdaten"
+            git commit -m "Bullwerk Tageslage: Meldungen, Konjunktur und Relevanz"
             git push
           fi
