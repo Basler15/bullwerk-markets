@@ -1,10 +1,9 @@
-
 {
   "projekt": "Bullwerk Markets",
   "bereich": "Morgenroutine",
   "version": "1.0",
-  "datenstand": null,
-  "status": "in_vorbereitung",
+  "datenstand": "2026-10-15T09:14:49+02:00",
+  "status": "teilweise_aktualisiert",
   "marktampel": {
     "farbe": null,
     "score": null,
@@ -26,9 +25,24 @@
     "distribution_days": null
   },
   "zinsen": {
-    "us_10y": null,
-    "us_2y": null,
-    "fed_erwartungen": null
+    "us_10y": {
+      "wert": 5.21,
+      "einheit": "Prozent",
+      "datum": "2026-10-13",
+      "quelle": "FRED/DGS10"
+    },
+    "us_2y": {
+      "wert": 4.79,
+      "einheit": "Prozent",
+      "datum": "2026-10-13",
+      "quelle": "FRED/DGS2"
+    },
+    "fed_erwartungen": null,
+    "zinsdifferenz_10y_2y": {
+      "wert": 0.42,
+      "einheit": "Prozentpunkte",
+      "hinweis": "Differenz der jeweils letzten verfügbaren Beobachtungen"
+    }
   },
   "rohstoffe": {
     "gold": null,
@@ -45,5 +59,5 @@
   },
   "wirtschaftskalender": [],
   "ampel_historie": [],
-  "hinweis": "Noch keine geprüften Marktdaten vorhanden."
+  "hinweis": "US-Zinsen automatisch abgerufen. Weitere Marktindikatoren noch nicht angebunden."
 }
