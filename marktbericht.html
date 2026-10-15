@@ -390,9 +390,10 @@ main{max-width:1120px}
   <div class="market-line"><span>Silber</span><span class="market-change">Daten ausstehend</span></div>
   <div class="market-line"><span>EUR/USD</span><span class="market-change">Daten ausstehend</span></div>
   <div class="market-line"><span>US-Dollarindex (DXY)</span><span class="market-change">Daten ausstehend</span></div>
-  <div class="market-line"><span>US-Staatsanleihe, 2 Jahre</span><span class="market-change">Daten ausstehend</span></div>
-  <div class="market-line"><span>US-Staatsanleihe, 10 Jahre</span><span class="market-change">Daten ausstehend</span></div>
-  <p class="market-note">Für Öl, Edelmetalle, EUR/USD und DXY veröffentlichen wir erst nach Prüfung von Datenabdeckung und Anzeigerechten einzelne zulässige Tageskennzahlen oder eine eigene qualitative Einschätzung. Für US-Staatsanleiherenditen ist die offizielle US-Treasury-Datenquelle vorgesehen. Hier werden bewusst keine ungeprüften Zahlen gezeigt.</p>
+  <div class="market-line"><span>US-Staatsanleihe, 2 Jahre</span><span class="market-change" id="bullwerk-us2y">Daten ausstehend</span></div>
+  <div class="market-line"><span>US-Staatsanleihe, 10 Jahre</span><span class="market-change" id="bullwerk-us10y">Daten ausstehend</span></div>
+  <p class="market-note" id="bullwerk-zinsen-stand" aria-live="polite">US-Zinsen: Datenstand wird geprüft.</p>
+  <p class="market-note">Für Öl, Edelmetalle, EUR/USD und DXY veröffentlichen wir erst nach Prüfung von Datenabdeckung und Anzeigerechten einzelne zulässige Tageskennzahlen oder eine eigene qualitative Einschätzung. US-Staatsanleiherenditen werden aus den bereits eingerichteten FRED-Reihen DGS2 und DGS10 eingelesen. Wir zeigen den Beobachtungstag und kennzeichnen fehlende Daten ausdrücklich.</p>
 </div>
 <h3>🐂 Bullwerk-Einschätzung</h3>
 <p>Steigende Ölpreise können den Inflationsdruck erhöhen. Steigende US-Renditen können besonders zinssensible Wachstumswerte belasten. Ein stärkerer US-Dollar kann zusätzliche Auswirkungen auf Rohstoffe und international tätige Unternehmen haben. Diese Zusammenhänge sind jedoch <strong>keine festen Regeln</strong>; wir prüfen den jeweiligen Marktkontext.</p>
@@ -651,4 +652,61 @@ main{max-width:1120px}
 </section>
 <p class="notice"><strong>Stand der Umsetzung:</strong> Abschnitte 1 bis 12 sind redaktionell und gestalterisch vorbereitet. Es werden noch keine Live-Daten angezeigt. Die Tiingo-Bestätigung erlaubt isolierte tägliche Index-Prozentwerte unter den genannten Lizenzbedingungen; die tatsächliche Verfügbarkeit der sechs Indexdaten und etwaige Rechte Dritter müssen vor automatischer Veröffentlichung geprüft werden. Weitere Abschnitte folgen nach Prüfung.</p>
 </main><footer>© Bullwerk Markets · Bullen finden, bevor sie ausbrechen.</footer>
+<script>
+/* Bullwerk Morgenroutine – sichere Anzeige der vom GitHub-Workflow gepflegten FRED-Daten.
+   Keine API-Schlüssel im Browser. Andere Abschnitte und Scanner bleiben unverändert. */
+(function () {
+  'use strict';
+  const source = 'morgenroutine-data.json';
+  const field2 = document.getElementById('bullwerk-us2y');
+  const field10 = document.getElementById('bullwerk-us10y');
+  const status = document.getElementById('bullwerk-zinsen-stand');
+  if (!field2 || !field10 || !status) return;
+
+  function validDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const d = new Date(value + 'T12:00:00Z');
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value ? value : null;
+  }
+  function showDate(value) {
+    const date = validDate(value);
+    if (!date) return 'Datum unbekannt';
+    const [year, month, day] = date.split('-');
+    return day + '.' + month + '.' + year;
+  }
+  function formatYield(obj, expectedSource) {
+    if (!obj || typeof obj !== 'object') return null;
+    const n = obj.wert;
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 30) return null;
+    if (obj.einheit !== 'Prozent' || obj.quelle !== expectedSource || !validDate(obj.datum)) return null;
+    return { text: n.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' %', date: obj.datum };
+  }
+  async function refresh() {
+    try {
+      const res = await fetch(source + '?stand=' + Date.now(), {cache: 'no-store'});
+      if (!res.ok) throw new Error('Datei nicht erreichbar');
+      const data = await res.json();
+      const two = formatYield(data?.zinsen?.us_2y, 'FRED/DGS2');
+      const ten = formatYield(data?.zinsen?.us_10y, 'FRED/DGS10');
+      field2.textContent = two ? two.text : 'Daten ausstehend';
+      field10.textContent = ten ? ten.text : 'Daten ausstehend';
+      if (two || ten) {
+        const details = [];
+        if (two) details.push('2 Jahre: ' + showDate(two.date));
+        if (ten) details.push('10 Jahre: ' + showDate(ten.date));
+        status.textContent = 'Quelle: Federal Reserve via FRED (DGS2 / DGS10). Beobachtungstag – ' + details.join(' · ') + '. Keine Live-Kurse; Veröffentlichung mit zeitlichem Verzug.';
+      } else {
+        status.textContent = 'US-Zinsen: Noch keine gültigen FRED-Daten verfügbar.';
+      }
+    } catch (err) {
+      field2.textContent = 'Daten ausstehend';
+      field10.textContent = 'Daten ausstehend';
+      status.textContent = 'US-Zinsen: Automatische Daten derzeit nicht abrufbar.';
+    }
+  }
+  refresh();
+  // Bereits geöffnete Seiten in regelmäßigen Abständen aktualisieren.
+  setInterval(refresh, 30 * 60 * 1000);
+})();
+</script>
 </body></html>
