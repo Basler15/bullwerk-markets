@@ -50,7 +50,9 @@ jobs:
               # deutscher Zeit freigeben.
               # Die Minuten koennen durch
               # GitHub-Verzoegerungen abweichen.
-              allowed = now.hour == 23
+              # Akzeptiere auch verspaetete GitHub-Ausfuehrungen.
+              # Der erste geplante Lauf des Tages verarbeitet die Daten.
+              allowed = True
 
           with open(
               os.environ["GITHUB_OUTPUT"],
