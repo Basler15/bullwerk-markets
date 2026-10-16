@@ -26,6 +26,7 @@ jobs:
         id: zeitpruefung
         env:
           EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_EXPR: ${{ github.event.schedule }}
         run: |
           python - <<'PY'
           import os
@@ -50,9 +51,12 @@ jobs:
               # deutscher Zeit freigeben.
               # Die Minuten koennen durch
               # GitHub-Verzoegerungen abweichen.
-              # Akzeptiere auch verspaetete GitHub-Ausfuehrungen.
-              # Der erste geplante Lauf des Tages verarbeitet die Daten.
-              allowed = True
+              # Pruefe den ausloesenden UTC-Zeitplan statt
+              # der tatsaechlichen Startstunde (GitHub-Verzoegerung).
+              scheduled = os.environ["SCHEDULE_EXPR"].strip()
+              expected = ("30 21 * * 1-5" if now.utcoffset().total_seconds() == 7200 else "30 22 * * 1-5")
+              allowed = scheduled == expected
+              print("Zeitplan:", scheduled, "Erwartet:", expected)
 
           with open(
               os.environ["GITHUB_OUTPUT"],
