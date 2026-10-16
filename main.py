@@ -246,9 +246,12 @@ def evaluate_stock(symbol, cik, benchmark):
         "relative_strength_gate": momentum.get(
             "rs_gate"
         ),
+        "score_change_14d": None,
         "score_change_28d": None,
         "early_bull_status": "HISTORIE FEHLT",
+        "early_bull_status_14d": "HISTORIE FEHLT",
         "score_history_details": None,
+        "score_history_details_14d": None,
     }
 
     print(
@@ -340,6 +343,20 @@ def update_score_history(results):
             item["symbol"],
             days=28,
             as_of=item["as_of"],
+        )
+
+        change_data_14d = get_score_change(
+            history,
+            item["symbol"],
+            days=14,
+            as_of=item["as_of"],
+        )
+
+        item["score_history_details_14d"] = change_data_14d
+        if change_data_14d is not None:
+            item["score_change_14d"] = change_data_14d["change"]
+        item["early_bull_status_14d"] = classify_early_bull(
+            change_data_14d
         )
 
         item["score_history_details"] = change_data
