@@ -122,3 +122,13 @@ Ziel: täglich etwa 07:30 Uhr Berlin.
 - Keine Beispieldaten als echte Marktdaten ausgeben.
 - Neue Entscheidungen und Fortschritte in dieser Datei nachtragen.
 - GitHub-Projektprotokoll dient als verlässliche Dokumentation des Projektstands.
+
+## 14. Morgenroutine-Freigabe – 16.10.2026
+- GitHub-Verbindung für dieses Repository erfolgreich geprüft (Lese-/Schreibzugriff).
+- Fester 12-Abschnitt-Aufbau der akzeptierten Vorlage; tägliche Daten werden innerhalb bestehender Komponenten eingesetzt.
+- Neuer Renderer mit strukturiertem JSON-Format Version 2. Keine Veröffentlichung älterer Rohtext-Fassungen.
+- Lokale Entwurfsvorschau: marktbericht.html?vorschau=1, JSON vom Gerät auswählen; kein Upload.
+- Täglicher Bericht zur manuellen Prüfung um 06:30 Europe/Berlin. Erst nach explizitem „Bullwerk freigeben“ schreibt der Assistent im interaktiven Chat die geprüfte Fassung via GitHub.
+- Veröffentlichung bis 07:30 als Ziel, abhängig von rechtzeitiger Freigabe und erfolgreichem Pages-Deployment. Keine automatische Freigabe durch Zeitablauf.
+- Pioneer-Vollanalysen bleiben aus öffentlichen Dateien ausgeschlossen; geschützter Mitgliederbereich weiterhin offen.
+- Ablauf und Datenvertrag: MORGENROUTINE_FREIGABE.md.

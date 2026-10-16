@@ -329,19 +329,12 @@ main{max-width:1120px}
 .calendar-guidelines strong{font-size:12px;color:#483720}
 .calendar-guidelines p{font-size:12px;line-height:1.55;color:#6b5e4e;margin:7px 0 0}
 @media(max-width:720px){.calendar-guidelines{grid-template-columns:1fr}.calendar-head{flex-direction:column;align-items:flex-start}.calendar-pending{align-self:flex-start}}
-</style><style id="bullwerk-freigabe-stil">
-#bullwerk-freigegebener-bericht[hidden]{display:none!important}
-#bullwerk-freigegebener-bericht .bullwerk-freigabe-kennung{font-size:.84rem;font-weight:800;letter-spacing:.08em;color:#8b661f;border-bottom:1px solid #e8d9b8;padding-bottom:12px}
-#bullwerk-freigegebener-bericht h2{margin-top:1.6em}
-#bullwerk-freigegebener-bericht h3{margin-top:1.1em}
-#bullwerk-freigegebener-bericht table{width:100%;border-collapse:collapse;display:block;overflow-x:auto;margin:14px 0}
-#bullwerk-freigegebener-bericht th,#bullwerk-freigegebener-bericht td{border-bottom:1px solid #e8d9b8;padding:9px 12px;text-align:left;vertical-align:top}
-#bullwerk-freigegebener-bericht th{background:#f5ecd9}
-#bullwerk-freigegebener-bericht a{color:#815b1c;text-decoration:underline;overflow-wrap:anywhere}
-#bullwerk-freigegebener-bericht blockquote{border-left:3px solid #bc8b38;padding-left:15px;margin-left:0}
-#bullwerk-freigegebener-bericht .bullwerk-stand{font-weight:700;color:#675d4b}
-</style>
-</head><body>
+
+.bw-positive{color:#287244!important;font-weight:700}.bw-negative{color:#aa3935!important;font-weight:700}.bw-caution{color:#967023!important;font-weight:700}.bw-number{color:#956a26!important;font-weight:700;font-variant-numeric:tabular-nums}
+.traffic-panel[data-farbe="rot"] .red{background:#df433a;border-color:#fa8c80;box-shadow:0 0 16px #e6443a88}.traffic-panel[data-farbe="gelb"] .yellow{background:#e7b84e;box-shadow:0 0 16px #e7b84e88}.traffic-panel[data-farbe="gruen"] .green{background:#3f9557;box-shadow:0 0 16px #3f955788}
+.ampel-day>i.bw-lamp-yellow{background:#e7b84e}.ampel-day>i.bw-lamp-red{background:#c8544c}.ampel-day>i.bw-lamp-green{background:#3f9557}
+.bw-preview-bar{background:#fff;border:1px solid #bc8b38;border-radius:10px;padding:18px;margin:0 0 24px}.bw-preview-bar p{font-size:13px;margin:8px 0}.market-change{font-variant-numeric:tabular-nums}
+</style></head><body data-report-classes="ampel-day ampel-days ampel-dot ampel-history ampel-history-head ampel-latest ampel-legend ampel-pending ampel-verdict back banner breadth-detail breadth-direction breadth-down breadth-grid breadth-header breadth-number breadth-overview breadth-tile breadth-trend breadth-up bw-caution bw-lamp-green bw-lamp-red bw-lamp-yellow bw-negative bw-number bw-positive bw-preview-bar calendar-comment calendar-comment-label calendar-guidelines calendar-head calendar-kicker calendar-panel calendar-pending calendar-stand calendar-table calendar-table-wrap calendar-tbd capital-data-status capital-editorial-note capital-factors capital-radar capital-source capital-table capital-table-wrap capital-topline capital-verdict conclusion data-line date editorial-copy editorial-dateline editorial-header editorial-lead editorial-subtitle entry eyebrow eyebrow-separator flow-board flow-board-head flow-board-row flow-board-rows flow-method flow-method-grid flow-pending flow-sector flow-status flow-verdict green intro light macro-card macro-factor macro-factors macro-heading macro-open macro-result macro-wait market-change market-daily market-daily-title market-line market-note notice pioneer-benefits pioneer-chart-grid pioneer-chart-legend pioneer-chart-preview pioneer-coming pioneer-dot pioneer-eyebrow pioneer-foot pioneer-lock pioneer-mark pioneer-preview pioneer-preview-body pioneer-preview-top pioneer-watch-head pioneer-watch-preview pioneer-watch-row red season-card season-conclusion season-metrics season-status season-top section-label sentiment-current sentiment-fear sentiment-greed sentiment-head sentiment-neutral sentiment-panel sentiment-pending sentiment-scale sentiment-zone signal signoff status-note stop target trade-chart-heading trade-chart-layout trade-chart-wrap trade-crv trade-facts trade-feature trade-feature-top trade-kicker trade-neutral trade-schematic traffic-body traffic-footer traffic-heading traffic-lights traffic-message traffic-panel tv-eyebrow tv-gold tv-green tv-idea tv-idea-head tv-idea-layout tv-idea-rule tv-idea-status tv-line-legend tv-red tv-research tv-snapshot tv-snapshot-inner tv-snapshot-symbol tv-source tv-trade-crv tv-trade-data tv-trade-row tv-trade-title watch-detail watch-header watch-kicker watch-list watch-name watch-panel watch-rank watch-review watch-row watch-state watch-verdict yellow">
 <header class="banner"><a class="back" href="morgenroutine.html">← Zur Morgenroutine</a></header>
 <main>
 <div class="intro">
@@ -364,12 +357,7 @@ main{max-width:1120px}
 </div>
 <p class="editorial-dateline">Morgenbriefing · Redaktionelle Vorlage · Aktueller Datenstand wird nach Prüfung ergänzt</p>
 </div>
-<!-- Bullwerk Freigabe: Nur ein explizit freigegebener GitHub-Bericht wird eingeblendet. -->
-<section id="bullwerk-freigegebener-bericht" hidden aria-live="polite">
-  <p class="bullwerk-freigabe-kennung">🐂 BULLWERK MARKETS · FREIGEGEBENE MORGENROUTINE</p>
-  <div id="bullwerk-freigabe-inhalt"></div>
-</section>
-<section>
+<section data-bericht-abschnitt="1">
 <h2>1. 🌍 Was ist seit gestern passiert?</h2>
 <p>Jeden Morgen betrachten wir, wie sich die US-Börsen am vorherigen Handelstag entwickelt haben und welche wichtigen Nachrichten über Nacht aus Asien, Europa und den USA hinzugekommen sind.</p>
 <p>Dabei interessieren uns besonders Entwicklungen, die das Umfeld für Aktien verändern können: Unternehmensnachrichten, die Stimmung in der Halbleiterbranche, Ölpreise, US-Anleiherenditen sowie neue geldpolitische oder geopolitische Risiken.</p>
@@ -378,7 +366,7 @@ main{max-width:1120px}
 <p><strong>Unsere Handelsentscheidung:</strong> Wir bevorzugen Long-Einstiege, wenn Markttrend, relative Stärke, Handelsvolumen und fundamentale Entwicklung zusammenpassen. Einzelne Schlagzeilen sind für uns allein kein Kauf- oder Verkaufssignal.</p>
 <p class="status-note"><strong>Tageslage:</strong> Die konkreten Meldungen für den jeweiligen Morgen werden erst nach Quellenprüfung ergänzt. Hier stehen bewusst keine ungeprüften aktuellen Behauptungen.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="2">
 <h2>2. 📊 Aktienmärkte – Wo zeigt sich Stärke?</h2>
 <p>Für unsere Marktanalyse betrachten wir täglich den Nasdaq 100, Nasdaq Composite, S&amp;P 500, Dow Jones, Russell 2000 und DAX. Entscheidend ist nicht nur, ob die Indizes steigen oder fallen, sondern welche Marktbereiche relative Stärke zeigen.</p>
 <div class="market-daily">
@@ -396,7 +384,7 @@ main{max-width:1120px}
 <p>Entwickeln sich die Technologiewerte dagegen deutlich schwächer, prüfen wir, ob eine gesunde Sektorrotation oder zunehmende Marktschwäche vorliegt.</p>
 <p><strong>Unsere Handelsentscheidung:</strong> Neue Breakouts bevorzugen wir in Marktphasen mit positiver relativer Stärke, breiter Beteiligung und überzeugendem Handelsvolumen.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="3">
 <h2>3. 🛢️ Rohstoffe, Dollar und Anleihen</h2>
 <p>Öl, Edelmetalle, US-Dollar und Anleiherenditen geben Hinweise auf Inflation, Risikobereitschaft und Finanzierungsbedingungen. Für Bullwerk ist entscheidend, wie diese Märkte <strong>zusammenwirken</strong> – nicht, ob ein einzelner Wert an einem Tag steigt oder fällt.</p>
 <div class="market-daily">
@@ -409,17 +397,16 @@ main{max-width:1120px}
   <div class="market-line"><span>US-Dollarindex (DXY)</span><span class="market-change">Daten ausstehend</span></div>
   <div class="market-line"><span>US-Staatsanleihe, 2 Jahre</span><span class="market-change" id="bullwerk-us2y">Daten ausstehend</span></div>
   <div class="market-line"><span>US-Staatsanleihe, 10 Jahre</span><span class="market-change" id="bullwerk-us10y">Daten ausstehend</span></div>
-  <p class="market-note" id="bullwerk-zinsen-stand" aria-live="polite">US-Zinsen: Datenstand wird geprüft.</p>
-  <p class="market-note">Für Öl, Edelmetalle, EUR/USD und DXY veröffentlichen wir erst nach Prüfung von Datenabdeckung und Anzeigerechten einzelne zulässige Tageskennzahlen oder eine eigene qualitative Einschätzung. US-Staatsanleiherenditen werden aus den bereits eingerichteten FRED-Reihen DGS2 und DGS10 eingelesen. Wir zeigen den Beobachtungstag und kennzeichnen fehlende Daten ausdrücklich.</p>
+  <p class="market-note" id="bullwerk-zinsen-stand">Für Öl, Edelmetalle, EUR/USD und DXY veröffentlichen wir erst nach Prüfung von Datenabdeckung und Anzeigerechten einzelne zulässige Tageskennzahlen oder eine eigene qualitative Einschätzung. Für US-Staatsanleiherenditen ist die offizielle US-Treasury-Datenquelle vorgesehen. Hier werden bewusst keine ungeprüften Zahlen gezeigt.</p>
 </div>
 <h3>🐂 Bullwerk-Einschätzung</h3>
 <p>Steigende Ölpreise können den Inflationsdruck erhöhen. Steigende US-Renditen können besonders zinssensible Wachstumswerte belasten. Ein stärkerer US-Dollar kann zusätzliche Auswirkungen auf Rohstoffe und international tätige Unternehmen haben. Diese Zusammenhänge sind jedoch <strong>keine festen Regeln</strong>; wir prüfen den jeweiligen Marktkontext.</p>
 <p><strong>Unsere Handelsentscheidung:</strong> Entspannen sich mehrere Belastungsfaktoren gleichzeitig, unterstützt das grundsätzlich unsere Suche nach Long-Setups. Ziehen Ölpreise, Renditen und Dollar dagegen gleichzeitig deutlich an, bewerten wir neue Breakouts vorsichtiger.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="4">
 <h2>4. 🐂 Marktbreite – Wie gesund ist der Aktienmarkt?</h2>
 <p>Ein steigender Index allein sagt noch nicht, wie stabil der Aufwärtstrend ist. Entscheidend ist, <strong>wie viele Aktien die Bewegung tatsächlich mittragen</strong>. Deshalb beobachten wir täglich die Zahl der Gewinner und Verlierer unter den S&amp;P-500-Aktien.</p>
-<div class="breadth-overview" aria-label="Marktbreite S&P 500">
+<div class="breadth-overview" aria-label="Marktbreite S&amp;P 500">
   <div class="breadth-header"><strong>S&amp;P 500 · Marktbreite</strong><span>Letzter geprüfter Handelstag</span></div>
   <div class="breadth-grid">
     <div class="breadth-tile breadth-up">
@@ -441,7 +428,7 @@ main{max-width:1120px}
 <p>Steigen dagegen viele Aktien gemeinsam und verbessert sich die Beteiligung über mehrere Handelstage, spricht das für einen <strong>breiter getragenen Aufwärtstrend</strong>. Das ist ein positives Signal für unsere Suche nach neuen Breakouts.</p>
 <p><strong>Unsere Handelsentscheidung:</strong> Bei schwacher oder nachlassender Marktbreite prüfen wir neue Long-Einstiege besonders kritisch. Bei zunehmender Marktbreite erhalten überzeugende Breakout-Setups mehr Rückenwind – vorausgesetzt, Trend, Volumen und Risiko passen ebenfalls.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="5">
 <h2>5. 🚦 Marktampel – Wie entwickelt sich das Marktumfeld?</h2>
 <p>Unsere Marktampel fasst die wichtigsten Signale für die Long-Seite zusammen. Wir bewerten dabei nicht nur den Indextrend, sondern auch <strong>Marktbreite, Zinsen, Liquidität, Volatilität und fundamentale Entwicklungen</strong>. So erkennen wir, ob sich die Bedingungen für neue Breakouts verbessern oder verschlechtern.</p>
 
@@ -474,7 +461,7 @@ main{max-width:1120px}
 <p>Wechselt die Ampel dagegen wiederholt zwischen Grün und Gelb oder verschlechtert sich Richtung Rot, deutet das auf ein unsicheres Marktumfeld hin. Wir reduzieren dann die Bereitschaft, schwache oder späte Ausbrüche zu handeln.</p>
 <p><strong>Unsere Handelsentscheidung:</strong> Grün begünstigt neue Long-Setups, Gelb verlangt eine besonders strenge Auswahl, und bei Rot stellen wir den Kapitalschutz in den Vordergrund. Ein einzelnes Signal ersetzt niemals Einstieg, Stop und Chance-Risiko-Verhältnis.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="6">
 <h2>6. 🧭 Marktstimmung – Angst oder Zuversicht?</h2>
 <p>Stimmung kann einen Aufwärtstrend unterstützen – oder vor übertriebener Euphorie warnen. Deshalb betrachten wir neben unserer Marktampel auch, ob die Anleger zunehmend vorsichtig oder risikofreudig werden.</p>
 <div class="sentiment-panel" aria-label="Bullwerk-Marktstimmung: noch nicht bewertet">
@@ -495,7 +482,7 @@ main{max-width:1120px}
 <p>Wir prüfen deshalb, ob Stimmung, Marktbreite und Kursentwicklung zueinander passen. Besonders aufmerksam werden wir, wenn die Indizes steigen, die Beteiligung vieler Aktien aber abnimmt und die Risikobereitschaft bereits sehr hoch erscheint.</p>
 <p><strong>Unsere Handelsentscheidung:</strong> Die Stimmung ist ein ergänzender Kontextfaktor. Über neue Long-Trades entscheiden weiterhin Marktampel, relative Stärke, Fundamentaldaten, Volumen, Einstieg und Stop.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="7">
 <h2>7. 📅 Nasdaq-Saisonalität – Rückenwind oder Gegenwind?</h2>
 <p>Manche Monate verliefen an der Börse historisch häufiger positiv als andere. Für Bullwerk ist Saisonalität jedoch <strong>nur ein ergänzender Kontextfaktor</strong>: Ein typischerweise starker Börsenmonat garantiert keinen Kursanstieg, und ein schwacher Monat bedeutet nicht automatisch fallende Kurse.</p>
 <div class="season-card" aria-label="Nasdaq-100-Saisonalität: historische Auswertung noch ausstehend">
@@ -512,7 +499,7 @@ main{max-width:1120px}
 <p>Historisch günstige Monate können einen intakten Aufwärtstrend unterstützen. Ist die Marktbreite schwach, die Ampel gelb oder rot oder steigt das Risiko deutlich, überstimmt die Saisonalität diese Warnsignale <strong>nicht</strong>.</p>
 <p><strong>Unsere Handelsentscheidung:</strong> Saisonalität liefert einen zusätzlichen Hinweis, aber niemals einen eigenständigen Kauf-Trigger. Wir handeln nur, wenn Trend, relative Stärke, Fundamentaldaten, Volumen und Chance-Risiko-Verhältnis zusammenpassen.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="8">
 <h2>8. 🌐 Makro-Ampel – Was bewegt den Gesamtmarkt?</h2>
 <p>Auch starke Aktien geraten unter Druck, wenn sich die wirtschaftlichen Rahmenbedingungen verschlechtern. Unsere <strong>Makro-Ampel</strong> bündelt deshalb die wichtigsten Einflussfaktoren für US-Aktien – und ergänzt die übergeordnete Bullwerk-Marktampel.</p>
 
@@ -538,7 +525,7 @@ main{max-width:1120px}
 <p>Wir bewerten deshalb immer das <strong>Zusammenspiel</strong> der Faktoren. Besonders wichtig ist, ob sich die Lage verbessert oder verschlechtert und ob der Aktienmarkt diese Entwicklung bereits bestätigt.</p>
 <p><strong>Unsere Handelsentscheidung:</strong> Bei günstiger Makrolage erhalten technisch und fundamental starke Breakouts zusätzlichen Rückenwind. Bei zunehmenden Risiken handeln wir selektiver. Eine rote übergeordnete Marktampel wird durch einzelne positive Makrodaten nicht aufgehoben.</p>
 </section>
-<section>
+<section data-bericht-abschnitt="9">
 <h2>9. 💰 Geldflüsse &amp; Sektorrotation – Wohin fließt das große Geld?</h2>
 <p>Wir wollen früh erkennen, welche Branchen zunehmend Kapital anziehen, den Nasdaq übertreffen und bessere fundamentale Aussichten entwickeln. Dafür kombinieren wir <strong>echte ETF-Nettozuflüsse</strong>, <strong>relative Stärke gegenüber QQQ</strong>, fundamentale Entwicklungen und technische Ausbruchssignale. Nicht jedes starke Kursplus bedeutet automatisch einen Mittelzufluss.</p>
 <div class="capital-radar" aria-label="Bullwerk ETF-Kapitalradar, Daten ausstehend">
@@ -567,8 +554,74 @@ main{max-width:1120px}
 <p><strong>Unsere Handelsentscheidung:</strong> Wir bevorzugen frühe Setups in Sektoren mit steigender relativer Stärke und einer günstigen Marktampel. Ein ETF, der bereits weit über seiner Basis notiert, ist trotz Zuflüssen nicht automatisch ein guter Einstieg.</p>
 <p class="capital-editorial-note"><strong>Transparenz:</strong> Nettozuflüsse, Kursstärke und Handelsvolumen sind unterschiedliche Größen. Wir nennen Geldflüsse nur, wenn sie durch eine geeignete Quelle belegt sind. Die Tabelle enthält bis zur Datenanbindung bewusst keine Zahlen oder Empfehlungen.</p>
 </section>
-<section id="wirtschaftskalender">
-<h2>10. 📅 Wirtschaftskalender – Die Termine, die Märkte bewegen</h2>
+<section id="pioneer-trading" data-bericht-abschnitt="10">
+<h2>10. 🎯 Trading-Ideen – Exklusiv für Pioneer-Bullen</h2>
+<p>Keine endlosen Aktienlisten, sondern <strong>maximal ein bis zwei sorgfältig geprüfte Setups</strong> – und an Tagen ohne überzeugende Chance auch keine neue Idee. Unsere Pioneer-Analysen verbinden Fundamentaldaten, relative Stärke und einen klaren Handelsplan.</p>
+<div class="pioneer-preview">
+  <div class="pioneer-preview-top">
+    <div class="pioneer-mark">🐂 <span>BULLWERK <b>PIONEER</b></span></div>
+    <span class="pioneer-lock">🔒 EXKLUSIV</span>
+  </div>
+  <div class="pioneer-preview-body">
+    <span class="pioneer-eyebrow">DIE TRADING-IDEE DES TAGES</span>
+    <h3>Chancen erkennen. Risiken kennen.</h3>
+    <p>Jede freigegebene Idee enthält einen echten, gekennzeichneten TradingView-Chart-Snapshot mit unserem vollständigen Handelsplan.</p>
+    <div class="pioneer-chart-preview" aria-label="Schematische Vorschau einer Chartanalyse, keine echten Kursdaten">
+      <div class="pioneer-chart-grid">
+        <svg viewbox="0 0 520 180" role="img" aria-label="Symbolischer Chart mit goldenem Einstieg, rotem Stop und grünem Kursziel" preserveaspectratio="none">
+          <polyline points="16,137 58,116 90,131 125,106 164,119 200,94 235,106 270,82 307,97 344,68 380,74 415,49" fill="none" stroke="#9c9a90" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          <line x1="8" y1="72" x2="512" y2="72" stroke="#c4a062" stroke-width="2" stroke-dasharray="7 5"></line>
+          <line x1="8" y1="135" x2="512" y2="135" stroke="#bc5952" stroke-width="2" stroke-dasharray="7 5"></line>
+          <line x1="8" y1="24" x2="512" y2="24" stroke="#579a6a" stroke-width="2" stroke-dasharray="7 5"></line>
+        </svg>
+      </div>
+      <div class="pioneer-chart-legend"><span><i class="pioneer-dot entry"></i>Einstieg</span><span><i class="pioneer-dot stop"></i>Stop-Loss</span><span><i class="pioneer-dot target"></i>Kursziel</span></div>
+      <small>Illustration · kein echter Aktienchart und keine aktuelle Empfehlung</small>
+    </div>
+    <div class="pioneer-benefits">
+      <div><strong>Fundamentaler Auslöser</strong><span>Was verändert sich im Unternehmen?</span></div>
+      <div><strong>Chart &amp; Einstieg</strong><span>Box, Trigger, Stop und Ziel</span></div>
+      <div><strong>CRV &amp; Risiken</strong><span>Nachvollziehbarer Handelsplan</span></div>
+    </div>
+    <div class="pioneer-foot">
+      <div><strong>Nur für Pioneer-Bullen</strong><span>Vollständige Analyse nach Anmeldung und aktiver Mitgliedschaft.</span></div>
+      <span class="pioneer-coming">MITGLIEDERBEREICH IN VORBEREITUNG</span>
+    </div>
+  </div>
+</div>
+</section>
+<section id="pioneer-fruehscanner" data-bericht-abschnitt="11">
+<h2>11. 🔎 Bullwerk-Frühscanner – Exklusiv für Pioneer-Bullen</h2>
+<p>Die spannendsten Chancen entstehen häufig <strong>vor dem eigentlichen Ausbruch</strong>. Unser Frühscanner sucht nach Aktien, bei denen sich Fundamentaldaten, relative Stärke und Chartstruktur gleichzeitig verbessern – bevor die Bewegung weit fortgeschritten ist.</p>
+<div class="pioneer-preview">
+  <div class="pioneer-preview-top">
+    <div class="pioneer-mark">🐂 <span>BULLWERK <b>PIONEER</b></span></div>
+    <span class="pioneer-lock">🔒 EXKLUSIV</span>
+  </div>
+  <div class="pioneer-preview-body">
+    <span class="pioneer-eyebrow">DER FRÜHBLICK AUF MÖGLICHE BREAKOUTS</span>
+    <h3>Fundamentale Stärke entdecken. Ausbrüche frühzeitig erkennen.</h3>
+    <p>Wenige ausgewählte Beobachtungskandidaten statt einer langen Trefferliste. Ein WATCH-Signal ist noch kein Kauf – entscheidend ist der spätere, überprüfbare Trigger.</p>
+    <div class="pioneer-watch-preview">
+      <div class="pioneer-watch-head"><span>FRÜHSCANNER · BEISPIELANSICHT</span><span>STATUS</span></div>
+      <div class="pioneer-watch-row"><div><strong>Beobachtungskandidat</strong><small>Fundamentales Momentum + relative Stärke</small></div><em>FRÜH-WATCH</em></div>
+      <div class="pioneer-watch-row"><div><strong>Chartbasis in Vorbereitung</strong><small>Box / Pullback / Ausbruchszone</small></div><em>WATCH</em></div>
+      <div class="pioneer-watch-row"><div><strong>Trigger noch nicht bestätigt</strong><small>Marktumfeld und Volumen werden geprüft</small></div><em>KEIN TRADE</em></div>
+    </div>
+    <div class="pioneer-benefits">
+      <div><strong>Frühe Veränderungen</strong><span>Gewinne, Aufträge, Prognosen</span></div>
+      <div><strong>Relative Stärke</strong><span>Beschleunigung gegenüber QQQ</span></div>
+      <div><strong>Klare Entscheidungen</strong><span>WATCH, TRIGGER oder FAIL</span></div>
+    </div>
+    <div class="pioneer-foot">
+      <div><strong>Nur für Pioneer-Bullen</strong><span>Konkrete Aktien, Bewertungen und Ausbruchszonen erst im geschützten Bereich.</span></div>
+      <span class="pioneer-coming">MITGLIEDERBEREICH IN VORBEREITUNG</span>
+    </div>
+  </div>
+</div>
+</section>
+<section id="wirtschaftskalender" data-bericht-abschnitt="12">
+<h2>12. 📅 Wirtschaftskalender – Die Termine, die Märkte bewegen</h2>
 <p>Nicht jeder Wirtschaftstermin ist für unsere Handelsentscheidungen relevant. Wir zeigen hier <strong>höchstens fünf bis sieben wichtige Ereignisse</strong> – mit deutscher Uhrzeit, möglicher Marktwirkung und direkter offizieller Quelle. Entscheidend ist nicht die Menge, sondern die Bedeutung für Nasdaq, Zinsen und unsere Marktampel.</p>
 
 <div class="calendar-panel">
@@ -600,72 +653,6 @@ main{max-width:1120px}
   <div><strong>Keine fremden Kalender kopieren</strong><p>Offizielle Termine und veröffentlichte Ist-Werte ja; Konsensschätzungen und fremde Kalenderdaten nur mit geklärten Nutzungsrechten.</p></div>
 </div>
 <p class="market-note"><strong>Redaktioneller Hinweis:</strong> Die Tabelle zeigt aktuell nur die geplanten Ereigniskategorien, <strong>keine tatsächlichen nächsten Termine</strong>. Die Auswahl wird später auf die nächsten fünf bis sieben relevanten Ereignisse begrenzt; wichtige Quartalszahlen können dann ergänzend berücksichtigt werden, sofern Termine aus offiziellen Unternehmensquellen bestätigt sind. Keine automatisch laufende Datenversorgung eingerichtet.</p>
-</section>
-<section id="pioneer-trading">
-<h2>11. 🎯 Trading-Ideen – Exklusiv für Pioneer-Bullen</h2>
-<p>Keine endlosen Aktienlisten, sondern <strong>maximal ein bis zwei sorgfältig geprüfte Setups</strong> – und an Tagen ohne überzeugende Chance auch keine neue Idee. Unsere Pioneer-Analysen verbinden Fundamentaldaten, relative Stärke und einen klaren Handelsplan.</p>
-<div class="pioneer-preview">
-  <div class="pioneer-preview-top">
-    <div class="pioneer-mark">🐂 <span>BULLWERK <b>PIONEER</b></span></div>
-    <span class="pioneer-lock">🔒 EXKLUSIV</span>
-  </div>
-  <div class="pioneer-preview-body">
-    <span class="pioneer-eyebrow">DIE TRADING-IDEE DES TAGES</span>
-    <h3>Chancen erkennen. Risiken kennen.</h3>
-    <p>Jede freigegebene Idee enthält einen echten, gekennzeichneten TradingView-Chart-Snapshot mit unserem vollständigen Handelsplan.</p>
-    <div class="pioneer-chart-preview" aria-label="Schematische Vorschau einer Chartanalyse, keine echten Kursdaten">
-      <div class="pioneer-chart-grid">
-        <svg viewBox="0 0 520 180" role="img" aria-label="Symbolischer Chart mit goldenem Einstieg, rotem Stop und grünem Kursziel" preserveAspectRatio="none">
-          <polyline points="16,137 58,116 90,131 125,106 164,119 200,94 235,106 270,82 307,97 344,68 380,74 415,49" fill="none" stroke="#9c9a90" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="8" y1="72" x2="512" y2="72" stroke="#c4a062" stroke-width="2" stroke-dasharray="7 5"/>
-          <line x1="8" y1="135" x2="512" y2="135" stroke="#bc5952" stroke-width="2" stroke-dasharray="7 5"/>
-          <line x1="8" y1="24" x2="512" y2="24" stroke="#579a6a" stroke-width="2" stroke-dasharray="7 5"/>
-        </svg>
-      </div>
-      <div class="pioneer-chart-legend"><span><i class="pioneer-dot entry"></i>Einstieg</span><span><i class="pioneer-dot stop"></i>Stop-Loss</span><span><i class="pioneer-dot target"></i>Kursziel</span></div>
-      <small>Illustration · kein echter Aktienchart und keine aktuelle Empfehlung</small>
-    </div>
-    <div class="pioneer-benefits">
-      <div><strong>Fundamentaler Auslöser</strong><span>Was verändert sich im Unternehmen?</span></div>
-      <div><strong>Chart &amp; Einstieg</strong><span>Box, Trigger, Stop und Ziel</span></div>
-      <div><strong>CRV &amp; Risiken</strong><span>Nachvollziehbarer Handelsplan</span></div>
-    </div>
-    <div class="pioneer-foot">
-      <div><strong>Nur für Pioneer-Bullen</strong><span>Vollständige Analyse nach Anmeldung und aktiver Mitgliedschaft.</span></div>
-      <span class="pioneer-coming">MITGLIEDERBEREICH IN VORBEREITUNG</span>
-    </div>
-  </div>
-</div>
-</section>
-<section id="pioneer-fruehscanner">
-<h2>12. 🔎 Bullwerk-Frühscanner – Exklusiv für Pioneer-Bullen</h2>
-<p>Die spannendsten Chancen entstehen häufig <strong>vor dem eigentlichen Ausbruch</strong>. Unser Frühscanner sucht nach Aktien, bei denen sich Fundamentaldaten, relative Stärke und Chartstruktur gleichzeitig verbessern – bevor die Bewegung weit fortgeschritten ist.</p>
-<div class="pioneer-preview">
-  <div class="pioneer-preview-top">
-    <div class="pioneer-mark">🐂 <span>BULLWERK <b>PIONEER</b></span></div>
-    <span class="pioneer-lock">🔒 EXKLUSIV</span>
-  </div>
-  <div class="pioneer-preview-body">
-    <span class="pioneer-eyebrow">DER FRÜHBLICK AUF MÖGLICHE BREAKOUTS</span>
-    <h3>Fundamentale Stärke entdecken. Ausbrüche frühzeitig erkennen.</h3>
-    <p>Wenige ausgewählte Beobachtungskandidaten statt einer langen Trefferliste. Ein WATCH-Signal ist noch kein Kauf – entscheidend ist der spätere, überprüfbare Trigger.</p>
-    <div class="pioneer-watch-preview">
-      <div class="pioneer-watch-head"><span>FRÜHSCANNER · BEISPIELANSICHT</span><span>STATUS</span></div>
-      <div class="pioneer-watch-row"><div><strong>Beobachtungskandidat</strong><small>Fundamentales Momentum + relative Stärke</small></div><em>FRÜH-WATCH</em></div>
-      <div class="pioneer-watch-row"><div><strong>Chartbasis in Vorbereitung</strong><small>Box / Pullback / Ausbruchszone</small></div><em>WATCH</em></div>
-      <div class="pioneer-watch-row"><div><strong>Trigger noch nicht bestätigt</strong><small>Marktumfeld und Volumen werden geprüft</small></div><em>KEIN TRADE</em></div>
-    </div>
-    <div class="pioneer-benefits">
-      <div><strong>Frühe Veränderungen</strong><span>Gewinne, Aufträge, Prognosen</span></div>
-      <div><strong>Relative Stärke</strong><span>Beschleunigung gegenüber QQQ</span></div>
-      <div><strong>Klare Entscheidungen</strong><span>WATCH, TRIGGER oder FAIL</span></div>
-    </div>
-    <div class="pioneer-foot">
-      <div><strong>Nur für Pioneer-Bullen</strong><span>Konkrete Aktien, Bewertungen und Ausbruchszonen erst im geschützten Bereich.</span></div>
-      <span class="pioneer-coming">MITGLIEDERBEREICH IN VORBEREITUNG</span>
-    </div>
-  </div>
-</div>
 </section>
 <p class="notice"><strong>Stand der Umsetzung:</strong> Abschnitte 1 bis 12 sind redaktionell und gestalterisch vorbereitet. Es werden noch keine Live-Daten angezeigt. Die Tiingo-Bestätigung erlaubt isolierte tägliche Index-Prozentwerte unter den genannten Lizenzbedingungen; die tatsächliche Verfügbarkeit der sechs Indexdaten und etwaige Rechte Dritter müssen vor automatischer Veröffentlichung geprüft werden. Weitere Abschnitte folgen nach Prüfung.</p>
 </main><footer>© Bullwerk Markets · Bullen finden, bevor sie ausbrechen.</footer>
@@ -725,69 +712,4 @@ main{max-width:1120px}
   // Bereits geöffnete Seiten in regelmäßigen Abständen aktualisieren.
   setInterval(refresh, 30 * 60 * 1000);
 })();
-</script>
-<script>
-/* Bullwerk: Nur manuell freigegebene Berichte aus dem eigenen Repository anzeigen.
-   Die Chat-Freigabe selbst veröffentlicht NICHTS; erst der GitHub-Commit der JSON-Datei. */
-(function () {
-  'use strict';
-  const host = document.getElementById('bullwerk-freigegebener-bericht');
-  const target = document.getElementById('bullwerk-freigabe-inhalt');
-  if (!host || !target) return;
-  const main = host.parentElement;
-  const fallbackSections = Array.from(main.children).filter(el => el.tagName === 'SECTION' && el !== host);
-  const fallbackNotice = Array.from(main.children).filter(el => el.matches('p.notice'));
-
-  function cleanReport(html) {
-    const template = document.createElement('template');
-    template.innerHTML = html;
-    const allowed = new Set(['H1','H2','H3','H4','P','STRONG','B','EM','I','UL','OL','LI','TABLE','THEAD','TBODY','TR','TH','TD','BLOCKQUOTE','HR','A','BR','SMALL','DIV','SPAN']);
-    function scrub(node) {
-      for (const child of Array.from(node.children)) {
-        if (!allowed.has(child.tagName)) { child.remove(); continue; }
-        for (const attr of Array.from(child.attributes)) {
-          if (child.tagName === 'A' && attr.name === 'href') {
-            try {
-              const u = new URL(attr.value, location.href);
-              if (!['https:', 'http:'].includes(u.protocol)) child.removeAttribute('href');
-              else { child.setAttribute('rel','noopener noreferrer'); child.setAttribute('target','_blank'); }
-            } catch (_) { child.removeAttribute('href'); }
-          } else if (attr.name !== 'href') child.removeAttribute(attr.name);
-        }
-        scrub(child);
-      }
-    }
-    scrub(template.content);
-    return template.content;
-  }
-
-  async function showApproved() {
-    try {
-      const response = await fetch('morgenroutine-freigegeben.json', {cache:'no-store'});
-      if (!response.ok) return;
-      const report = await response.json();
-      if (!report || report.status !== 'freigegeben' ||
-          typeof report.datum !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(report.datum) ||
-          typeof report.html !== 'string' || report.html.trim().length < 50) return;
-      const date = new Date(report.datum + 'T12:00:00Z');
-      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0,10) !== report.datum) return;
-      const stamp = date.toLocaleDateString('de-DE', {day:'2-digit', month:'long', year:'numeric', timeZone:'UTC'});
-      const title = document.createElement('h1');
-      title.textContent = 'Morgenroutine – ' + stamp;
-      const status = document.createElement('p');
-      status.className = 'bullwerk-stand';
-      status.textContent = 'Redaktionell freigegeben · ' + stamp;
-      target.replaceChildren(title, status, cleanReport(report.html));
-      for (const el of [...fallbackSections,...fallbackNotice]) el.hidden = true;
-      host.hidden = false;
-      document.title = 'Bullwerk Markets – Morgenroutine ' + stamp;
-      const dateline = document.querySelector('.editorial-dateline');
-      if (dateline) dateline.textContent = 'Morgenbriefing · Redaktionell freigegeben · ' + stamp;
-    } catch (_) {
-      /* Keine gültige Freigabe: Bestehende Webseite unverändert anzeigen. */
-    }
-  }
-  showApproved();
-})();
-</script>
-</body></html>
+</script><script src="bericht-renderer.js"></script></body></html>
