@@ -30,6 +30,13 @@ class ExportTest(unittest.TestCase):
   d=copy.deepcopy(self.base);d['stocks']=[]
   for i,sym in enumerate(['AMD','MSFT','NVDA','PLTR']):d['stocks'].append({'symbol':sym,'as_of':'2026-10-16','quality_score':81+i})
   r=public_results(d,self.report);self.assertEqual(len(r['selection']),3);self.assertEqual(r['counts']['watch'],4);self.assertEqual(r['selection'][0]['symbol'],'PLTR')
+ def test_overview(self):
+  d=copy.deepcopy(self.base);d['stocks'][0]['quality_score']=50
+  r=public_results(d,self.report)
+  self.assertEqual(r['selection'],[])
+  self.assertEqual(r['overview'],[{'symbol':'MSFT','name':'Microsoft','score':50,'as_of':'2026-10-16'}])
+  self.assertNotIn('close',json.dumps(r['overview']))
+  self.assertNotIn('trigger',json.dumps(r['overview']))
  def test_partial(self):
   self.base['stocks'][0]['quality_score']=None
   with self.assertRaises(ValueError):public_results(self.base,self.report)

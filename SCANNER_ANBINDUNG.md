@@ -25,3 +25,8 @@ Ungültige, gemischte oder vollständig fehlende Bewertungen brechen den Export 
 `python -m unittest test_export.py` und `node test_feed.cjs` prüfen Grenzwerte, Signalvoraussetzungen, öffentliche Felder, Auswahlbegrenzung, ungültige Daten und Wochenend-Alter. Die erste veröffentlichte Auswahl stammt aus dem vollständigen Scan mit Kursdaten vom 16.10.2026: zehn bewertete Aktien, keine über 80 Punkte.
 
 Die abschließende Prüfung von Datenrechten und Veröffentlichungsbedingungen bleibt wie vereinbart vor dem eigentlichen Seitenstart vorgesehen.
+
+
+## Öffentliche Punkteübersicht – 19.10.2026
+
+Auf ausdrücklichen Nutzerwunsch öffnet der Button „Öffentliche Auswahl“ eine Übersicht aller zehn beobachteten Aktien mit Gesamtqualitätsscore und Datenstand, auch unterhalb der WATCH-Schwelle. Dafür exportiert `overview` nur Symbol, Name, Gesamtpunkte und Datum. Die Liste ist damit ausdrücklich öffentlich; exklusive Komponentenwerte, Rohkurse und Handelspläne werden nicht veröffentlicht. Die eigentliche Kandidatenauswahl bleibt auf drei qualifizierte Treffer begrenzt. Anfangswerte der Punkteübersicht stammen aus der vorhandenen Score-Historie des 16.10.2026; der Nachtworkflow ersetzt sie durch die nächste tatsächliche Auswertung. Keine neu berechneten oder erfundenen Tageswerte.

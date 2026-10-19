@@ -47,7 +47,8 @@ def public_results(data, report=None):
         breakout = gate['allowed'] and score > 90 and b.get('signal') is True and b.get('volume_confirmed') is True
         candidates.append({'symbol':item['symbol'],'name':NAMES[item['symbol']],'score':score,'status':'BREAKOUT' if breakout else 'WATCH','as_of':day})
     candidates.sort(key=lambda s:(-s['score'],s['symbol']))
-    return {'schema_version':1,'scanner':str(data.get('scanner','Bullwerk Gesamtscanner')),'generated_at':stamp,'as_of':dates.pop(),'market_gate':gate,'coverage':{'evaluated':len(valid),'errors':len(data.get('errors',[]))},'counts':{'watch':sum(s['status']=='WATCH' for s in candidates),'breakout':sum(s['status']=='BREAKOUT' for s in candidates)},'selection':candidates[:3],'leaders':LEADERS,'note':'Tagesauswertung, keine Live-Signale. Qualitaetsscore aus drei berechneten Saeulen; Signal und feste LEADERS-Liste getrennt. Keine Anlageberatung.'}
+    overview = sorted([{'symbol':item['symbol'],'name':NAMES[item['symbol']],'score':score,'as_of':day} for item, day, score in valid], key=lambda s:(-s['score'],s['symbol']))
+    return {'schema_version':1,'scanner':str(data.get('scanner','Bullwerk Gesamtscanner')),'generated_at':stamp,'as_of':dates.pop(),'market_gate':gate,'coverage':{'evaluated':len(valid),'errors':len(data.get('errors',[]))},'counts':{'watch':sum(s['status']=='WATCH' for s in candidates),'breakout':sum(s['status']=='BREAKOUT' for s in candidates)},'overview':overview,'selection':candidates[:3],'leaders':LEADERS,'note':'Tagesauswertung, keine Live-Signale. Qualitaetsscore aus drei berechneten Saeulen; Signal und feste LEADERS-Liste getrennt. Keine Anlageberatung.'}
 
 
 if __name__ == '__main__':
