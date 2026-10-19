@@ -177,3 +177,8 @@ Feste Bedingung prominent: Handel nur bei passender fundamentaler Bewertung UND 
 ## 21. Scanner-Startprüfung – 19.10.2026
 
 Bestand, echte Workflow-Schritte, öffentliche Filter und Tests geprüft. Kein Kandidat >80 bei zehn bewerteten Aktien zum 16.10.; höchster Score 80.0. Testpfad korrigiert und Tests in den nächtlichen Hauptworkflow aufgenommen. Begrenztes Zehner-Universum auf der Scanner-Seite sichtbar. Keine Änderung der Scores, Schwellen oder Handelslogik. Offene Startpunkte und Nachweise: SCANNER_STARTPRUEFUNG.md. Nächster tatsächlicher Exportlauf, Umfangserweiterung, Datenrechte und technische Ampelkopplung noch zu prüfen.
+
+
+## 22. Technische Marktampel-Sperre – 19.10.2026
+
+Öffentlicher Export, Scanner-Seite und Startseiten-Zähler berücksichtigen jetzt die ausdrücklich freigegebene Marktampel. Bei ROT, fehlender/ungültiger/alter Freigabe keine BREAKOUT-Freigabe; Kandidaten bleiben WATCH, Scores unverändert. Gelb/Grün ersetzen nicht die bisherigen Kriterien >90, Ausbruchssignal und bestätigtes Volumen. Browser prüft beim Seitenaufruf neu, keine laufenden Intraday-Alarme. Sperre schützt auch einen älteren Feed nach neuer roter Ampel. Wochenenden verwenden Freitag; Feiertagskalender noch offen. Export- und Gate-Tests bestanden und im Nachtworkflow ergänzt.

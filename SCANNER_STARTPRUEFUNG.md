@@ -16,7 +16,7 @@ Geprüfter Ausgangsstand: a0a97b06ade212253f0eb744767beabb40cfa61a.
 1. Nächsten echten Scan nach dieser Anbindungsänderung prüfen: Export-Schritt, Commit, Datenstand und sichtbare Website müssen zusammenpassen. Die bisherigen grünen Scannerläufe liegen vor der heutigen Anbindungsänderung.
 2. Aktienuniversum bewusst festlegen und bei Erweiterung Symbolzuordnung sowie Datenabdeckung prüfen. Keine Schwellen absenken, um Treffer zu erzeugen.
 3. Datenquellen: main.py verwendet yfinance für Kurse und SEC für Fundamentals. Nutzungs- und Veröffentlichungsrechte vor kommerziellem Start gesondert prüfen; eine Tiingo-Vereinbarung bestätigt keine Rechte für eine andere Quelle.
-4. Rote Marktampel ist derzeit kein technischer Gate im Export. Vor einer verbindlichen Breakout-Freigabe muss die Strategieentscheidung zur Kopplung umgesetzt und getestet werden.
+4. Marktampel-Gate am 19.10. umgesetzt und lokal getestet: Export plus erneute Website-Prüfung beim Laden. Rot, fehlende/ungültige/veraltete Freigabe sperrt BREAKOUT; Umstufung auf WATCH bei unverändertem Score. Gelb/Grün erlauben nur die bisherige Signalprüfung, keine automatische Handelsfreigabe. Nachtlauf weiterhin im nächsten tatsächlichen Lauf kontrollieren. Anforderungen: aktueller Bericht des deutschen Wochentags (am Wochenende Freitag), explizite Freigabe von Basler15 ohne zukünftigen Zeitstempel. Feiertage führen konservativ zur Sperre, solange kein gültiger Tagesbericht vorliegt.
 5. Vollständige Score-Historie liegt im öffentlichen Repository. Das ist kein geschützter Pioneer-Speicher; zukünftige exklusive Ergebnisse separat schützen.
 6. Aktualität: einfache Wochentagsprüfung, kein Börsenfeiertagskalender. Tagesauswertung, keine Intraday- oder E-Mail-Alarme.
 

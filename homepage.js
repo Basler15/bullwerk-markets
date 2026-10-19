@@ -33,9 +33,10 @@
  }
  async function scanner(){
   try{
-   const d=await read('data/scanner-public.json');
+   const raw=await read('data/scanner-public.json');const d=window.BullwerkMarketGate.apply(raw,await window.BullwerkMarketGate.load());
    if(d.schema_version!==1||!validDate(d.as_of)||!d.coverage||!Number.isInteger(d.coverage.evaluated)||d.coverage.evaluated<1||!d.counts||!['watch','breakout'].every(k=>Number.isInteger(d.counts[k])&&d.counts[k]>=0))throw Error('Scanner-Daten');
    byId('home-scanner-text').textContent='Letzter Scan: '+stamp(d.as_of)+' · '+d.coverage.evaluated+' Aktien bewertet. '+(d.counts.watch+d.counts.breakout===0?'Keine Kandidaten über 80 Punkte.':d.counts.watch+' WATCH · '+d.counts.breakout+' BREAKOUT. Auswahl und Signalbedingungen auf der Scanner-Seite.');
+   if(!d.market_gate.allowed)byId('home-scanner-text').textContent+=' '+d.market_gate.reason+'.';
   }catch(_){byId('home-scanner-text').textContent+=' Aktualisierung nicht abrufbar; gespeicherter Scan-Stand.';}
  }
  report();scanner();

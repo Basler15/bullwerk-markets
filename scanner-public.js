@@ -21,14 +21,14 @@ const doc=root.document;const byId=id=>doc.getElementById(id);
 const el=(tag,content,cls)=>{const e=doc.createElement(tag);e.textContent=content;if(cls)e.className=cls;return e;};
 async function load(){
  try{
-  const r=await fetch('https://raw.githubusercontent.com/Basler15/bullwerk-markets/main/data/scanner-public.json?stand='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error();const d=validate(await r.json());
+  const r=await fetch('https://raw.githubusercontent.com/Basler15/bullwerk-markets/main/data/scanner-public.json?stand='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error();const raw=validate(await r.json());const d=root.BullwerkMarketGate.apply(raw,await root.BullwerkMarketGate.load());
   const old=businessAge(d.as_of)>1,stamp=d.as_of.split('-').reverse().join('.');
   byId('scanner-datenstand').textContent=(old?'Älterer Datenstand: ':'Datenstand: ')+stamp+' · Tagesauswertung · '+d.coverage.evaluated+' Aktien bewertet'+(d.coverage.errors?' · '+d.coverage.errors+' nicht auswertbar':'');
   byId('scanner-datenstand').classList.toggle('scan-old',old);
   byId('watch-zahl').textContent=(old?'LETZTER SCAN: ':'')+d.counts.watch+' WATCH';
   byId('watch-text').textContent=d.counts.watch?'Kandidaten mit Qualitätsscore über 80. Die öffentliche Auswahl steht weiter unten.':'Im letzten Scan erfüllt keine Aktie die WATCH-Kriterien.';
   byId('breakout-zahl').textContent=(old?'LETZTER SCAN: ':'')+d.counts.breakout+' BREAKOUT';
-  byId('breakout-text').textContent=d.counts.breakout?'Tagesausbrüche mit Score über 90 und bestätigtem Volumen. Kein Intraday-Alarm.':'Keine qualifizierten Ausbruchssignale im letzten Scan.';
+  byId('breakout-text').textContent=!d.market_gate.allowed?d.market_gate.reason+'. Qualifizierte Aktien bleiben WATCH.':d.counts.breakout?'Tagesausbrüche mit Score über 90 und bestätigtem Volumen. Kein Intraday-Alarm.':'Keine qualifizierten Ausbruchssignale im letzten Scan.';
   byId('ideen-beschreibung').textContent=old?'Ergebnisse eines älteren Scans. Keine aktuellen Handelssignale.':'Bis zu drei ausgewählte Aktien aus dem letzten vollständigen Scan.';
   const target=byId('scanner-auswahl');target.replaceChildren();
   if(!d.selection.length){const box=el('article','', 'idea scan-empty');box.append(el('strong','Keine neuen Kandidaten'),el('p','Keine ausgewertete Aktie überschreitet die Schwelle von 80 Punkten. Wir erzwingen keine Treffer.'),el('div','Letzter Scan: '+stamp,'wait'));target.append(box);}
