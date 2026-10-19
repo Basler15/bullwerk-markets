@@ -182,3 +182,8 @@ Bestand, echte Workflow-Schritte, öffentliche Filter und Tests geprüft. Kein K
 ## 22. Technische Marktampel-Sperre – 19.10.2026
 
 Öffentlicher Export, Scanner-Seite und Startseiten-Zähler berücksichtigen jetzt die ausdrücklich freigegebene Marktampel. Bei ROT, fehlender/ungültiger/alter Freigabe keine BREAKOUT-Freigabe; Kandidaten bleiben WATCH, Scores unverändert. Gelb/Grün ersetzen nicht die bisherigen Kriterien >90, Ausbruchssignal und bestätigtes Volumen. Browser prüft beim Seitenaufruf neu, keine laufenden Intraday-Alarme. Sperre schützt auch einen älteren Feed nach neuer roter Ampel. Wochenenden verwenden Freitag; Feiertagskalender noch offen. Export- und Gate-Tests bestanden und im Nachtworkflow ergänzt.
+
+
+## 23. Tradingideen-Rubrik – 19.10.2026
+
+Navigation und neue Seite tradingideen.html eingerichtet. Aufbau jeder Idee: Titel, Veröffentlichungsdatum direkt darunter, Aktie/fundamentale Begründung, echter Chart mit Quelle und Datenstand, Einstiegsszenario, Stop, Ziel und Risiken. Keine zugesagte tägliche Frequenz. Neue Ideen nur bei passenden Gelegenheiten; keine tatsächlich ausgeführten Trades behaupten. Datenquelle data/tradingideen.json ist zunächst leer. Renderer zeigt nur geprüfte, freigegebene und vollständig ausgefüllte Ideen mit nicht zukünftigem Veröffentlichungszeitpunkt. Keine erfundene erste Aktie oder Kursmarke. Breiter Scanner/Tiingo-Abo und Pioneer-Leistungen bleiben für später vorgesehen.
