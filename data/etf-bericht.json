@@ -1,0 +1,81 @@
+{
+  "report_date": "2026-10-19",
+  "weekly_as_of": "2026-10-16",
+  "weekly_start": "2026-10-09",
+  "weekly_basis": "USD price returns; excludes distributions",
+  "benchmark": "QQQ",
+  "weekly": [
+    {
+      "symbol": "XLE",
+      "theme": "Energie",
+      "week": 4.86,
+      "rs": 10.38,
+      "status": "LEADER · beobachten"
+    },
+    {
+      "symbol": "XLP",
+      "theme": "Basiskonsum",
+      "week": 5.02,
+      "rs": 10.54,
+      "status": "WATCH · defensiv"
+    },
+    {
+      "symbol": "CIBR",
+      "theme": "Cybersecurity",
+      "week": -10.16,
+      "rs": -4.64,
+      "status": "Technisch schwach"
+    },
+    {
+      "symbol": "SOXX",
+      "theme": "Halbleiter",
+      "week": -11.8,
+      "rs": -6.28,
+      "status": "Technisch schwach"
+    },
+    {
+      "symbol": "QQQ",
+      "theme": "Vergleichsmaßstab",
+      "week": -5.52,
+      "rs": 0.0,
+      "status": "Benchmark"
+    }
+  ],
+  "annual_basis": "USD NAV total return; reinvested distributions",
+  "annual_as_of": "2026-09-30",
+  "annual_selection": [
+    {
+      "symbol": "SOXX",
+      "name": "iShares Semiconductor ETF",
+      "theme": "Halbleiter",
+      "ytd": 89.02,
+      "date": "2026-09-30",
+      "source": "https://www.ishares.com/us/products/239705/ishares-phlx-semiconductor-etf",
+      "risk": "Hohe Schwankungen; zuletzt deutlicher Rückschlag im Halbleitersektor."
+    },
+    {
+      "symbol": "SMH",
+      "name": "VanEck Semiconductor ETF",
+      "theme": "Halbleiter",
+      "ytd": 68.93,
+      "date": "2026-09-30",
+      "source": "https://www.vaneck.com/us/en/investments/semiconductor-etf-smh/",
+      "risk": "Starke Überschneidung mit SOXX. Beide zusammen bieten wenig zusätzliche Sektorstreuung."
+    },
+    {
+      "symbol": "CIBR",
+      "name": "First Trust Nasdaq Cybersecurity ETF",
+      "theme": "Cybersecurity",
+      "ytd": 44.56,
+      "date": "2026-09-30",
+      "source": "https://www.ftportfolios.com/Retail/Etf/EtfSummary.aspx?Ticker=CIBR",
+      "risk": "Positives Gesamtjahr, aber kurzfristig unter Druck. Jahresrendite ist kein Einstiegssignal."
+    }
+  ],
+  "signals": "Kein neuer bestaetigter FRUEH-WATCH / TRIGGER",
+  "open_checks": [
+    "ETF-specific net flows",
+    "EMA50/200",
+    "confirmed box breakouts"
+  ]
+}

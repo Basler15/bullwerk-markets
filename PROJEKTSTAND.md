@@ -144,3 +144,10 @@ Der nächtliche Workflow exportiert und speichert `data/scanner-public.json`. Ke
 ## 16. Startseite aktualisiert – 19.10.2026
 
 Startseite zeigt freigegebene Marktampel, vier Index-Tagesveränderungen mit Farben und Berichtsdatum aus derselben Morgenroutine wie die Berichtsseite. `homepage.js` lädt ausschließlich ausdrücklich freigegebene Berichte und die öffentliche Scanner-Zusammenfassung. Der gespeicherte Stand bleibt bei Abruffehlern mit sichtbarer Kennzeichnung erhalten. Scanner-/Watchlist-Links und Berichtszugänge sind verbunden; eigene ETF-/Rohstoffseiten bleiben in Vorbereitung. Keine neue Marktanalyse oder Änderung der Scannerlogik.
+
+
+## 17. ETF-Bericht und Jahresübersicht – 19.10.2026
+
+`etfs.html` enthält die öffentliche Webfassung des heutigen ETF-Wochenberichts: XLE/XLP relative Wochenstärke, CIBR/SOXX technische Schwäche, QQQ-Vergleich; Datenstand 16.10.2026. Nicht durchgängig bestätigte Flows, EMA50/200 und Box-Signale bleiben ausdrücklich offen. Kein neuer FRÜH-WATCH/TRIGGER. Keine Pharma.
+
+Startseite und ETF-Seite zeigen SOXX, SMH und CIBR mit verifizierter USD-NAV-Gesamtrendite seit Jahresbeginn zum gemeinsamen 30.09.2026. Keine marktweite Top-3-Rangliste, keine UCITS-Verwechslung; Oktober-Rückschlag gesondert erläutert. Quellen direkt an den Karten und im Bericht. ETF-Navigation von Start- und Scanner-Seite verbunden. Strukturierte redaktionelle Daten: `data/etf-bericht.json`. Noch kein automatischer wöchentlicher Website-Import eingerichtet.
