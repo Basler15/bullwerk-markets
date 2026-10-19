@@ -151,3 +151,10 @@ Startseite zeigt freigegebene Marktampel, vier Index-Tagesveränderungen mit Far
 `etfs.html` enthält die öffentliche Webfassung des heutigen ETF-Wochenberichts: XLE/XLP relative Wochenstärke, CIBR/SOXX technische Schwäche, QQQ-Vergleich; Datenstand 16.10.2026. Nicht durchgängig bestätigte Flows, EMA50/200 und Box-Signale bleiben ausdrücklich offen. Kein neuer FRÜH-WATCH/TRIGGER. Keine Pharma.
 
 Startseite und ETF-Seite zeigen SOXX, SMH und CIBR mit verifizierter USD-NAV-Gesamtrendite seit Jahresbeginn zum gemeinsamen 30.09.2026. Keine marktweite Top-3-Rangliste, keine UCITS-Verwechslung; Oktober-Rückschlag gesondert erläutert. Quellen direkt an den Karten und im Bericht. ETF-Navigation von Start- und Scanner-Seite verbunden. Strukturierte redaktionelle Daten: `data/etf-bericht.json`. Noch kein automatischer wöchentlicher Website-Import eingerichtet.
+
+
+## 18. Rohstoffseite eingebunden – 19.10.2026
+
+Die vom Nutzer freigegebene Rohstoff-Vorschau ist unter `rohstoffe.html` veröffentlicht. Navigation auf Startseite, Scanner und ETF-Seite sowie Startseitenkachel verbunden. Rechte schwarze Spalte mit hellen Texten, größerer Schrift und verbesserten goldenen Überschriften. Keine weiteren Inhaltsänderungen gegenüber der freigegebenen Vorschau.
+
+Berichtsstand 19.10.2026, zeitgestempelte Meldungen zu Öl/Gold/Kupfer sowie Silber/US-Gas. Ein echter GCZ6-Tageskerzenchart bis 16.10.2026, 5-Tage-Range als Messbereich, keine behauptete Darvas-Box. Zwei bedingte Long-Szenarien ohne bestätigten Intraday-Trigger. Private Vorschau bleibt separat erhalten. Noch kein automatischer Rohstoffbericht-Import eingerichtet.
