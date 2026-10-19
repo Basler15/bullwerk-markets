@@ -167,3 +167,8 @@ Berichtsstand 19.10.2026, zeitgestempelte Meldungen zu Öl/Gold/Kupfer sowie Sil
 Farside-US-Spot-ETF-Nettoflüsse der Wochen 05.–09.10. und 12.–16.10., Freitagswert sowie einzelne Tage, keine Vermischung mit globalen/börsenseitigen Flows. DefiLlama-On-Chain-Snapshot 19.10. für ETH und SOL: Stablecoins, DEX, Chain Fees/Revenue und RWA-Bestand mit Zeitstand und Definitionshinweisen. Mehrwöchige Bewertungstrends und Charttrigger bleiben unbestätigt.
 
 Feste Bedingung prominent: Handel nur bei passender fundamentaler Bewertung UND tragfähiger Chartentwicklung, bestätigt durch Nachfrage, Kapital und relative Stärke. Noch keine Handelsfreigabe, keine fiktiven Scores. Navigation aller vier bestehenden Seiten und Krypto-Themenkarte der Startseite verbunden. Strukturierte Daten: `data/krypto-bericht.json`. Keine automatische Website-Aktualisierung oder Alarmierung eingerichtet.
+
+
+## 20. Über uns – 19.10.2026
+
+`ueber-uns.html` fasst Ziel, Scanner-Aufgabe und Breakout-Schwerpunkt im vorhandenen Design zusammen. Prominenter Breakout-Block: Basis, Volumen, Ausbruch, Akzeptanz sowie fundamentale Bestätigung und Risikoplan. Tatsächlicher Drei-Säulen-Stand und öffentliche Score-Grenzen erklärt. Krypto-Regel Fundamentalbewertung UND Chartstruktur aufgenommen. Pioneer und automatische Alarme ausdrücklich im Aufbau; keine erfundene Gründerbiografie oder Renditeversprechen. Navigation und Missionslinks auf allen fünf Hauptseiten verbunden.
