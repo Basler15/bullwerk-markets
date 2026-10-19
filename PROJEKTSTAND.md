@@ -139,3 +139,8 @@ Ziel: täglich etwa 07:30 Uhr Berlin.
 Die vorhandene Scanner-Seite übernimmt jetzt eine begrenzte öffentliche Auswahl aus den bestehenden Gesamtscanner-Ergebnissen. Höchstens drei Kandidaten mit Score über 80; BREAKOUT zusätzlich nur über 90 mit Ausbruchssignal und bestätigtem Volumen. Die feste LEADERS-Liste und das Layout bleiben erhalten. Datenstand, veraltete Ergebnisse, fehlende Treffer und Abruffehler werden sichtbar angezeigt.
 
 Der nächtliche Workflow exportiert und speichert `data/scanner-public.json`. Keine Änderung der Scanner-Berechnung. Startdaten: vollständiger Scan vom 16.10.2026, zehn Bewertungen, keine qualifizierten Treffer. Einzelheiten und Prüfungen: `SCANNER_ANBINDUNG.md`. Die abschließende Daten-/Veröffentlichungsprüfung erfolgt wie vereinbart erst nahe dem eigentlichen Start.
+
+
+## 16. Startseite aktualisiert – 19.10.2026
+
+Startseite zeigt freigegebene Marktampel, vier Index-Tagesveränderungen mit Farben und Berichtsdatum aus derselben Morgenroutine wie die Berichtsseite. `homepage.js` lädt ausschließlich ausdrücklich freigegebene Berichte und die öffentliche Scanner-Zusammenfassung. Der gespeicherte Stand bleibt bei Abruffehlern mit sichtbarer Kennzeichnung erhalten. Scanner-/Watchlist-Links und Berichtszugänge sind verbunden; eigene ETF-/Rohstoffseiten bleiben in Vorbereitung. Keine neue Marktanalyse oder Änderung der Scannerlogik.
