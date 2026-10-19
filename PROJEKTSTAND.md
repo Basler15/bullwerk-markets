@@ -172,3 +172,8 @@ Feste Bedingung prominent: Handel nur bei passender fundamentaler Bewertung UND 
 ## 20. Über uns – 19.10.2026
 
 `ueber-uns.html` fasst Ziel, Scanner-Aufgabe und Breakout-Schwerpunkt im vorhandenen Design zusammen. Prominenter Breakout-Block: Basis, Volumen, Ausbruch, Akzeptanz sowie fundamentale Bestätigung und Risikoplan. Tatsächlicher Drei-Säulen-Stand und öffentliche Score-Grenzen erklärt. Krypto-Regel Fundamentalbewertung UND Chartstruktur aufgenommen. Pioneer und automatische Alarme ausdrücklich im Aufbau; keine erfundene Gründerbiografie oder Renditeversprechen. Navigation und Missionslinks auf allen fünf Hauptseiten verbunden.
+
+
+## 21. Scanner-Startprüfung – 19.10.2026
+
+Bestand, echte Workflow-Schritte, öffentliche Filter und Tests geprüft. Kein Kandidat >80 bei zehn bewerteten Aktien zum 16.10.; höchster Score 80.0. Testpfad korrigiert und Tests in den nächtlichen Hauptworkflow aufgenommen. Begrenztes Zehner-Universum auf der Scanner-Seite sichtbar. Keine Änderung der Scores, Schwellen oder Handelslogik. Offene Startpunkte und Nachweise: SCANNER_STARTPRUEFUNG.md. Nächster tatsächlicher Exportlauf, Umfangserweiterung, Datenrechte und technische Ampelkopplung noch zu prüfen.

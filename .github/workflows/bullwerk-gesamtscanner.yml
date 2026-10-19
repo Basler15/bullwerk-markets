@@ -99,6 +99,12 @@ jobs:
           python -m compileall -q main.py scanner
           python -c "from scanner.fundamental import get_fundamental_data; from scanner.price_momentum import calculate_price_momentum; from scanner.trend import calculate_trend_quality; from scanner.darvas import detect_darvas_box; from scanner.breakout import detect_breakout; from scanner.score_history import record_scores, get_score_change; print('Alle Scanner-Module importiert')"
 
+      - name: Oeffentliche Schnittstelle pruefen
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
+        run: |
+          python -m unittest test_export.py
+          node test_feed.cjs
+
       - name: Bullwerk Gesamtscanner starten
         if: steps.zeitpruefung.outputs.run_scanner == 'true'
         env:
