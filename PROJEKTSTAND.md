@@ -192,3 +192,8 @@ Navigation und neue Seite tradingideen.html eingerichtet. Aufbau jeder Idee: Tit
 ## 24. Scanner im Aufbau – 19.10.2026
 
 Scanner im Hauptmenü auf allen neun Seiten an vorletzte Stelle vor Über uns verschoben. Scanner-Seite zeigt prominent Entwicklungsstand, Bedarf an verlässlichen Daten und Tests sowie das Ziel einer möglichst baldigen Fertigstellung ohne Terminzusage. Bisherige Vorschau aufklappbar erhalten; kein fertiger marktweiter Scanner behauptet. Tradingideen und Morgenroutine als bereits erreichbare Inhalte verlinkt. Berechnung, Score-Schwellen und Zeitplan unverändert.
+
+
+## 25. Erste öffentliche Tradingidee HTFL – 19.10.2026
+
+Auf ausdrücklichen Veröffentlichungswunsch des Nutzers HeartFlow mit bereitgestelltem TradingView-Screenshot unverändert veröffentlicht. Status Beobachtung / Ampel Rot; kein freigegebener neuer Breakout-Trade. 51,77 USD als sichtbare Positions-/Planungsmarke, nicht als bestätigter Range-Ausbruch; Stop 45,08 USD. 2R bei 65,15 USD ausdrücklich rein rechnerisch und bedingt, kein bestätigtes Chartziel. Aktuelle Tageskerze, Intraday-Bestätigung und nächster Ergebnistermin unbestätigt. Q2-Unternehmenszahlen vom 13.08.2026 an IR-/SEC-Primärquelle geprüft und verlinkt. Chartquelle und Datenstand sichtbar; keine tatsächliche Bullwerk-Ausführung oder Empfehlung der sichtbaren Positionsgröße behauptet. Erweiterter Renderer für Status, fundamentalen Hintergrund, Quellen und Chartnotiz; vorherige Veröffentlichungen bleiben erhalten.
