@@ -187,3 +187,8 @@ Bestand, echte Workflow-Schritte, öffentliche Filter und Tests geprüft. Kein K
 ## 23. Tradingideen-Rubrik – 19.10.2026
 
 Navigation und neue Seite tradingideen.html eingerichtet. Aufbau jeder Idee: Titel, Veröffentlichungsdatum direkt darunter, Aktie/fundamentale Begründung, echter Chart mit Quelle und Datenstand, Einstiegsszenario, Stop, Ziel und Risiken. Keine zugesagte tägliche Frequenz. Neue Ideen nur bei passenden Gelegenheiten; keine tatsächlich ausgeführten Trades behaupten. Datenquelle data/tradingideen.json ist zunächst leer. Renderer zeigt nur geprüfte, freigegebene und vollständig ausgefüllte Ideen mit nicht zukünftigem Veröffentlichungszeitpunkt. Keine erfundene erste Aktie oder Kursmarke. Breiter Scanner/Tiingo-Abo und Pioneer-Leistungen bleiben für später vorgesehen.
+
+
+## 24. Scanner im Aufbau – 19.10.2026
+
+Scanner im Hauptmenü auf allen neun Seiten an vorletzte Stelle vor Über uns verschoben. Scanner-Seite zeigt prominent Entwicklungsstand, Bedarf an verlässlichen Daten und Tests sowie das Ziel einer möglichst baldigen Fertigstellung ohne Terminzusage. Bisherige Vorschau aufklappbar erhalten; kein fertiger marktweiter Scanner behauptet. Tradingideen und Morgenroutine als bereits erreichbare Inhalte verlinkt. Berechnung, Score-Schwellen und Zeitplan unverändert.
