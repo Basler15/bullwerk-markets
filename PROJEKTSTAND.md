@@ -158,3 +158,12 @@ Startseite und ETF-Seite zeigen SOXX, SMH und CIBR mit verifizierter USD-NAV-Ges
 Die vom Nutzer freigegebene Rohstoff-Vorschau ist unter `rohstoffe.html` veröffentlicht. Navigation auf Startseite, Scanner und ETF-Seite sowie Startseitenkachel verbunden. Rechte schwarze Spalte mit hellen Texten, größerer Schrift und verbesserten goldenen Überschriften. Keine weiteren Inhaltsänderungen gegenüber der freigegebenen Vorschau.
 
 Berichtsstand 19.10.2026, zeitgestempelte Meldungen zu Öl/Gold/Kupfer sowie Silber/US-Gas. Ein echter GCZ6-Tageskerzenchart bis 16.10.2026, 5-Tage-Range als Messbereich, keine behauptete Darvas-Box. Zwei bedingte Long-Szenarien ohne bestätigten Intraday-Trigger. Private Vorschau bleibt separat erhalten. Noch kein automatischer Rohstoffbericht-Import eingerichtet.
+
+
+## 19. Krypto-Seite BTC / ETH / SOL – 19.10.2026
+
+`krypto.html` zeigt Bitcoin, Ethereum und Solana mit USD-Kursperformance seit 31.12.2025 bis zum gemeinsamen Stichtag 16.10.2026 gegenüber Nasdaq 100. Krypto-UTC-Abschluss und US-Kassaschluss ausdrücklich unterschieden; keine Staking-/Dividendenerträge. Rechenbasis und Quellen aufklappbar.
+
+Farside-US-Spot-ETF-Nettoflüsse der Wochen 05.–09.10. und 12.–16.10., Freitagswert sowie einzelne Tage, keine Vermischung mit globalen/börsenseitigen Flows. DefiLlama-On-Chain-Snapshot 19.10. für ETH und SOL: Stablecoins, DEX, Chain Fees/Revenue und RWA-Bestand mit Zeitstand und Definitionshinweisen. Mehrwöchige Bewertungstrends und Charttrigger bleiben unbestätigt.
+
+Feste Bedingung prominent: Handel nur bei passender fundamentaler Bewertung UND tragfähiger Chartentwicklung, bestätigt durch Nachfrage, Kapital und relative Stärke. Noch keine Handelsfreigabe, keine fiktiven Scores. Navigation aller vier bestehenden Seiten und Krypto-Themenkarte der Startseite verbunden. Strukturierte Daten: `data/krypto-bericht.json`. Keine automatische Website-Aktualisierung oder Alarmierung eingerichtet.

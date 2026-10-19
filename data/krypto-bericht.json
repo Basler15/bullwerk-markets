@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "report_date": "2026-10-19",
+  "performance_start": "2025-12-31",
+  "performance_end": "2026-10-16",
+  "performance_basis": "USD price return; crypto UTC close, NDX US cash close; excludes staking and dividends",
+  "flow_week": [
+    "2026-10-12",
+    "2026-10-16"
+  ],
+  "previous_flow_week": [
+    "2026-10-05",
+    "2026-10-09"
+  ],
+  "flow_unit": "USD million; US spot ETF daily net totals",
+  "benchmark": {
+    "name": "Nasdaq 100",
+    "symbol": "NDX",
+    "start": 25249.85,
+    "end": 29187.55,
+    "source": "https://finance.yahoo.com/quote/%5ENDX/history/",
+    "price_source": "https://finance.yahoo.com/quote/%5ENDX/history/",
+    "ytd": 15.594944128380961
+  },
+  "assets": [
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "start": 87508.83,
+      "end": 81500.8,
+      "price_source": "https://finance.yahoo.com/quote/BTC-USD/history/",
+      "flow_source": "https://farside.co.uk/btc/",
+      "daily": [
+        -65.4,
+        175.7,
+        -261.4,
+        5.1,
+        -82.4
+      ],
+      "previous_daily": [
+        -89.8,
+        118.8,
+        -484.9,
+        -244.1,
+        21.1
+      ],
+      "ytd": -6.865627160139153,
+      "flow": -228.4,
+      "previous_flow": -678.9,
+      "vs_ndx_pp": -22.460571288520114
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "start": 2967.04,
+      "end": 2419.77,
+      "price_source": "https://finance.yahoo.com/quote/ETH-USD/history/",
+      "flow_source": "https://farside.co.uk/eth/",
+      "daily": [
+        -85.4,
+        24.8,
+        -129.5,
+        -60.3,
+        -69.7
+      ],
+      "previous_daily": [
+        -50.8,
+        -201.9,
+        -160.9,
+        -72.5,
+        -56.1
+      ],
+      "ytd": -18.444982204486628,
+      "flow": -320.1,
+      "previous_flow": -542.2,
+      "vs_ndx_pp": -34.03992633286759
+    },
+    {
+      "symbol": "SOL",
+      "name": "Solana",
+      "start": 124.48,
+      "end": 104.3,
+      "price_source": "https://finance.yahoo.com/quote/SOL-USD/history/",
+      "flow_source": "https://farside.co.uk/sol/",
+      "daily": [
+        -0.7,
+        -1.0,
+        -1.3,
+        -9.8,
+        -12.7
+      ],
+      "previous_daily": [
+        -9.2,
+        -3.7,
+        -4.8,
+        -3.5,
+        -3.8
+      ],
+      "ytd": -16.211439588688947,
+      "flow": -25.5,
+      "previous_flow": -25.0,
+      "vs_ndx_pp": -31.806383717069906
+    }
+  ],
+  "onchain_date": "2026-10-19",
+  "onchain_source": "DefiLlama live snapshot",
+  "onchain": {
+    "ETH": {
+      "stablecoin_change_7d_pct": -0.02,
+      "dex_change_7d_pct": -16.89,
+      "chain_fees_24h_usd": 200872,
+      "chain_revenue_24h_usd": 28816,
+      "rwa_active_aum_usd": 13966000000
+    },
+    "SOL": {
+      "stablecoin_change_7d_pct": -2.1,
+      "dex_change_7d_pct": 6.91,
+      "chain_fees_24h_usd": 641346,
+      "chain_revenue_24h_usd": 106849,
+      "rwa_active_aum_usd": 2409000000
+    }
+  },
+  "trade_rule": "Fundamentale Bewertung UND tragfaehige Chartentwicklung; gemeinsame Bestaetigung erforderlich",
+  "trade_approved": false
+}
