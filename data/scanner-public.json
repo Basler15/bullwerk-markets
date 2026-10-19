@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "scanner": "Bullwerk Markets V1.1",
+  "generated_at": "2026-10-16T23:48:23.568909+00:00",
+  "as_of": "2026-10-16",
+  "coverage": {
+    "evaluated": 10,
+    "errors": 0
+  },
+  "counts": {
+    "watch": 0,
+    "breakout": 0
+  },
+  "selection": [],
+  "leaders": [
+    "MSFT",
+    "NVDA",
+    "DELL",
+    "PLTR",
+    "AMD",
+    "HPE",
+    "INTC"
+  ],
+  "note": "Tagesauswertung, keine Live-Signale. Qualitaetsscore aus drei berechneten Saeulen; Signal und feste LEADERS-Liste getrennt. Keine Anlageberatung."
+}

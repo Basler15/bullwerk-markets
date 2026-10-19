@@ -169,6 +169,10 @@ jobs:
           print("\nERGEBNISKONTROLLE BESTANDEN")
           PY
 
+      - name: Oeffentliche Scanner-Auswahl erstellen
+        if: steps.zeitpruefung.outputs.run_scanner == 'true'
+        run: python export_public_scanner.py
+
       - name: Score-Historie dauerhaft speichern
         if: steps.zeitpruefung.outputs.run_scanner == 'true'
         run: |
@@ -176,12 +180,13 @@ jobs:
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data/score_history.json
+          git add data/score_history.json data/scanner-public.json
 
           if git diff --cached --quiet; then
             echo "Keine neue Score-Historie vorhanden."
           else
-            git commit -m "Update Bullwerk score history"
+            git commit -m "Update Bullwerk scores and public scanner selection"
+            git pull --rebase origin main
             git push
             echo "Score-Historie dauerhaft gespeichert."
           fi
@@ -193,6 +198,7 @@ jobs:
           name: bullwerk-scanner-ergebnisse
           path: |
             data/scanner_results.json
+            data/scanner-public.json
             data/score_history.json
           if-no-files-found: warn
           retention-days: 7

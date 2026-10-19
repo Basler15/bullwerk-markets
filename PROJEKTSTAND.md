@@ -132,3 +132,10 @@ Ziel: täglich etwa 07:30 Uhr Berlin.
 - Veröffentlichung bis 07:30 als Ziel, abhängig von rechtzeitiger Freigabe und erfolgreichem Pages-Deployment. Keine automatische Freigabe durch Zeitablauf.
 - Pioneer-Vollanalysen bleiben aus öffentlichen Dateien ausgeschlossen; geschützter Mitgliederbereich weiterhin offen.
 - Ablauf und Datenvertrag: MORGENROUTINE_FREIGABE.md.
+
+
+## 15. Scanner-Seite angebunden – 19.10.2026
+
+Die vorhandene Scanner-Seite übernimmt jetzt eine begrenzte öffentliche Auswahl aus den bestehenden Gesamtscanner-Ergebnissen. Höchstens drei Kandidaten mit Score über 80; BREAKOUT zusätzlich nur über 90 mit Ausbruchssignal und bestätigtem Volumen. Die feste LEADERS-Liste und das Layout bleiben erhalten. Datenstand, veraltete Ergebnisse, fehlende Treffer und Abruffehler werden sichtbar angezeigt.
+
+Der nächtliche Workflow exportiert und speichert `data/scanner-public.json`. Keine Änderung der Scanner-Berechnung. Startdaten: vollständiger Scan vom 16.10.2026, zehn Bewertungen, keine qualifizierten Treffer. Einzelheiten und Prüfungen: `SCANNER_ANBINDUNG.md`. Die abschließende Daten-/Veröffentlichungsprüfung erfolgt wie vereinbart erst nahe dem eigentlichen Start.
