@@ -1,8 +1,14 @@
 {
   "schema_version": 1,
   "scanner": "Bullwerk Markets V1.1",
-  "generated_at": "2026-10-16T23:48:23.568909+00:00",
+  "generated_at": "2026-10-20T00:34:27.683272+00:00",
   "as_of": "2026-10-16",
+  "market_gate": {
+    "allowed": false,
+    "farbe": null,
+    "datum": null,
+    "reason": "Keine aktuelle freigegebene Marktampel"
+  },
   "coverage": {
     "evaluated": 10,
     "errors": 0
@@ -11,22 +17,11 @@
     "watch": 0,
     "breakout": 0
   },
-  "selection": [],
-  "leaders": [
-    "MSFT",
-    "NVDA",
-    "DELL",
-    "PLTR",
-    "AMD",
-    "HPE",
-    "INTC"
-  ],
-  "note": "Tagesauswertung, keine Live-Signale. Qualitaetsscore aus drei berechneten Saeulen; Signal und feste LEADERS-Liste getrennt. Keine Anlageberatung.",
   "overview": [
     {
       "symbol": "PLTR",
       "name": "Palantir",
-      "score": 80,
+      "score": 80.0,
       "as_of": "2026-10-16"
     },
     {
@@ -50,7 +45,7 @@
     {
       "symbol": "NVDA",
       "name": "NVIDIA",
-      "score": 60,
+      "score": 60.0,
       "as_of": "2026-10-16"
     },
     {
@@ -68,13 +63,13 @@
     {
       "symbol": "AMD",
       "name": "Advanced Micro Devices",
-      "score": 50,
+      "score": 50.0,
       "as_of": "2026-10-16"
     },
     {
       "symbol": "INTC",
       "name": "Intel",
-      "score": 45,
+      "score": 45.0,
       "as_of": "2026-10-16"
     },
     {
@@ -83,5 +78,16 @@
       "score": 41.7,
       "as_of": "2026-10-16"
     }
-  ]
+  ],
+  "selection": [],
+  "leaders": [
+    "MSFT",
+    "NVDA",
+    "DELL",
+    "PLTR",
+    "AMD",
+    "HPE",
+    "INTC"
+  ],
+  "note": "Tagesauswertung, keine Live-Signale. Qualitaetsscore aus drei berechneten Saeulen; Signal und feste LEADERS-Liste getrennt. Keine Anlageberatung."
 }
