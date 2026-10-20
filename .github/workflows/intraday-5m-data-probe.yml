@@ -1,0 +1,23 @@
+name: Bullwerk 5m Data Probe (isolated)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install yfinance pandas
+      - name: Check 5-minute OHLCV for PLTR and NVDA
+        run: python tests/intraday_5m_data_probe.py
