@@ -35,19 +35,24 @@ def wikipedia_index(page):
     raise RuntimeError("No reliable constituent table on "+page)
 
 def german_index(page):
+    """Read German constituents; SDAX tables often have ISIN instead of ticker."""
     tables=html_tables("https://en.wikipedia.org/wiki/"+page)
+    # First try a genuine symbol column; do not misread ISINs as tickers.
     for table in tables:
-        table.columns=[" ".join(map(str,c)) if isinstance(c,tuple) else str(c) for c in table.columns]
-        cols=[c for c in table.columns if re.search(r"ticker|symbol",c,re.I)]
-        if not cols:continue
-        out=[]
-        for _,row in table.iterrows():
-            sym=str(row[cols[0]]).strip().split(" ")[0]
-            if not re.fullmatch(r"[A-Za-z0-9]{2,8}",sym):continue
-            if EXCLUDE.search(" ".join(str(x) for x in row.values)):continue
-            out.append(sym+".DE")
-        if len(out)>=25:return list(dict.fromkeys(out))
-    raise RuntimeError("No reliable German constituents from "+page)
+        table.columns=[" ".join(map(str,col)) if isinstance(col,tuple) else str(col) for col in table.columns]
+        cols=[col for col in table.columns if re.search(r"ticker|symbol|kürzel|kuerzel",col,re.I)]
+        for col in cols:
+            out=[]
+            for _,row in table.iterrows():
+                sym=str(row[col]).strip().split(" ")[0]
+                if not re.fullmatch(r"[A-Za-z0-9]{2,6}",sym):continue
+                if EXCLUDE.search(" ".join(str(x) for x in row.values)):continue
+                out.append(sym+".DE")
+            if len(out)>=25:return list(dict.fromkeys(out))
+    # Some SDAX/MDAX lists contain only company names and ISINs. Use the
+    # current Deutsche Boerse index factsheets via Wikipedia company links?
+    # Fail explicitly rather than silently scanning the wrong tickers.
+    raise RuntimeError("German "+page+" table has no usable ticker column; use a verified ticker-mapped constituent source")
 
 def nasdaq_symbols():
     url="https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
