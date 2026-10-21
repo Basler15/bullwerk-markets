@@ -45,6 +45,10 @@ def german_index(page):
     for stock in members:
         if EXCLUDE.search(str(stock.get("name",""))):
             continue
+        direct=str(stock.get("symbol") or "")
+        if re.fullmatch(r"[A-Za-z0-9]{1,8}\\.DE",direct):
+            out.append(direct.upper())
+            continue
         for item in stock.get("symbols",[]):
             if not isinstance(item,dict):
                 continue
