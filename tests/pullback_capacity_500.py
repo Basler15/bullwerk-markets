@@ -115,7 +115,7 @@ def expanded_universe():
     # NasdaqTrader does not provide turnover; prefer larger established
     # Nasdaq constituents using Nasdaq-100 as a proxy, then the remaining
     # exchange directory. Do not claim remaining directory order is liquidity.
-    nasdaq100=wikipedia_index("Nasdaq-100")
+    nasdaq100=[]\n    print("NASDAQ: using NasdaqTrader listing directly; no Wikipedia dependency",flush=True)
     ordered=list(dict.fromkeys(mdax+sdax+dow+[s for s in nasdaq100 if s in nasdaq]+nasdaq))
     symbols=ordered[:500]
     if len(symbols)!=500:raise RuntimeError(f"Only {len(symbols)} unique symbols")
