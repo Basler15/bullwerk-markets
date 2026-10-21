@@ -1,40 +1,95 @@
-"""Manual 500-stock capacity test. Existing production and pattern detection untouched."""
+"""Manual benchmark of 500 Nasdaq/Dow/MDAX/SDAX stocks. No production changes."""
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pullback_capacity_300 import universe as base_universe
+from io import StringIO
+import pandas as pd
+import requests
 from pullback_volume_watch import scan
 
-# German mid/small-cap candidates, including CTS Eventim. Research universe,
-# not a claim of current MDAX/SDAX membership.
-GERMAN_EXTRA="""EVD.DE G1A.DE FPE3.DE TUI1.DE KRN.DE JUN3.DE WAF.DE AIXA.DE
-SRT3.DE NEM.DE BOSS.DE LEG.DE G24.DE FNTN.DE EVK.DE LHA.DE
-NDA.DE PUM.DE SDF.DE KCO.DE DUE.DE BNR.DE RAA.DE HFG.DE
-SIX2.DE CEC.DE AT1.DE DEZ.DE FIE.DE HLE.DE JEN.DE
-VOS.DE WCH.DE AOF.DE PNE3.DE 2GB.DE HYQ.DE 1U1.DE
-SAX.DE MBB.DE S92.DE DBAN.DE DWS.DE BVB.DE
-DRW3.DE GFT.DE O2D.DE SZG.DE KWS.DE UTDI.DE
-BC8.DE COK.DE TTK.DE VBK.DE
-""".split()
+HEADERS={"User-Agent":"Mozilla/5.0 (compatible; BullwerkResearch/0.1)"}
+# Financial and biotech/pharma names are excluded only where identified by
+# explicit industry data; additional filters are heuristic and not exhaustive.
+EXCLUDE=re.compile(r"pharma|biotech|biopharma|therapeutic|drug manufacturer|biological product",re.I)
+
+def html_tables(url):
+    response=requests.get(url,headers=HEADERS,timeout=25)
+    response.raise_for_status()
+    return pd.read_html(StringIO(response.text))
+
+def wikipedia_index(page):
+    tables=html_tables("https://en.wikipedia.org/wiki/"+page)
+    for table in tables:
+        table.columns=[" ".join(map(str,c)) if isinstance(c,tuple) else str(c) for c in table.columns]
+        cols=[c for c in table.columns if re.search(r"ticker|symbol",c,re.I)]
+        if not cols or len(table)<20:continue
+        col=cols[0]
+        out=[]
+        for _,row in table.iterrows():
+            sym=str(row[col]).strip().split(" ")[0]
+            if not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}",sym):continue
+            desc=" ".join(str(x) for x in row.values)
+            if EXCLUDE.search(desc):continue
+            out.append(sym.replace(".","-"))
+        if len(out)>=20:return list(dict.fromkeys(out))
+    raise RuntimeError("No reliable constituent table on "+page)
+
+def german_index(page):
+    tables=html_tables("https://en.wikipedia.org/wiki/"+page)
+    for table in tables:
+        table.columns=[" ".join(map(str,c)) if isinstance(c,tuple) else str(c) for c in table.columns]
+        cols=[c for c in table.columns if re.search(r"ticker|symbol",c,re.I)]
+        if not cols:continue
+        out=[]
+        for _,row in table.iterrows():
+            sym=str(row[cols[0]]).strip().split(" ")[0]
+            if not re.fullmatch(r"[A-Za-z0-9]{2,8}",sym):continue
+            if EXCLUDE.search(" ".join(str(x) for x in row.values)):continue
+            out.append(sym+".DE")
+        if len(out)>=25:return list(dict.fromkeys(out))
+    raise RuntimeError("No reliable German constituents from "+page)
+
+def nasdaq_symbols():
+    url="https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
+    response=requests.get(url,headers=HEADERS,timeout=30)
+    response.raise_for_status()
+    lines=response.text.strip().splitlines()
+    if not lines or not lines[0].startswith("Symbol|"):raise RuntimeError("Nasdaq directory format changed")
+    df=pd.read_csv(StringIO("\n".join(lines)),sep="|",dtype=str)
+    required={"Symbol","Security Name","Test Issue","ETF"}
+    if not required.issubset(df.columns):raise RuntimeError("Nasdaq directory columns missing")
+    df=df[(df["Test Issue"]=="N")&(df["ETF"]=="N")]
+    # Common shares only, exclude warrants/units/rights and obvious funds.
+    bad=re.compile(r"warrant|unit|rights|preferred|depositary|ETF|fund|trust|acquisition corp|biotech|pharma|therapeutic",re.I)
+    df=df[~df["Security Name"].fillna("").str.contains(bad)]
+    symbols=[s for s in df["Symbol"].dropna().astype(str) if re.fullmatch(r"[A-Z]{1,5}",s)]
+    if len(symbols)<500:raise RuntimeError("Nasdaq directory too small or inaccessible")
+    return symbols
 
 def expanded_universe():
-    base=base_universe()
-    # Base consists of original 104 symbols and the first S&P500 members.
-    # Re-fetch full constituent set to fill the remaining slots.
-    import requests, pandas as pd
-    from io import StringIO
-    url="https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    resp=requests.get(url,headers={"User-Agent":"BullwerkResearch/0.1 (capacity benchmark)"},timeout=20)
-    resp.raise_for_status()
-    table=pd.read_html(StringIO(resp.text),match="Symbol")[0]
-    us=[str(x).replace(".","-") for x in table["Symbol"].dropna()]
-    symbols=list(dict.fromkeys(base+GERMAN_EXTRA+us))[:500]
+    mdax=german_index("MDAX")
+    sdax=german_index("SDAX")
+    dow=wikipedia_index("Dow_Jones_Industrial_Average")
+    nasdaq=nasdaq_symbols()
+    if not 35<=len(mdax)<=60:raise RuntimeError(f"MDAX constituents unexpected: {len(mdax)}")
+    if not 45<=len(sdax)<=85:raise RuntimeError(f"SDAX constituents unexpected: {len(sdax)}")
+    if not 25<=len(dow)<=35:raise RuntimeError(f"Dow constituents unexpected: {len(dow)}")
+    # Priority: German indices and Dow first, then liquid Nasdaq names.
+    # NasdaqTrader does not provide turnover; prefer larger established
+    # Nasdaq constituents using Nasdaq-100 as a proxy, then the remaining
+    # exchange directory. Do not claim remaining directory order is liquidity.
+    nasdaq100=wikipedia_index("Nasdaq-100")
+    ordered=list(dict.fromkeys(mdax+sdax+dow+[s for s in nasdaq100 if s in nasdaq]+nasdaq))
+    symbols=ordered[:500]
     if len(symbols)!=500:raise RuntimeError(f"Only {len(symbols)} unique symbols")
+    print(f"UNIVERSE | MDAX={len(mdax)} | SDAX={len(sdax)} | Dow={len(dow)} | Nasdaq directory={len(nasdaq)} | Nasdaq100={len(nasdaq100)}",flush=True)
+    print(f"CTS Eventim included={'EVD.DE' in symbols}",flush=True)
     return symbols
 
 def main():
     start=time.monotonic()
     symbols=expanded_universe()
-    print(f"500 STOCK CAPACITY TEST | unique={len(symbols)} | EVD.DE included={'EVD.DE' in symbols} | manual only",flush=True)
+    print(f"500 STOCK CAPACITY TEST | unique={len(symbols)} | manual only",flush=True)
     hits=[];errors=0
     with ThreadPoolExecutor(max_workers=3) as pool:
         futures=[pool.submit(scan,s) for s in symbols]
@@ -50,6 +105,6 @@ def main():
     for h in evd:print(f'CTS EVENTIM {h["category"]} {h["tf"]} | bar={h["time"]} | vol={h["volume_ratio"]}x | retrace={h["retracement"]}%',flush=True)
     for h in sorted(hits,key=lambda x:(x["category"]!="WATCH",-x["score"]))[:15]:
         print(f'{h["category"]} {h["symbol"]} {h["tf"]} | bar={h["time"]} | vol={h["volume_ratio"]}x | retrace={h["retracement"]}%',flush=True)
-    print("Manual research only. No modifications to the hourly workflow or public website.",flush=True)
+    print("Manual research only; hourly workflow and public website unchanged.",flush=True)
 
 if __name__=="__main__":main()
