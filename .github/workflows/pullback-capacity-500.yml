@@ -2,6 +2,11 @@ name: Bullwerk 500 Stock Capacity Test
 
 on:
   workflow_dispatch:
+    inputs:
+      validate_only:
+        description: "Validate stock symbols only (no chart scan)"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -17,5 +22,12 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: python -m pip install yfinance pandas requests lxml pytickersymbols
-      - name: Benchmark 500 stocks without changing detection
-        run: python tests/pullback_capacity_500.py
+      - name: Validate universe or run benchmark
+        env:
+          VALIDATE_ONLY: ${{ inputs.validate_only }}
+        run: |
+          if [ "$VALIDATE_ONLY" = "true" ]; then
+            python tests/pullback_capacity_500.py --validate-universe
+          else
+            python tests/pullback_capacity_500.py
+          fi
