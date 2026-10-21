@@ -35,23 +35,28 @@ def wikipedia_index(page):
     raise RuntimeError("No reliable constituent table on "+page)
 
 def german_index(page):
-    """Map MDAX/SDAX via pytickersymbols index metadata and Yahoo symbols."""
+    """Inspect actual library schema before accepting German index tickers."""
     from pytickersymbols import PyTickerSymbols
     stocks=PyTickerSymbols()
+    members=list(stocks.get_stocks_by_index(page))
+    print(f"INDEX DIAGNOSTIC {page}: members={len(members)}",flush=True)
+    print(f"INDEX SAMPLE {page}: {repr(members[:2])[:2500]}",flush=True)
     out=[]
-    # The library stores index names in stock['indices']; get_stocks_by_index
-    # may not recognize the short index name on some library versions.
-    for stock in stocks.get_all_stocks():
-        indices=[str(x).upper() for x in stock.get("indices",[])]
-        if not any(page.upper() in x for x in indices):continue
-        if EXCLUDE.search(str(stock.get("name",""))):continue
+    for stock in members:
+        if EXCLUDE.search(str(stock.get("name",""))):
+            continue
         for item in stock.get("symbols",[]):
-            ticker=str(item.get("yahoo") or "")
-            if re.fullmatch(r"[A-Za-z0-9]{1,8}\\.DE",ticker):
-                out.append(ticker.upper())
+            if not isinstance(item,dict):
+                continue
+            candidates=[str(v) for v in item.values() if isinstance(v,str)]
+            match=next((v.upper() for v in candidates if re.fullmatch(r"[A-Za-z0-9]{1,8}\\.DE",v)),None)
+            if match:
+                out.append(match)
                 break
     out=list(dict.fromkeys(out))
-    if len(out)<25:raise RuntimeError(f"{page}: only {len(out)} mapped Yahoo tickers; available index keys={stocks.get_all_indices()[:25]}")
+    print(f"INDEX MAPPED {page}: {len(out)} tickers; examples={out[:10]}",flush=True)
+    if len(out)<25:
+        raise RuntimeError(f"{page}: only {len(out)} mapped Yahoo tickers of {len(members)} members")
     return out
 
 def nasdaq_symbols():
@@ -92,6 +97,11 @@ def expanded_universe():
     return symbols
 
 def main():
+    import sys
+    if "--validate-universe" in sys.argv:
+        symbols=expanded_universe()
+        print(f"VALIDATED {len(symbols)} unique tickers; sample={symbols[:20]}",flush=True)
+        return
     start=time.monotonic()
     symbols=expanded_universe()
     print(f"500 STOCK CAPACITY TEST | unique={len(symbols)} | manual only",flush=True)
