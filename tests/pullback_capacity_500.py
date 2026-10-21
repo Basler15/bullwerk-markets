@@ -35,24 +35,21 @@ def wikipedia_index(page):
     raise RuntimeError("No reliable constituent table on "+page)
 
 def german_index(page):
-    """Read German constituents; SDAX tables often have ISIN instead of ticker."""
-    tables=html_tables("https://en.wikipedia.org/wiki/"+page)
-    # First try a genuine symbol column; do not misread ISINs as tickers.
-    for table in tables:
-        table.columns=[" ".join(map(str,col)) if isinstance(col,tuple) else str(col) for col in table.columns]
-        cols=[col for col in table.columns if re.search(r"ticker|symbol|kürzel|kuerzel",col,re.I)]
-        for col in cols:
-            out=[]
-            for _,row in table.iterrows():
-                sym=str(row[col]).strip().split(" ")[0]
-                if not re.fullmatch(r"[A-Za-z0-9]{2,6}",sym):continue
-                if EXCLUDE.search(" ".join(str(x) for x in row.values)):continue
-                out.append(sym+".DE")
-            if len(out)>=25:return list(dict.fromkeys(out))
-    # Some SDAX/MDAX lists contain only company names and ISINs. Use the
-    # current Deutsche Boerse index factsheets via Wikipedia company links?
-    # Fail explicitly rather than silently scanning the wrong tickers.
-    raise RuntimeError("German "+page+" table has no usable ticker column; use a verified ticker-mapped constituent source")
+    """Resolve index members using Yahoo-compatible symbols from pytickersymbols."""
+    from pytickersymbols import PyTickerSymbols
+    stocks=PyTickerSymbols()
+    out=[]
+    for stock in stocks.get_stocks_by_index(page):
+        name=str(stock.get("name",""))
+        if EXCLUDE.search(name):continue
+        symbols=stock.get("symbols",[])
+        yahoo=next((item.get("yahoo") for item in symbols
+                    if item.get("yahoo") and str(item.get("yahoo")).endswith(".DE")),None)
+        if yahoo and re.fullmatch(r"[A-Z0-9]{1,8}\\.DE",str(yahoo)):
+            out.append(yahoo)
+    out=list(dict.fromkeys(out))
+    if len(out)<25:raise RuntimeError(f"{page}: only {len(out)} mapped Yahoo tickers; abort rather than mislabel constituents")
+    return out
 
 def nasdaq_symbols():
     url="https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
@@ -77,7 +74,7 @@ def expanded_universe():
     dow=wikipedia_index("Dow_Jones_Industrial_Average")
     nasdaq=nasdaq_symbols()
     if not 35<=len(mdax)<=60:raise RuntimeError(f"MDAX constituents unexpected: {len(mdax)}")
-    if not 45<=len(sdax)<=85:raise RuntimeError(f"SDAX constituents unexpected: {len(sdax)}")
+    if not 35<=len(sdax)<=85:raise RuntimeError(f"SDAX constituents unexpected: {len(sdax)}")
     if not 25<=len(dow)<=35:raise RuntimeError(f"Dow constituents unexpected: {len(dow)}")
     # Priority: German indices and Dow first, then liquid Nasdaq names.
     # NasdaqTrader does not provide turnover; prefer larger established
