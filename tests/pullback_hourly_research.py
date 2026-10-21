@@ -2,7 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from pullback_capacity_300 import universe
+from pullback_capacity_500 import expanded_universe as universe
 from pullback_volume_watch import scan
 
 def main():
