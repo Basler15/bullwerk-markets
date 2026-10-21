@@ -54,11 +54,13 @@ def german_index(page):
                 continue
             candidates=[str(v) for v in item.values() if isinstance(v,str)]
             match=next((v.upper() for v in candidates if re.fullmatch(r"[A-Za-z0-9]{1,8}\.DE",v)),None)
+            if not match:
+                match=next((v.upper() for v in candidates if re.fullmatch(r"[A-Za-z0-9]{1,8}\.F",v)),None)
             if match:
                 out.append(match)
                 break
     out=list(dict.fromkeys(out))
-    print(f"INDEX MAPPED {page}: {len(out)} tickers; examples={out[:10]}",flush=True)
+    print(f"INDEX MAPPED {page}: {len(out)} tickers; examples={out[:10]} | Frankfurt .F fallback={sum(x.endswith(chr(46)+chr(70)) for x in out)}",flush=True)
     if len(out)<25:
         raise RuntimeError(f"{page}: only {len(out)} mapped Yahoo tickers of {len(members)} members")
     return out
