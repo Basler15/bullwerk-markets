@@ -16,6 +16,6 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: python -m pip install yfinance pandas requests lxml
+        run: python -m pip install yfinance pandas requests lxml pytickersymbols
       - name: Benchmark 500 stocks without changing detection
         run: python tests/pullback_capacity_500.py
