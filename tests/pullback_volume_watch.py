@@ -86,7 +86,9 @@ def main():
             rows,error=f.result();found.extend(rows)
             if error:errors+=1
     found.sort(key=lambda x:(x["category"]!="WATCH",-x["score"],x["symbol"]))
-    print(f"Pattern matches: {len(found)} | WATCH={sum(x[\'category\']==\'WATCH\' for x in found)} | FRUEH-WATCH={sum(x[\'category\']==\'FRUEH-WATCH\' for x in found)} | symbols unavailable: {errors}")
+    watch_count=sum(x["category"]=="WATCH" for x in found)
+    early_count=sum(x["category"]=="FRUEH-WATCH" for x in found)
+    print(f"Pattern matches: {len(found)} | WATCH={watch_count} | FRUEH-WATCH={early_count} | symbols unavailable: {errors}")
     for hit in found[:10]:
         symbol=hit["symbol"]
         print(f"{hit['phase']} {symbol} {hit['tf']} | {hit['time']} | {hit['reds']} red bars | green/red volume {hit['volume_ratio']}x | retrace {hit['retracement']}% | pattern score {hit['score']} | https://www.tradingview.com/chart/?symbol={symbol}")
