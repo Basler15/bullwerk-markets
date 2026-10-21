@@ -35,20 +35,23 @@ def wikipedia_index(page):
     raise RuntimeError("No reliable constituent table on "+page)
 
 def german_index(page):
-    """Resolve index members using Yahoo-compatible symbols from pytickersymbols."""
+    """Map MDAX/SDAX via pytickersymbols index metadata and Yahoo symbols."""
     from pytickersymbols import PyTickerSymbols
     stocks=PyTickerSymbols()
     out=[]
-    for stock in stocks.get_stocks_by_index(page):
-        name=str(stock.get("name",""))
-        if EXCLUDE.search(name):continue
-        symbols=stock.get("symbols",[])
-        yahoo=next((item.get("yahoo") for item in symbols
-                    if item.get("yahoo") and str(item.get("yahoo")).endswith(".DE")),None)
-        if yahoo and re.fullmatch(r"[A-Z0-9]{1,8}\\.DE",str(yahoo)):
-            out.append(yahoo)
+    # The library stores index names in stock['indices']; get_stocks_by_index
+    # may not recognize the short index name on some library versions.
+    for stock in stocks.get_all_stocks():
+        indices=[str(x).upper() for x in stock.get("indices",[])]
+        if not any(page.upper() in x for x in indices):continue
+        if EXCLUDE.search(str(stock.get("name",""))):continue
+        for item in stock.get("symbols",[]):
+            ticker=str(item.get("yahoo") or "")
+            if re.fullmatch(r"[A-Za-z0-9]{1,8}\\.DE",ticker):
+                out.append(ticker.upper())
+                break
     out=list(dict.fromkeys(out))
-    if len(out)<25:raise RuntimeError(f"{page}: only {len(out)} mapped Yahoo tickers; abort rather than mislabel constituents")
+    if len(out)<25:raise RuntimeError(f"{page}: only {len(out)} mapped Yahoo tickers; available index keys={stocks.get_all_indices()[:25]}")
     return out
 
 def nasdaq_symbols():
