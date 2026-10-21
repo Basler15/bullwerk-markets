@@ -73,6 +73,14 @@
   }
   root.BullwerkReport={validate,render};
   const preview = new URLSearchParams(root.location.search).get('vorschau')==='1';
+  // Pioneer 10/11 bleiben nur in der privaten Berichtsvorschau sichtbar.
+  // Die öffentliche Morgenroutine verweist auf die separate Tradingideen-Seite.
+  if (!preview) {
+    ['10','11'].forEach(id => {
+      const section = doc.querySelector('[data-bericht-abschnitt="'+id+'"]');
+      if (section) section.remove();
+    });
+  }
   if (preview) {
     const bar=doc.createElement('div');bar.className='bw-preview-bar';
     const title=doc.createElement('strong');title.textContent='Private Vorschau: Berichtsdatei vom Gerät öffnen';
