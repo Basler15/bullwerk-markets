@@ -18,21 +18,42 @@ def html_tables(url):
     return pd.read_html(StringIO(response.text))
 
 def wikipedia_index(page):
+    """Resolve Dow/Nasdaq100 symbols from Wikipedia tables with flexible headings."""
     tables=html_tables("https://en.wikipedia.org/wiki/"+page)
     for table in tables:
         table.columns=[" ".join(map(str,c)) if isinstance(c,tuple) else str(c) for c in table.columns]
         cols=[c for c in table.columns if re.search(r"ticker|symbol",c,re.I)]
-        if not cols or len(table)<20:continue
+        if not cols or len(table)<20:
+            continue
         col=cols[0]
         out=[]
         for _,row in table.iterrows():
             sym=str(row[col]).strip().split(" ")[0]
-            if not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}",sym):continue
-            desc=" ".join(str(x) for x in row.values)
-            if EXCLUDE.search(desc):continue
+            if not re.fullmatch(r"[A-Za-z0-9.\\-]{1,12}",sym):
+                continue
+            if EXCLUDE.search(" ".join(str(x) for x in row.values)):
+                continue
             out.append(sym.replace(".","-"))
-        if len(out)>=20:return list(dict.fromkeys(out))
+        if len(out)>=20:
+            return list(dict.fromkeys(out))
     raise RuntimeError("No reliable constituent table on "+page)
+
+def dow_symbols():
+    """Prefer structured index constituents from pytickersymbols."""
+    from pytickersymbols import PyTickerSymbols
+    stocks=PyTickerSymbols()
+    out=[]
+    for stock in stocks.get_stocks_by_index("DOW JONES"):
+        if EXCLUDE.search(str(stock.get("name",""))):
+            continue
+        primary=str(stock.get("symbol") or "").upper()
+        if re.fullmatch(r"[A-Z]{1,5}",primary):
+            out.append(primary)
+    out=list(dict.fromkeys(out))
+    print(f"DOW MAPPED: {len(out)} symbols; examples={out[:10]}",flush=True)
+    if len(out)<25:
+        raise RuntimeError(f"Dow index mapping incomplete: {len(out)}")
+    return out
 
 def german_index(page):
     """Inspect actual library schema before accepting German index tickers."""
@@ -85,7 +106,7 @@ def nasdaq_symbols():
 def expanded_universe():
     mdax=german_index("MDAX")
     sdax=german_index("SDAX")
-    dow=wikipedia_index("Dow_Jones_Industrial_Average")
+    dow=dow_symbols()
     nasdaq=nasdaq_symbols()
     if not 35<=len(mdax)<=60:raise RuntimeError(f"MDAX constituents unexpected: {len(mdax)}")
     if not 35<=len(sdax)<=85:raise RuntimeError(f"SDAX constituents unexpected: {len(sdax)}")
