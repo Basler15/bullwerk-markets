@@ -56,14 +56,15 @@ def detect(df,tf):
             rise=float(impulse.Close.iloc[-1]-impulse.Open.iloc[0])
             if rise<=0:continue
             red_vol=float(pull.Volume.mean());green_vol=float(greens.Volume.mean())
-            if red_vol<=0 or green_vol/red_vol<1.5:continue
+            if red_vol<=0 or green_vol/red_vol<1.2:continue
             depth=float(impulse.Close.iloc[-1]-pull.Low.min())/rise
-            if not (0<=depth<=0.5):continue
+            if not (0<=depth<=0.6):continue
             last=end-1
             if not (close.iloc[last]>ema50.iloc[last] and ema20.iloc[last]>ema20.iloc[last-4] and ema50.iloc[last]>ema50.iloc[last-4]):continue
             decreasing=int(sum(pull.Volume.iloc[i]<pull.Volume.iloc[i-1] for i in range(1,reds)))
             score=round(50+min(25,8*(green_vol/red_vol-1))+8*(4-depth*4)+3*decreasing,1)
-            candidates.append({"tf":tf,"time":str(df.index[last]),"reds":reds,"volume_ratio":round(green_vol/red_vol,2),"retracement":round(depth*100,1),"score":score,"phase":"WATCH" if end==len(df) else "RECENT"})
+            category="WATCH" if green_vol/red_vol>=1.5 and depth<=0.5 else "FRUEH-WATCH"
+            candidates.append({"category":category,"tf":tf,"time":str(df.index[last]),"reds":reds,"volume_ratio":round(green_vol/red_vol,2),"retracement":round(depth*100,1),"score":score,"phase":"WATCH" if end==len(df) else "RECENT"})
     return candidates
 
 def scan(symbol):
@@ -84,8 +85,8 @@ def main():
         for f in as_completed(futures):
             rows,error=f.result();found.extend(rows)
             if error:errors+=1
-    found.sort(key=lambda x:(-x["score"],x["symbol"]))
-    print(f"Pattern matches: {len(found)} | symbols unavailable: {errors}")
+    found.sort(key=lambda x:(x["category"]!="WATCH",-x["score"],x["symbol"]))
+    print(f"Pattern matches: {len(found)} | WATCH={sum(x[\'category\']==\'WATCH\' for x in found)} | FRUEH-WATCH={sum(x[\'category\']==\'FRUEH-WATCH\' for x in found)} | symbols unavailable: {errors}")
     for hit in found[:10]:
         symbol=hit["symbol"]
         print(f"{hit['phase']} {symbol} {hit['tf']} | {hit['time']} | {hit['reds']} red bars | green/red volume {hit['volume_ratio']}x | retrace {hit['retracement']}% | pattern score {hit['score']} | https://www.tradingview.com/chart/?symbol={symbol}")
