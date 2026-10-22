@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "scanner": "Bullwerk Markets V1.1",
-  "generated_at": "2026-10-21T00:12:18.238142+00:00",
-  "as_of": "2026-10-19",
+  "generated_at": "2026-10-22T00:09:38.733057+00:00",
+  "as_of": "2026-10-20",
   "market_gate": {
     "allowed": false,
     "farbe": null,
@@ -22,61 +22,61 @@
       "symbol": "PLTR",
       "name": "Palantir",
       "score": 83.3,
-      "as_of": "2026-10-19"
+      "as_of": "2026-10-20"
     },
     {
       "symbol": "MSFT",
       "name": "Microsoft",
-      "score": 75.0,
-      "as_of": "2026-10-19"
+      "score": 73.3,
+      "as_of": "2026-10-20"
     },
     {
       "symbol": "SNOW",
       "name": "Snowflake",
-      "score": 67.2,
-      "as_of": "2026-10-19"
-    },
-    {
-      "symbol": "APH",
-      "name": "Amphenol",
-      "score": 66.7,
-      "as_of": "2026-10-19"
-    },
-    {
-      "symbol": "KEYS",
-      "name": "Keysight Technologies",
-      "score": 63.3,
-      "as_of": "2026-10-19"
+      "score": 68.8,
+      "as_of": "2026-10-20"
     },
     {
       "symbol": "NVDA",
       "name": "NVIDIA",
-      "score": 63.3,
-      "as_of": "2026-10-19"
+      "score": 65.0,
+      "as_of": "2026-10-20"
+    },
+    {
+      "symbol": "KEYS",
+      "name": "Keysight Technologies",
+      "score": 61.7,
+      "as_of": "2026-10-20"
+    },
+    {
+      "symbol": "APH",
+      "name": "Amphenol",
+      "score": 58.3,
+      "as_of": "2026-10-20"
     },
     {
       "symbol": "DELL",
       "name": "Dell Technologies",
-      "score": 58.3,
-      "as_of": "2026-10-19"
-    },
-    {
-      "symbol": "AMD",
-      "name": "Advanced Micro Devices",
-      "score": 48.3,
-      "as_of": "2026-10-19"
+      "score": 53.3,
+      "as_of": "2026-10-20"
     },
     {
       "symbol": "INTC",
       "name": "Intel",
-      "score": 46.7,
-      "as_of": "2026-10-19"
+      "score": 45.0,
+      "as_of": "2026-10-20"
+    },
+    {
+      "symbol": "AMD",
+      "name": "Advanced Micro Devices",
+      "score": 43.3,
+      "as_of": "2026-10-20"
     },
     {
       "symbol": "COHR",
       "name": "Coherent",
-      "score": 41.7,
-      "as_of": "2026-10-19"
+      "score": 40.0,
+      "as_of": "2026-10-20"
     }
   ],
   "selection": [
@@ -85,7 +85,7 @@
       "name": "Palantir",
       "score": 83.3,
       "status": "WATCH",
-      "as_of": "2026-10-19"
+      "as_of": "2026-10-20"
     }
   ],
   "leaders": [
