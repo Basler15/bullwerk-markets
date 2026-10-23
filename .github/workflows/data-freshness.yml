@@ -1,0 +1,31 @@
+name: Bullwerk Datenfrische pruefen
+on:
+  schedule:
+    # Europe/Berlin 06:50 (Sommer-/Winterzeit); Guard verhindert Doppelpruefung.
+    - cron: '50 4,5 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check local schedule
+        id: berlin
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$(TZ=Europe/Berlin date +%H:%M)" = "06:50" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.berlin.outputs.run == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.berlin.outputs.run == 'true'
+        with:
+          python-version: '3.12'
+      - name: Validate dates and report approval
+        if: steps.berlin.outputs.run == 'true'
+        run: python scripts/check_freshness.py
