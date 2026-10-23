@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "scanner": "Bullwerk Markets V1.1",
-  "generated_at": "2026-10-22T00:09:38.733057+00:00",
-  "as_of": "2026-10-20",
+  "generated_at": "2026-10-23T00:06:44.874105+00:00",
+  "as_of": "2026-10-21",
   "market_gate": {
     "allowed": false,
     "farbe": null,
@@ -22,61 +22,61 @@
       "symbol": "PLTR",
       "name": "Palantir",
       "score": 83.3,
-      "as_of": "2026-10-20"
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "MSFT",
       "name": "Microsoft",
-      "score": 73.3,
-      "as_of": "2026-10-20"
+      "score": 75.0,
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "SNOW",
       "name": "Snowflake",
       "score": 68.8,
-      "as_of": "2026-10-20"
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "NVDA",
       "name": "NVIDIA",
-      "score": 65.0,
-      "as_of": "2026-10-20"
+      "score": 68.3,
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "KEYS",
       "name": "Keysight Technologies",
-      "score": 61.7,
-      "as_of": "2026-10-20"
+      "score": 65.0,
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "APH",
       "name": "Amphenol",
       "score": 58.3,
-      "as_of": "2026-10-20"
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "DELL",
       "name": "Dell Technologies",
-      "score": 53.3,
-      "as_of": "2026-10-20"
-    },
-    {
-      "symbol": "INTC",
-      "name": "Intel",
-      "score": 45.0,
-      "as_of": "2026-10-20"
+      "score": 58.3,
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "AMD",
       "name": "Advanced Micro Devices",
-      "score": 43.3,
-      "as_of": "2026-10-20"
+      "score": 50.0,
+      "as_of": "2026-10-21"
+    },
+    {
+      "symbol": "INTC",
+      "name": "Intel",
+      "score": 46.7,
+      "as_of": "2026-10-21"
     },
     {
       "symbol": "COHR",
       "name": "Coherent",
-      "score": 40.0,
-      "as_of": "2026-10-20"
+      "score": 41.7,
+      "as_of": "2026-10-21"
     }
   ],
   "selection": [
@@ -85,7 +85,7 @@
       "name": "Palantir",
       "score": 83.3,
       "status": "WATCH",
-      "as_of": "2026-10-20"
+      "as_of": "2026-10-21"
     }
   ],
   "leaders": [
