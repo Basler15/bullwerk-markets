@@ -115,12 +115,27 @@ def expanded_universe():
     # NasdaqTrader does not provide turnover; prefer larger established
     # Nasdaq constituents using Nasdaq-100 as a proxy, then the remaining
     # exchange directory. Do not claim remaining directory order is liquidity.
-    nasdaq100=[]
-    print("NASDAQ: using NasdaqTrader listing directly; no Wikipedia dependency",flush=True)
-    ordered=list(dict.fromkeys(mdax+sdax+dow+[s for s in nasdaq100 if s in nasdaq]+nasdaq))
+    # Put major liquid Nasdaq stocks ahead of the directory's alphabetical
+    # ordering. This is a priority list, NOT a claim of current index membership.
+    # The NasdaqTrader security-name filter still determines eligibility.
+    priority = """
+    AAPL MSFT NVDA AMZN META GOOGL GOOG AVGO TSLA COST NFLX AMD INTC
+    QCOM AMAT LRCX KLAC MU ADI TXN MRVL ARM ASML CSCO PANW CRWD
+    FTNT DDOG ZS SNPS CDNS ANET APP PLTR ORCL ADBE INTU ADSK TEAM
+    SHOP MDB SNOW NET OKTA HUBS DOCU ZM PYPL ABNB BKNG DASH
+    MELI PDD JD BIDU NTES TCOM CHTR CMCSA TMUS SBUX MAR ROST
+    KDP MNST ODFL PCAR CPRT FAST CTAS PAYX ADP EA TTWO RBLX
+    WDAY VRSK VRSN FICO AXON MSTR COIN HOOD IBKR SOFI
+    DELL HPE SMCI STX WDC TER ON MCHP NXPI MPWR ALAB
+    COHR KEYS SMTC FEIM APH EMBJ
+    """.split()
+    eligible=set(nasdaq)
+    preferred=[symbol for symbol in priority if symbol in eligible]
+    print(f"NASDAQ PRIORITY | eligible={len(preferred)} of {len(priority)} | TEAM={'TEAM' in preferred} | IBM in Dow={'IBM' in dow}",flush=True)
+    ordered=list(dict.fromkeys(mdax+sdax+dow+preferred+nasdaq))
     symbols=ordered[:500]
     if len(symbols)!=500:raise RuntimeError(f"Only {len(symbols)} unique symbols")
-    print(f"UNIVERSE | MDAX={len(mdax)} | SDAX={len(sdax)} | Dow={len(dow)} | Nasdaq directory={len(nasdaq)} | Nasdaq100={len(nasdaq100)}",flush=True)
+    print(f"UNIVERSE | MDAX={len(mdax)} | SDAX={len(sdax)} | Dow={len(dow)} | Nasdaq directory={len(nasdaq)} | Nasdaq priority={len(preferred)}",flush=True)
     print(f"CTS Eventim included={'EVD.DE' in symbols}",flush=True)
     return symbols
 
