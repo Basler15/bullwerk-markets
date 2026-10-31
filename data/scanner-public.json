@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "scanner": "Bullwerk Markets V1.1",
-  "generated_at": "2026-10-30T02:06:16.514772+00:00",
-  "as_of": "2026-10-29",
+  "generated_at": "2026-10-31T01:45:27.999955+00:00",
+  "as_of": "2026-10-30",
   "market_gate": {
     "allowed": false,
     "farbe": null,
@@ -14,80 +14,72 @@
     "errors": 0
   },
   "counts": {
-    "watch": 1,
+    "watch": 0,
     "breakout": 0
   },
   "overview": [
     {
-      "symbol": "PLTR",
-      "name": "Palantir",
-      "score": 83.3,
-      "as_of": "2026-10-29"
-    },
-    {
       "symbol": "MSFT",
       "name": "Microsoft",
-      "score": 72.8,
-      "as_of": "2026-10-29"
+      "score": 71.2,
+      "as_of": "2026-10-30"
     },
     {
-      "symbol": "SNOW",
-      "name": "Snowflake",
-      "score": 65.5,
-      "as_of": "2026-10-29"
+      "symbol": "PLTR",
+      "name": "Palantir",
+      "score": 68.3,
+      "as_of": "2026-10-30"
     },
     {
       "symbol": "AMD",
       "name": "Advanced Micro Devices",
-      "score": 61.7,
-      "as_of": "2026-10-29"
+      "score": 50.0,
+      "as_of": "2026-10-30"
     },
     {
-      "symbol": "DELL",
-      "name": "Dell Technologies",
-      "score": 61.7,
-      "as_of": "2026-10-29"
-    },
-    {
-      "symbol": "NVDA",
-      "name": "NVIDIA",
-      "score": 55.0,
-      "as_of": "2026-10-29"
+      "symbol": "SNOW",
+      "name": "Snowflake",
+      "score": 47.2,
+      "as_of": "2026-10-30"
     },
     {
       "symbol": "APH",
       "name": "Amphenol",
-      "score": 50.0,
-      "as_of": "2026-10-29"
+      "score": 45.0,
+      "as_of": "2026-10-30"
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA",
+      "score": 43.3,
+      "as_of": "2026-10-30"
     },
     {
       "symbol": "KEYS",
       "name": "Keysight Technologies",
-      "score": 48.3,
-      "as_of": "2026-10-29"
+      "score": 40.0,
+      "as_of": "2026-10-30"
     },
     {
-      "symbol": "INTC",
-      "name": "Intel",
-      "score": 34.7,
-      "as_of": "2026-10-29"
+      "symbol": "DELL",
+      "name": "Dell Technologies",
+      "score": 36.7,
+      "as_of": "2026-10-30"
     },
     {
       "symbol": "COHR",
       "name": "Coherent",
       "score": 33.3,
-      "as_of": "2026-10-29"
-    }
-  ],
-  "selection": [
+      "as_of": "2026-10-30"
+    },
     {
-      "symbol": "PLTR",
-      "name": "Palantir",
-      "score": 83.3,
-      "status": "WATCH",
-      "as_of": "2026-10-29"
+      "symbol": "INTC",
+      "name": "Intel",
+      "score": 27.0,
+      "as_of": "2026-10-30"
     }
   ],
+  "selection": [],
   "leaders": [
     "MSFT",
     "NVDA",
