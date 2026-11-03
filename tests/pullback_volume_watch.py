@@ -46,7 +46,7 @@ def detect(df,tf):
     ema50=close.ewm(span=50,adjust=False).mean()
     candidates=[]
     # Evaluate last three completed bars as possible formation endpoints.
-    for end in range(len(df)-3,len(df)):
+    for end in range(len(df)-2,len(df)+1):
         for reds in (2,3,4):
             impulse=df.iloc[end-reds-4:end-reds]
             pull=df.iloc[end-reds:end]
