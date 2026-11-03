@@ -41,9 +41,6 @@ def detect(df,tf):
     if len(df)<55:return []
     # Exclude last potentially incomplete bar for intraday series; conservative.
     if tf!="1D":df=df.iloc[:-1]
-    close=df.Close.astype(float)
-    ema20=close.ewm(span=20,adjust=False).mean()
-    ema50=close.ewm(span=50,adjust=False).mean()
     candidates=[]
     # Evaluate last three completed bars as possible formation endpoints.
     for end in range(len(df)-2,len(df)+1):
@@ -60,7 +57,6 @@ def detect(df,tf):
             depth=float(impulse.Close.iloc[-1]-pull.Low.min())/rise
             if not (0<=depth<=0.6):continue
             last=end-1
-            if not (close.iloc[last]>ema50.iloc[last] and ema20.iloc[last]>ema20.iloc[last-4] and ema50.iloc[last]>ema50.iloc[last-4]):continue
             decreasing=int(sum(pull.Volume.iloc[i]<pull.Volume.iloc[i-1] for i in range(1,reds)))
             score=round(50+min(25,8*(green_vol/red_vol-1))+8*(4-depth*4)+3*decreasing,1)
             category="WATCH" if green_vol/red_vol>=1.5 and depth<=0.5 else "FRUEH-WATCH"
