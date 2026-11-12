@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "scanner": "Bullwerk Markets V1.1",
-  "generated_at": "2026-11-10T04:15:15.048246+00:00",
-  "as_of": "2026-11-09",
+  "generated_at": "2026-11-12T03:15:30.029976+00:00",
+  "as_of": "2026-11-11",
   "market_gate": {
     "allowed": false,
     "farbe": null,
@@ -21,62 +21,62 @@
     {
       "symbol": "MSFT",
       "name": "Microsoft",
-      "score": 72.8,
-      "as_of": "2026-11-09"
-    },
-    {
-      "symbol": "APH",
-      "name": "Amphenol",
-      "score": 50.0,
-      "as_of": "2026-11-09"
+      "score": 62.8,
+      "as_of": "2026-11-11"
     },
     {
       "symbol": "AMD",
       "name": "Advanced Micro Devices",
-      "score": 45.0,
-      "as_of": "2026-11-09"
+      "score": 55.0,
+      "as_of": "2026-11-11"
     },
     {
-      "symbol": "PLTR",
-      "name": "Palantir",
-      "score": 42.8,
-      "as_of": "2026-11-09"
+      "symbol": "APH",
+      "name": "Amphenol",
+      "score": 43.3,
+      "as_of": "2026-11-11"
+    },
+    {
+      "symbol": "KEYS",
+      "name": "Keysight Technologies",
+      "score": 40.0,
+      "as_of": "2026-11-11"
     },
     {
       "symbol": "SNOW",
       "name": "Snowflake",
       "score": 38.8,
-      "as_of": "2026-11-09"
-    },
-    {
-      "symbol": "KEYS",
-      "name": "Keysight Technologies",
-      "score": 36.7,
-      "as_of": "2026-11-09"
+      "as_of": "2026-11-11"
     },
     {
       "symbol": "NVDA",
       "name": "NVIDIA",
-      "score": 36.7,
-      "as_of": "2026-11-09"
+      "score": 38.3,
+      "as_of": "2026-11-11"
+    },
+    {
+      "symbol": "PLTR",
+      "name": "Palantir",
+      "score": 37.8,
+      "as_of": "2026-11-11"
     },
     {
       "symbol": "COHR",
       "name": "Coherent",
-      "score": 35.0,
-      "as_of": "2026-11-09"
+      "score": 36.7,
+      "as_of": "2026-11-11"
     },
     {
       "symbol": "DELL",
       "name": "Dell Technologies",
       "score": 33.3,
-      "as_of": "2026-11-09"
+      "as_of": "2026-11-11"
     },
     {
       "symbol": "INTC",
       "name": "Intel",
-      "score": 28.7,
-      "as_of": "2026-11-09"
+      "score": 27.0,
+      "as_of": "2026-11-11"
     }
   ],
   "selection": [],
