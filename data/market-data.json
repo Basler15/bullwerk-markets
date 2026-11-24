@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-23T15:57:43.246547+00:00",
+  "updated": "2026-11-24T15:52:49.901572+00:00",
   "source": "Financial Modeling Prep",
   "version": "bullwerk-market-data-v6",
   "scoreVersion": "bullwerk-technical-v1",
@@ -7,57 +7,65 @@
     {
       "symbol": "AAPL",
       "name": "Apple Inc.",
-      "price": 349.22501,
-      "change": 6.66501,
-      "changePercentage": 1.94565,
-      "volume": 15833669.0,
-      "dayHigh": 352.6,
-      "dayLow": 345.4422,
+      "price": 350.62,
+      "change": 1.54,
+      "changePercentage": 0.44116,
+      "volume": 10006531.0,
+      "dayHigh": 353.92,
+      "dayLow": 345.88,
       "technical": {
         "breakoutTrigger20": 360.83,
-        "distanceToTriggerPct": -3.2161932211844824,
-        "breakoutStatus": "WATCH",
+        "distanceToTriggerPct": -2.829587340298745,
+        "breakoutStatus": "NEAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 360.83,
-        "distanceTo4WeekHighPct": -3.2161932211844824,
+        "distanceTo4WeekHighPct": -2.829587340298745,
         "high52WeekCalculated": 360.83,
-        "distanceTo52WeekHighPct": -3.2161932211844824,
-        "ma20": 347.477,
-        "ma50": 341.8072,
-        "distanceToMA20Pct": 0.503057756340719,
-        "distanceToMA50Pct": 2.1701737119639297,
+        "distanceTo52WeekHighPct": -2.829587340298745,
+        "ma20": 347.7355,
+        "ma50": 342.1272,
+        "distanceToMA20Pct": 0.8295097854547517,
+        "distanceToMA50Pct": 2.482351593208598,
         "aboveMA20": true,
         "aboveMA50": true,
         "ma20AboveMA50": true,
         "trendStatus": "UPTREND",
         "higherLow": false,
-        "averageVolume20": 49758989.85,
-        "volumeRatio20": 0.31820720331604563,
+        "averageVolume20": 50551245.0,
+        "volumeRatio20": 0.19794826022583617,
         "volumeStatus": "LOW",
         "boxRange10Pct": 5.951961475217284,
-        "recentRange5Pct": 4.865515621329573,
-        "previousRange5Pct": 4.655142409652536,
-        "compressionRatio": 1.0451915737831832,
-        "technicalScore": 11,
+        "recentRange5Pct": 4.657035470988964,
+        "previousRange5Pct": 4.147664954107258,
+        "compressionRatio": 1.1228089834925787,
+        "technicalScore": 13,
         "technicalGrade": "CONSTRUCTIVE",
         "technicalBreakdown": {
           "box": 4,
-          "proximity": 2,
+          "proximity": 3,
           "structure": 1,
           "compression": 0,
           "highProximity": 3,
-          "trigger": 1
+          "trigger": 2
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
         {
+          "date": "2026-11-24",
+          "open": 348.12,
+          "high": 353.92,
+          "low": 345.88,
+          "close": 350.9115,
+          "volume": 9818149.0
+        },
+        {
           "date": "2026-11-23",
-          "open": 347.78,
+          "open": 347.87,
           "high": 352.6,
-          "low": 345.4422,
-          "close": 350.78,
-          "volume": 15043407.0
+          "low": 345.44,
+          "close": 349.08,
+          "volume": 58588703.0
         },
         {
           "date": "2026-11-20",
@@ -2122,51 +2130,43 @@
           "low": 271.7,
           "close": 273.47,
           "volume": 48398000.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 269.81,
-          "high": 275.91,
-          "low": 269.8,
-          "close": 275.25,
-          "volume": 46208318.0
         }
       ]
     },
     {
       "symbol": "MSFT",
       "name": "Microsoft Corporation",
-      "price": 499.46,
-      "change": 14.93999,
-      "changePercentage": 3.08346,
-      "volume": 9038952.0,
-      "dayHigh": 509.15,
-      "dayLow": 498.35999,
+      "price": 495.39001,
+      "change": 2.89001,
+      "changePercentage": 0.58681,
+      "volume": 5541190.0,
+      "dayHigh": 496.79,
+      "dayLow": 488.43,
       "technical": {
         "breakoutTrigger20": 559.15,
-        "distanceToTriggerPct": -10.675131896628809,
+        "distanceToTriggerPct": -11.403020656353391,
         "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 559.15,
-        "distanceTo4WeekHighPct": -10.675131896628809,
+        "distanceTo4WeekHighPct": -11.403020656353391,
         "high52WeekCalculated": 559.15,
-        "distanceTo52WeekHighPct": -10.675131896628809,
-        "ma20": 522.9565,
-        "ma50": 519.8366,
-        "distanceToMA20Pct": -4.493012325116908,
-        "distanceToMA50Pct": -3.919808647563483,
+        "distanceTo52WeekHighPct": -11.403020656353391,
+        "ma20": 520.9515,
+        "ma50": 519.5784,
+        "distanceToMA20Pct": -4.906692849526295,
+        "distanceToMA50Pct": -4.655387906810593,
         "aboveMA20": false,
         "aboveMA50": false,
         "ma20AboveMA50": true,
         "trendStatus": "WEAK",
         "higherLow": false,
-        "averageVolume20": 30007956.55,
-        "volumeRatio20": 0.3012185113284563,
+        "averageVolume20": 30577124.5,
+        "volumeRatio20": 0.18122011440284386,
         "volumeStatus": "LOW",
-        "boxRange10Pct": 13.980417021807373,
-        "recentRange5Pct": 9.754069392761382,
-        "previousRange5Pct": 6.706628780506777,
-        "compressionRatio": 1.454392320194041,
+        "boxRange10Pct": 13.13015820219115,
+        "recentRange5Pct": 9.450554019499831,
+        "previousRange5Pct": 5.910630181775719,
+        "compressionRatio": 1.598908023147647,
         "technicalScore": 1,
         "technicalGrade": "WEAK",
         "technicalBreakdown": {
@@ -2177,16 +2177,24 @@
           "highProximity": 0,
           "trigger": 0
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
         {
+          "date": "2026-11-24",
+          "open": 490.435,
+          "high": 496.79,
+          "low": 488.43,
+          "close": 495.04251,
+          "volume": 5453085.0
+        },
+        {
           "date": "2026-11-23",
-          "open": 506.055,
+          "open": 506.06,
           "high": 509.15,
-          "low": 499.33,
-          "close": 499.585,
-          "volume": 8666092.0
+          "low": 492.02,
+          "close": 492.5,
+          "volume": 30404395.0
         },
         {
           "date": "2026-11-20",
@@ -4251,51 +4259,43 @@
           "low": 499.12,
           "close": 511.14,
           "volume": 26574900.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 504.8,
-          "high": 509.6,
-          "low": 502.35,
-          "close": 508.68,
-          "volume": 17980020.0
         }
       ]
     },
     {
       "symbol": "NVDA",
       "name": "NVIDIA Corporation",
-      "price": 168.28,
-      "change": 42.75,
-      "changePercentage": 34.0556,
-      "volume": 411256614.18589,
-      "dayHigh": 171.49001,
-      "dayLow": 156.93,
+      "price": 151.7651,
+      "change": -13.2849,
+      "changePercentage": -8.04902,
+      "volume": 145572252.49191,
+      "dayHigh": 159.92,
+      "dayLow": 151.28,
       "technical": {
         "breakoutTrigger20": 219.99,
-        "distanceToTriggerPct": -23.505613891540523,
+        "distanceToTriggerPct": -31.012727851265975,
         "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 219.99,
-        "distanceTo4WeekHighPct": -23.505613891540523,
+        "distanceTo4WeekHighPct": -31.012727851265975,
         "high52WeekCalculated": 243.37,
-        "distanceTo52WeekHighPct": -30.854254838312034,
-        "ma20": 181.457,
-        "ma50": 207.0004,
-        "distanceToMA20Pct": -7.261775517064651,
-        "distanceToMA50Pct": -18.70547110053894,
+        "distanceTo52WeekHighPct": -37.640177507498876,
+        "ma20": 178.9095,
+        "ma50": 206.0822,
+        "distanceToMA20Pct": -15.172140104354447,
+        "distanceToMA50Pct": -26.357007058348568,
         "aboveMA20": false,
         "aboveMA50": false,
         "ma20AboveMA50": false,
         "trendStatus": "WEAK",
         "higherLow": false,
-        "averageVolume20": 287643572.7,
-        "volumeRatio20": 1.4297437982903,
-        "volumeStatus": "ELEVATED",
-        "boxRange10Pct": 44.51405622489959,
-        "recentRange5Pct": 31.084337349397583,
-        "previousRange5Pct": 20.91397849462364,
-        "compressionRatio": 1.4862947935701685,
+        "averageVolume20": 322231772.15,
+        "volumeRatio20": 0.45176256680283416,
+        "volumeStatus": "LOW",
+        "boxRange10Pct": 42.602409638554214,
+        "recentRange5Pct": 37.75100401606426,
+        "previousRange5Pct": 19.314516129032246,
+        "compressionRatio": 1.954540500205416,
         "technicalScore": 0,
         "technicalGrade": "WEAK",
         "technicalBreakdown": {
@@ -4306,16 +4306,24 @@
           "highProximity": 0,
           "trigger": 0
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
         {
+          "date": "2026-11-24",
+          "open": 159.06,
+          "high": 159.92,
+          "low": 151.31,
+          "close": 152.1658,
+          "volume": 142950519.0
+        },
+        {
           "date": "2026-11-23",
-          "open": 167.035,
-          "high": 171.49001,
+          "open": 167.04,
+          "high": 171.5,
           "low": 156.93,
-          "close": 168.6,
-          "volume": 401716282.0
+          "close": 165.05,
+          "volume": 782593289.0
         },
         {
           "date": "2026-11-20",
@@ -6380,51 +6388,43 @@
           "low": 191.13,
           "close": 193.8,
           "volume": 154935300.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 195.16,
-          "high": 195.42,
-          "low": 191.3,
-          "close": 193.16,
-          "volume": 176483327.0
         }
       ]
     },
     {
       "symbol": "AMD",
       "name": "Advanced Micro Devices, Inc.",
-      "price": 457.6508,
-      "change": 33.2608,
-      "changePercentage": 7.83732,
-      "volume": 22095670.10057,
-      "dayHigh": 477.38,
-      "dayLow": 432.03,
+      "price": 402.47,
+      "change": -50.99,
+      "changePercentage": -11.24465,
+      "volume": 16170730.0,
+      "dayHigh": 428.8677,
+      "dayLow": 400.42,
       "technical": {
         "breakoutTrigger20": 594.0,
-        "distanceToTriggerPct": -22.95441077441077,
+        "distanceToTriggerPct": -32.244107744107744,
         "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 594.0,
-        "distanceTo4WeekHighPct": -22.95441077441077,
+        "distanceTo4WeekHighPct": -32.244107744107744,
         "high52WeekCalculated": 658.52,
-        "distanceTo52WeekHighPct": -30.503128226933118,
-        "ma20": 509.08099999999996,
-        "ma50": 553.0976,
-        "distanceToMA20Pct": -10.102557353348473,
-        "distanceToMA50Pct": -17.25677348807878,
+        "distanceTo52WeekHighPct": -38.882645933304985,
+        "ma20": 505.18999999999994,
+        "ma50": 552.2986,
+        "distanceToMA20Pct": -20.332944040855907,
+        "distanceToMA50Pct": -27.128187542028883,
         "aboveMA20": false,
         "aboveMA50": false,
         "ma20AboveMA50": false,
         "trendStatus": "WEAK",
         "higherLow": false,
-        "averageVolume20": 42333344.05,
-        "volumeRatio20": 0.5219448308754622,
+        "averageVolume20": 44193534.35,
+        "volumeRatio20": 0.36590714541933894,
         "volumeStatus": "LOW",
         "boxRange10Pct": 41.84735886904193,
         "recentRange5Pct": 32.53653644092081,
-        "previousRange5Pct": 26.866149804574874,
-        "compressionRatio": 1.211060634947415,
+        "previousRange5Pct": 20.0,
+        "compressionRatio": 1.6268268220460407,
         "technicalScore": 0,
         "technicalGrade": "WEAK",
         "technicalBreakdown": {
@@ -6435,16 +6435,24 @@
           "highProximity": 0,
           "trigger": 0
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
         {
+          "date": "2026-11-24",
+          "open": 425.125,
+          "high": 428.8677,
+          "low": 400.52,
+          "close": 401.8,
+          "volume": 15866720.0
+        },
+        {
           "date": "2026-11-23",
-          "open": 476.33,
-          "high": 477.38,
-          "low": 432.1001,
-          "close": 457.84,
-          "volume": 21393962.0
+          "open": 476.92,
+          "high": 477.75,
+          "low": 432.01,
+          "close": 453.46,
+          "volume": 54000570.0
         },
         {
           "date": "2026-11-20",
@@ -6452,7 +6460,7 @@
           "high": 474.79,
           "low": 418.76,
           "close": 424.39,
-          "volume": 70280864.0
+          "volume": 70280900.0
         },
         {
           "date": "2026-11-19",
@@ -8509,71 +8517,71 @@
           "low": 250.0,
           "close": 258.89,
           "volume": 108942000.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 241.66,
-          "high": 248.46,
-          "low": 234.64,
-          "close": 237.52,
-          "volume": 61336800.0
         }
       ]
     },
     {
       "symbol": "AMZN",
       "name": "Amazon.com, Inc.",
-      "price": 257.06,
-      "change": 10.24,
-      "changePercentage": 4.14877,
-      "volume": 19317360.53065,
-      "dayHigh": 262.48,
-      "dayLow": 251.25,
+      "price": 253.41,
+      "change": -1.98,
+      "changePercentage": -0.77528,
+      "volume": 8629951.0,
+      "dayHigh": 255.55,
+      "dayLow": 250.53,
       "technical": {
         "breakoutTrigger20": 275.34,
-        "distanceToTriggerPct": -6.639064429432695,
-        "breakoutStatus": "WATCH",
+        "distanceToTriggerPct": -7.96469819132708,
+        "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 275.34,
-        "distanceTo4WeekHighPct": -6.639064429432695,
+        "distanceTo4WeekHighPct": -7.96469819132708,
         "high52WeekCalculated": 287.2,
-        "distanceTo52WeekHighPct": -10.494428969359326,
-        "ma20": 257.42150000000004,
-        "ma50": 255.032,
-        "distanceToMA20Pct": -0.14043116056741134,
-        "distanceToMA50Pct": 0.795194328554838,
+        "distanceTo52WeekHighPct": -11.76532033426183,
+        "ma20": 257.7365,
+        "ma50": 255.06900000000002,
+        "distanceToMA20Pct": -1.678652422144311,
+        "distanceToMA50Pct": -0.6504122413935165,
         "aboveMA20": false,
-        "aboveMA50": true,
+        "aboveMA50": false,
         "ma20AboveMA50": true,
-        "trendStatus": "NEUTRAL",
+        "trendStatus": "WEAK",
         "higherLow": false,
-        "averageVolume20": 52977287.95,
-        "volumeRatio20": 0.36463475723562405,
+        "averageVolume20": 54006336.75,
+        "volumeRatio20": 0.1597951558897392,
         "volumeStatus": "LOW",
-        "boxRange10Pct": 12.241653418123995,
+        "boxRange10Pct": 12.050059108882639,
         "recentRange5Pct": 11.69540581305287,
-        "previousRange5Pct": 4.331021939297468,
-        "compressionRatio": 2.700380182084687,
-        "technicalScore": 5,
+        "previousRange5Pct": 7.086644849618201,
+        "compressionRatio": 1.650344565197587,
+        "technicalScore": 2,
         "technicalGrade": "WEAK",
         "technicalBreakdown": {
           "box": 2,
-          "proximity": 2,
+          "proximity": 0,
           "structure": 0,
           "compression": 0,
           "highProximity": 0,
-          "trigger": 1
+          "trigger": 0
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
+        {
+          "date": "2026-11-24",
+          "open": 252.54,
+          "high": 255.55,
+          "low": 250.53,
+          "close": 253.25999,
+          "volume": 8500235.0
+        },
         {
           "date": "2026-11-23",
           "open": 260.26,
           "high": 262.48,
           "low": 251.25,
-          "close": 256.685,
-          "volume": 18700717.0
+          "close": 255.39,
+          "volume": 53277376.0
         },
         {
           "date": "2026-11-20",
@@ -10638,51 +10646,43 @@
           "low": 243.75,
           "close": 244.2,
           "volume": 31190100.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 248.41,
-          "high": 249.75,
-          "low": 247.23,
-          "close": 249.1,
-          "volume": 23564100.0
         }
       ]
     },
     {
       "symbol": "META",
       "name": "Meta Platforms, Inc.",
-      "price": 593.4,
-      "change": 32.55999,
-      "changePercentage": 5.80558,
-      "volume": 5954667.86368,
-      "dayHigh": 595.4299,
-      "dayLow": 579.78,
+      "price": 590.95,
+      "change": -6.65,
+      "changePercentage": -1.11278,
+      "volume": 2918923.0,
+      "dayHigh": 600.25,
+      "dayLow": 588.28,
       "technical": {
         "breakoutTrigger20": 648.45,
-        "distanceToTriggerPct": -8.489474901688654,
+        "distanceToTriggerPct": -8.867298943634816,
         "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 648.45,
-        "distanceTo4WeekHighPct": -8.489474901688654,
+        "distanceTo4WeekHighPct": -8.867298943634816,
         "high52WeekCalculated": 779.82,
-        "distanceTo52WeekHighPct": -23.90551665769024,
-        "ma20": 618.5645000000001,
-        "ma50": 676.6536,
-        "distanceToMA20Pct": -4.068209539991397,
-        "distanceToMA50Pct": -12.303725273906775,
+        "distanceTo52WeekHighPct": -24.219691723731117,
+        "ma20": 616.9165,
+        "ma50": 675.2936,
+        "distanceToMA20Pct": -4.209078538181421,
+        "distanceToMA50Pct": -12.489915497496185,
         "aboveMA20": false,
         "aboveMA50": false,
         "ma20AboveMA50": false,
         "trendStatus": "WEAK",
         "higherLow": false,
-        "averageVolume20": 21668521.05,
-        "volumeRatio20": 0.27480730456590163,
+        "averageVolume20": 21078183.55,
+        "volumeRatio20": 0.13848076581532567,
         "volumeStatus": "LOW",
         "boxRange10Pct": 16.06823226175988,
-        "recentRange5Pct": 14.681033865540218,
+        "recentRange5Pct": 12.776544712536694,
         "previousRange5Pct": 4.77121437342469,
-        "compressionRatio": 3.077001517121613,
+        "compressionRatio": 2.6778391647420206,
         "technicalScore": 0,
         "technicalGrade": "WEAK",
         "technicalBreakdown": {
@@ -10693,16 +10693,24 @@
           "highProximity": 0,
           "trigger": 0
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
         {
+          "date": "2026-11-24",
+          "open": 589.5,
+          "high": 600.25,
+          "low": 588.28,
+          "close": 591.46,
+          "volume": 2852505.0
+        },
+        {
           "date": "2026-11-23",
-          "open": 591.78,
-          "high": 595.4299,
+          "open": 591.72,
+          "high": 602.46,
           "low": 579.78,
-          "close": 591.93,
-          "volume": 5648241.0
+          "close": 597.6,
+          "volume": 19106850.0
         },
         {
           "date": "2026-11-20",
@@ -12767,51 +12775,43 @@
           "low": 607.77,
           "close": 609.01,
           "volume": 24493300.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 628.0,
-          "high": 629.56,
-          "low": 619.39,
-          "close": 627.08,
-          "volume": 13302200.0
         }
       ]
     },
     {
       "symbol": "GOOGL",
       "name": "Alphabet Inc.",
-      "price": 282.245,
-      "change": 16.955,
-      "changePercentage": 6.39112,
-      "volume": 16045393.27538,
-      "dayHigh": 284.6,
-      "dayLow": 275.36,
+      "price": 278.58,
+      "change": -3.52,
+      "changePercentage": -1.24778,
+      "volume": 8851253.0,
+      "dayHigh": 281.395,
+      "dayLow": 276.7,
       "technical": {
         "breakoutTrigger20": 326.4,
-        "distanceToTriggerPct": -13.527879901960782,
+        "distanceToTriggerPct": -14.650735294117645,
         "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 326.4,
-        "distanceTo4WeekHighPct": -13.527879901960782,
+        "distanceTo4WeekHighPct": -14.650735294117645,
         "high52WeekCalculated": 408.61,
-        "distanceTo52WeekHighPct": -30.92557695602164,
-        "ma20": 289.4495,
-        "ma50": 322.30060000000003,
-        "distanceToMA20Pct": -2.489035220306135,
-        "distanceToMA50Pct": -12.428025265854304,
+        "distanceTo52WeekHighPct": -31.822520251584653,
+        "ma20": 287.7145,
+        "ma50": 320.9548,
+        "distanceToMA20Pct": -3.1748486781166707,
+        "distanceToMA50Pct": -13.20273135033344,
         "aboveMA20": false,
         "aboveMA50": false,
         "ma20AboveMA50": false,
         "trendStatus": "WEAK",
         "higherLow": false,
-        "averageVolume20": 45284053.4,
-        "volumeRatio20": 0.3543276732241465,
+        "averageVolume20": 46303239.1,
+        "volumeRatio20": 0.19115839781498137,
         "volumeStatus": "LOW",
         "boxRange10Pct": 15.422753765801225,
         "recentRange5Pct": 11.812126258421003,
-        "previousRange5Pct": 6.752310277233276,
-        "compressionRatio": 1.7493458939894806,
+        "previousRange5Pct": 7.778484591461708,
+        "compressionRatio": 1.5185639464256246,
         "technicalScore": 1,
         "technicalGrade": "WEAK",
         "technicalBreakdown": {
@@ -12822,16 +12822,24 @@
           "highProximity": 0,
           "trigger": 0
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
         {
+          "date": "2026-11-24",
+          "open": 281.395,
+          "high": 281.395,
+          "low": 276.7,
+          "close": 278.42,
+          "volume": 8761934.0
+        },
+        {
           "date": "2026-11-23",
-          "open": 284.265,
-          "high": 284.6,
+          "open": 284.27,
+          "high": 285.14,
           "low": 275.36,
-          "close": 281.6287,
-          "volume": 15506921.0
+          "close": 282.1,
+          "volume": 44375551.0
         },
         {
           "date": "2026-11-20",
@@ -14896,51 +14904,43 @@
           "low": 283.69,
           "close": 286.71,
           "volume": 24829923.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 287.75,
-          "high": 291.92,
-          "low": 287.32,
-          "close": 291.31,
-          "volume": 19842136.0
         }
       ]
     },
     {
       "symbol": "PLTR",
       "name": "Palantir Technologies Inc.",
-      "price": 158.3802,
-      "change": 14.8902,
-      "changePercentage": 10.37717,
-      "volume": 11240839.88325,
-      "dayHigh": 161.1587,
-      "dayLow": 154.57,
+      "price": 159.89999,
+      "change": 0.53999,
+      "changePercentage": 0.33885,
+      "volume": 6171524.0,
+      "dayHigh": 162.97,
+      "dayLow": 157.8,
       "technical": {
         "breakoutTrigger20": 201.83,
-        "distanceToTriggerPct": -21.527919536243378,
+        "distanceToTriggerPct": -20.774914532031907,
         "breakoutStatus": "FAR",
         "triggerTouchedToday": false,
         "high4WeekCalculated": 201.83,
-        "distanceTo4WeekHighPct": -21.527919536243378,
+        "distanceTo4WeekHighPct": -20.774914532031907,
         "high52WeekCalculated": 212.94,
-        "distanceTo52WeekHighPct": -25.622147083685544,
-        "ma20": 171.825,
-        "ma50": 183.2602,
-        "distanceToMA20Pct": -7.824705368834561,
-        "distanceToMA50Pct": -13.576324810297047,
+        "distanceTo52WeekHighPct": -24.90842960458345,
+        "ma20": 169.851,
+        "ma50": 182.9812,
+        "distanceToMA20Pct": -5.858670246274677,
+        "distanceToMA50Pct": -12.613978922424817,
         "aboveMA20": false,
         "aboveMA50": false,
         "ma20AboveMA50": false,
         "trendStatus": "WEAK",
         "higherLow": false,
-        "averageVolume20": 24971645.3,
-        "volumeRatio20": 0.4501441434157324,
+        "averageVolume20": 25756231.7,
+        "volumeRatio20": 0.23961284678146455,
         "volumeStatus": "LOW",
         "boxRange10Pct": 23.285071689626086,
         "recentRange5Pct": 17.465560865898226,
-        "previousRange5Pct": 8.95031055900621,
-        "compressionRatio": 1.95139160264373,
+        "previousRange5Pct": 10.543231661204935,
+        "compressionRatio": 1.656566167484,
         "technicalScore": 0,
         "technicalGrade": "WEAK",
         "technicalBreakdown": {
@@ -14951,16 +14951,24 @@
           "highProximity": 0,
           "trigger": 0
         },
-        "historyDays": 276
+        "historyDays": 277
       },
       "history": [
         {
+          "date": "2026-11-24",
+          "open": 157.8,
+          "high": 162.97,
+          "low": 157.8,
+          "close": 160.24,
+          "volume": 5999608.0
+        },
+        {
           "date": "2026-11-23",
-          "open": 157.28,
-          "high": 161.1587,
+          "open": 157.32,
+          "high": 161.19,
           "low": 154.57,
-          "close": 157.96001,
-          "volume": 10831280.0
+          "close": 159.36,
+          "volume": 32072087.0
         },
         {
           "date": "2026-11-20",
@@ -14968,7 +14976,7 @@
           "high": 152.51,
           "low": 142.28,
           "close": 143.49,
-          "volume": 36629759.0
+          "volume": 36629800.0
         },
         {
           "date": "2026-11-19",
@@ -17025,14 +17033,6 @@
           "low": 180.4,
           "close": 184.17,
           "volume": 55347134.0
-        },
-        {
-          "date": "2025-11-11",
-          "open": 190.34,
-          "high": 192.93,
-          "low": 187.13,
-          "close": 190.96,
-          "volume": 49819723.0
         }
       ]
     }
